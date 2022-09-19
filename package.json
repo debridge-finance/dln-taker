@@ -1,0 +1,34 @@
+{
+  "name": "@debridge-finance/market-maker-executor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/cjs/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint:fix": "prettier src/** tests/** -w",
+    "lint": "prettier src/** tests/** --check"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/debridge-finance/market-maker-executor.git"
+  },
+  "author": "Anton Kuzmenko",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/debridge-finance/market-maker-executor/issues"
+  },
+  "homepage": "https://github.com/debridge-finance/market-maker-executor#readme",
+  "devDependencies": {
+    "assert": "^2.0.0",
+    "eslint": "^8.23.1",
+    "eslint-config-prettier": "^8.5.0",
+    "mocha": "^10.0.0",
+    "prettier": "^2.7.1",
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.4.0"
+  },
+  "dependencies": {
+    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client"
+  }
+}
