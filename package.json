@@ -4,9 +4,10 @@
   "description": "",
   "main": "dist/cjs/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "lint:fix": "prettier src/** tests/** -w",
-    "lint": "prettier src/** tests/** --check"
+    "test": "mocha -r ts-node/register -b -t 100000 ./tests/proto.test.ts",
+    "lint:fix": "prettier src/**/*.ts tests/**/*.ts -w",
+    "lint": "prettier src/**/*.ts tests/**/*.ts --check",
+    "loop": "node --experimental-fetch -r ts-node/register ./src/index.ts"
   },
   "repository": {
     "type": "git",
@@ -19,6 +20,10 @@
   },
   "homepage": "https://github.com/debridge-finance/market-maker-executor#readme",
   "devDependencies": {
+    "@types/amqplib": "^0.8.2",
+    "@types/chai": "^4.3.3",
+    "@types/mocha": "^9.1.1",
+    "@types/node": "^18.7.18",
     "assert": "^2.0.0",
     "eslint": "^8.23.1",
     "eslint-config-prettier": "^8.5.0",
@@ -29,6 +34,11 @@
     "tslib": "^2.4.0"
   },
   "dependencies": {
-    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client"
+    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client",
+    "@debridge-finance/solana-utils": "github:debridge-finance/solana-utils",
+    "@protobuf-ts/plugin": "^2.8.1",
+    "amqplib": "^0.10.3",
+    "bs58": "^5.0.0",
+    "node-fetch": "^3.2.10"
   }
 }
