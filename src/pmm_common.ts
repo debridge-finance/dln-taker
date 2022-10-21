@@ -15,512 +15,491 @@ import { MessageType } from "@protobuf-ts/runtime";
  * @generated from protobuf message pmm_common.U256
  */
 export interface U256 {
-	/**
-	 * @generated from protobuf field: fixed64 limb1 = 1;
-	 */
-	limb1: bigint;
-	/**
-	 * @generated from protobuf field: fixed64 limb2 = 2;
-	 */
-	limb2: bigint;
-	/**
-	 * @generated from protobuf field: fixed64 limb3 = 3;
-	 */
-	limb3: bigint;
-	/**
-	 * @generated from protobuf field: fixed64 limb4 = 4;
-	 */
-	limb4: bigint;
+    /**
+     * @generated from protobuf field: fixed64 limb1 = 1;
+     */
+    limb1: bigint;
+    /**
+     * @generated from protobuf field: fixed64 limb2 = 2;
+     */
+    limb2: bigint;
+    /**
+     * @generated from protobuf field: fixed64 limb3 = 3;
+     */
+    limb3: bigint;
+    /**
+     * @generated from protobuf field: fixed64 limb4 = 4;
+     */
+    limb4: bigint;
 }
 /**
  * @generated from protobuf message pmm_common.Address
  */
 export interface Address {
-	/**
-	 * @generated from protobuf field: bytes address = 1;
-	 */
-	address: Uint8Array;
+    /**
+     * @generated from protobuf field: bytes address = 1;
+     */
+    address: Uint8Array;
 }
 /**
  * @generated from protobuf message pmm_common.TokenMetadata
  */
 export interface TokenMetadata {
-	/**
-	 * @generated from protobuf field: pmm_common.U256 chain_id = 1;
-	 */
-	chainId?: U256;
-	/**
-	 * @generated from protobuf field: bytes token_address = 2;
-	 */
-	tokenAddress: Uint8Array;
-	/**
-	 * @generated from protobuf field: string name = 3;
-	 */
-	name: string;
-	/**
-	 * @generated from protobuf field: string symbol = 4;
-	 */
-	symbol: string;
-	/**
-	 * @generated from protobuf field: uint32 decimals = 5;
-	 */
-	decimals: number;
+    /**
+     * @generated from protobuf field: pmm_common.U256 chain_id = 1;
+     */
+    chainId?: U256;
+    /**
+     * @generated from protobuf field: bytes token_address = 2;
+     */
+    tokenAddress: Uint8Array;
+    /**
+     * @generated from protobuf field: string name = 3;
+     */
+    name: string;
+    /**
+     * @generated from protobuf field: string symbol = 4;
+     */
+    symbol: string;
+    /**
+     * @generated from protobuf field: uint32 decimals = 5;
+     */
+    decimals: number;
 }
 /**
  * @generated from protobuf message pmm_common.TransactionMetadata
  */
 export interface TransactionMetadata {
-	/**
-	 * @generated from protobuf field: bytes transaction_hash = 1;
-	 */
-	transactionHash: Uint8Array;
-	/**
-	 * @generated from protobuf field: bytes block_hash = 2;
-	 */
-	blockHash: Uint8Array;
-	/**
-	 * @generated from protobuf field: uint64 block_time = 3;
-	 */
-	blockTime: bigint;
-	/**
-	 * @generated from protobuf field: uint64 block_number = 4;
-	 */
-	blockNumber: bigint;
-	/**
-	 * @generated from protobuf field: uint64 tracked_by_reader_timestamp = 5;
-	 */
-	trackedByReaderTimestamp: bigint;
-	/**
-	 * / For each type of event
-	 * / For created order - maker
-	 * / for fulfill order - taker
-	 *
-	 * @generated from protobuf field: pmm_common.Address initiator = 6;
-	 */
-	initiator?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.U256 chain_id = 1;
+     */
+    chainId?: U256;
+    /**
+     * @generated from protobuf field: bytes transaction_hash = 2;
+     */
+    transactionHash: Uint8Array;
+    /**
+     * @generated from protobuf field: bytes block_hash = 3;
+     */
+    blockHash: Uint8Array;
+    /**
+     * @generated from protobuf field: uint64 block_time = 4;
+     */
+    blockTime: bigint;
+    /**
+     * @generated from protobuf field: uint64 block_number = 5;
+     */
+    blockNumber: bigint;
+    /**
+     * @generated from protobuf field: uint64 tracked_by_reader_timestamp = 6;
+     */
+    trackedByReaderTimestamp: bigint;
+    /**
+     * / For each type of event
+     * / For created order - maker
+     * / for fulfill order - taker
+     *
+     * @generated from protobuf field: pmm_common.Address initiator = 7;
+     */
+    initiator?: Address;
 }
 /**
  * @generated from protobuf message pmm_common.Offer
  */
 export interface Offer {
-	/**
-	 * @generated from protobuf field: pmm_common.U256 chain_id = 1;
-	 */
-	chainId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.Address token_address = 2;
-	 */
-	tokenAddress?: Address;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 amount = 3;
-	 */
-	amount?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.U256 chain_id = 1;
+     */
+    chainId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.Address token_address = 2;
+     */
+    tokenAddress?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.U256 amount = 3;
+     */
+    amount?: U256;
 }
 /**
  * @generated from protobuf message pmm_common.ExternalCallParams
  */
 export interface ExternalCallParams {
-	/**
-	 * @generated from protobuf field: pmm_common.U256 execution_fee = 1;
-	 */
-	executionFee?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.Address fallback_address_dst = 2;
-	 */
-	fallbackAddressDst?: Address;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 hash_of_external_call = 3;
-	 */
-	hashOfExternalCall?: U256;
-	/**
-	 * @generated from protobuf field: bytes external_call_data = 4;
-	 */
-	externalCallData: Uint8Array;
+    /**
+     * @generated from protobuf field: pmm_common.U256 execution_fee = 1;
+     */
+    executionFee?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.Address fallback_address_dst = 2;
+     */
+    fallbackAddressDst?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.U256 hash_of_external_call = 3;
+     */
+    hashOfExternalCall?: U256;
+    /**
+     * @generated from protobuf field: bytes external_call_data = 4;
+     */
+    externalCallData: Uint8Array;
 }
 /**
  * @generated from protobuf message pmm_common.Order
  */
 export interface Order {
-	/**
-	 * / Unique nonce number for each maker
-	 * / Together with the maker, it forms the uniqueness for the order,
-	 * / which is important for calculating the order id
-	 *
-	 * @generated from protobuf field: uint64 maker_order_nonce = 1;
-	 */
-	makerOrderNonce: bigint;
-	/**
-	 * / Offer given on source chain
-	 *
-	 * @generated from protobuf field: pmm_common.Offer give = 2;
-	 */
-	give?: Offer;
-	/**
-	 * / Offer to take in destination chain
-	 *
-	 * @generated from protobuf field: pmm_common.Offer take = 3;
-	 */
-	take?: Offer;
-	/**
-	 * / Order maker address
-	 * / Address in source chain
-	 *
-	 * @generated from protobuf field: pmm_common.Address maker_src = 4;
-	 */
-	makerSrc?: Address;
-	/**
-	 * / Address of receiver_dst of tokens in target chain
-	 * / or
-	 * / Address of external call executor if `external_call` presented
-	 *
-	 * @generated from protobuf field: pmm_common.Address receiver_dst = 5;
-	 */
-	receiverDst?: Address;
-	/**
-	 * / Optional external call for automatically execution in target chain after execution of order
-	 *
-	 * @generated from protobuf field: pmm_common.ExternalCallParams external_call = 6;
-	 */
-	externalCall?: ExternalCallParams;
-	/**
-	 * / Address in source chain
-	 * / Can `patch_order_give`
-	 *
-	 * @generated from protobuf field: pmm_common.Address give_patch_authority_src = 7;
-	 */
-	givePatchAuthoritySrc?: Address;
-	/**
-	 * / Address in destination chain
-	 * / Can `send_order_cancel`, `process_fallback` and `patch_order_take`
-	 *
-	 * @generated from protobuf field: pmm_common.Address order_authority_address_dst = 8;
-	 */
-	orderAuthorityAddressDst?: Address;
-	/**
-	 * / Optional address in destination chain
-	 * / If the field is `Some`, then only this address can call `full_fill_order` with this
-	 * / order
-	 *
-	 * @generated from protobuf field: pmm_common.Address allowed_taker_dst = 9;
-	 */
-	allowedTakerDst?: Address;
-	/**
-	 * / Optional address in source chain
-	 * / If the field is `Some`, then only this address can receive cancel
-	 *
-	 * @generated from protobuf field: pmm_common.Address allowed_cancel_beneficiary_src = 10;
-	 */
-	allowedCancelBeneficiarySrc?: Address;
+    /**
+     * / Unique nonce number for each maker
+     * / Together with the maker, it forms the uniqueness for the order,
+     * / which is important for calculating the order id
+     *
+     * @generated from protobuf field: uint64 maker_order_nonce = 1;
+     */
+    makerOrderNonce: bigint;
+    /**
+     * / Offer given on source chain
+     *
+     * @generated from protobuf field: pmm_common.Offer give = 2;
+     */
+    give?: Offer;
+    /**
+     * / Offer to take in destination chain
+     *
+     * @generated from protobuf field: pmm_common.Offer take = 3;
+     */
+    take?: Offer;
+    /**
+     * / Order maker address
+     * / Address in source chain
+     *
+     * @generated from protobuf field: pmm_common.Address maker_src = 4;
+     */
+    makerSrc?: Address;
+    /**
+     * / Address of receiver_dst of tokens in target chain
+     * / or
+     * / Address of external call executor if `external_call` presented
+     *
+     * @generated from protobuf field: pmm_common.Address receiver_dst = 5;
+     */
+    receiverDst?: Address;
+    /**
+     * / Optional external call for automatically execution in target chain after execution of order
+     *
+     * @generated from protobuf field: pmm_common.ExternalCallParams external_call = 6;
+     */
+    externalCall?: ExternalCallParams;
+    /**
+     * / Address in source chain
+     * / Can `patch_order_give`
+     *
+     * @generated from protobuf field: pmm_common.Address give_patch_authority_src = 7;
+     */
+    givePatchAuthoritySrc?: Address;
+    /**
+     * / Address in destination chain
+     * / Can `send_order_cancel`, `process_fallback` and `patch_order_take`
+     *
+     * @generated from protobuf field: pmm_common.Address order_authority_address_dst = 8;
+     */
+    orderAuthorityAddressDst?: Address;
+    /**
+     * / Optional address in destination chain
+     * / If the field is `Some`, then only this address can call `full_fill_order` with this
+     * / order
+     *
+     * @generated from protobuf field: pmm_common.Address allowed_taker_dst = 9;
+     */
+    allowedTakerDst?: Address;
+    /**
+     * / Optional address in source chain
+     * / If the field is `Some`, then only this address can receive cancel
+     *
+     * @generated from protobuf field: pmm_common.Address allowed_cancel_beneficiary_src = 10;
+     */
+    allowedCancelBeneficiarySrc?: Address;
 }
 /**
  * @generated from protobuf message pmm_common.AffiliateFee
  */
 export interface AffiliateFee {
-	/**
-	 * @generated from protobuf field: pmm_common.Address beneficiary_src = 1;
-	 */
-	beneficiarySrc?: Address;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 amount = 2;
-	 */
-	amount?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.Address beneficiary_src = 1;
+     */
+    beneficiarySrc?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.U256 amount = 2;
+     */
+    amount?: U256;
 }
 /**
  * @generated from protobuf message pmm_common.EventCreatedSrc
  */
 export interface EventCreatedSrc {
-	/**
-	 * @generated from protobuf field: pmm_common.TransactionMetadata transaction_metadata = 1;
-	 */
-	transactionMetadata?: TransactionMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.TokenMetadata give_token_metadata = 2;
-	 */
-	giveTokenMetadata?: TokenMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.TokenMetadata take_token_metadata = 3;
-	 */
-	takeTokenMetadata?: TokenMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.Order created_order = 4;
-	 */
-	createdOrder?: Order;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 order_id = 5;
-	 */
-	orderId?: U256;
-	/**
-	 * @generated from protobuf field: uint32 referral_code = 6;
-	 */
-	referralCode: number;
-	/**
-	 * @generated from protobuf field: pmm_common.AffiliateFee affiliate_fee = 7;
-	 */
-	affiliateFee?: AffiliateFee;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 fix_fee = 8;
-	 */
-	fixFee?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 percent_fee = 9;
-	 */
-	percentFee?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.TokenMetadata give_token_metadata = 2;
+     */
+    giveTokenMetadata?: TokenMetadata;
+    /**
+     * @generated from protobuf field: pmm_common.TokenMetadata take_token_metadata = 3;
+     */
+    takeTokenMetadata?: TokenMetadata;
+    /**
+     * @generated from protobuf field: pmm_common.Order created_order = 4;
+     */
+    createdOrder?: Order;
+    /**
+     * @generated from protobuf field: pmm_common.U256 order_id = 5;
+     */
+    orderId?: U256;
+    /**
+     * @generated from protobuf field: uint32 referral_code = 6;
+     */
+    referralCode: number;
+    /**
+     * @generated from protobuf field: pmm_common.AffiliateFee affiliate_fee = 7;
+     */
+    affiliateFee?: AffiliateFee;
+    /**
+     * @generated from protobuf field: pmm_common.U256 fix_fee = 8;
+     */
+    fixFee?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.U256 percent_fee = 9;
+     */
+    percentFee?: U256;
 }
 /**
  * @generated from protobuf message pmm_common.EventFulfilledDst
  */
 export interface EventFulfilledDst {
-	/**
-	 * @generated from protobuf field: pmm_common.TransactionMetadata transaction_metadata = 1;
-	 */
-	transactionMetadata?: TransactionMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.TokenMetadata give_token_metadata = 2;
-	 */
-	giveTokenMetadata?: TokenMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.TokenMetadata take_token_metadata = 3;
-	 */
-	takeTokenMetadata?: TokenMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.Order fulfilled_order = 4;
-	 */
-	fulfilledOrder?: Order;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 order_id = 5;
-	 */
-	orderId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.Address taker_dst = 6;
-	 */
-	takerDst?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.TokenMetadata give_token_metadata = 2;
+     */
+    giveTokenMetadata?: TokenMetadata;
+    /**
+     * @generated from protobuf field: pmm_common.TokenMetadata take_token_metadata = 3;
+     */
+    takeTokenMetadata?: TokenMetadata;
+    /**
+     * @generated from protobuf field: pmm_common.Order fulfilled_order = 4;
+     */
+    fulfilledOrder?: Order;
+    /**
+     * @generated from protobuf field: pmm_common.U256 order_id = 5;
+     */
+    orderId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.Address taker_dst = 6;
+     */
+    takerDst?: Address;
 }
 /**
  * @generated from protobuf message pmm_common.EventSentUnlockDst
  */
 export interface EventSentUnlockDst {
-	/**
-	 * @generated from protobuf field: pmm_common.TransactionMetadata transaction_metadata = 1;
-	 */
-	transactionMetadata?: TransactionMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 order_id = 2;
-	 */
-	orderId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 submission_id = 3;
-	 */
-	submissionId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.Address unlock_beneficiary_src = 4;
-	 */
-	unlockBeneficiarySrc?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.U256 order_id = 2;
+     */
+    orderId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.U256 submission_id = 3;
+     */
+    submissionId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.Address unlock_beneficiary_src = 4;
+     */
+    unlockBeneficiarySrc?: Address;
 }
 /**
  * @generated from protobuf message pmm_common.EventOrderCancelledDst
  */
 export interface EventOrderCancelledDst {
-	/**
-	 * @generated from protobuf field: pmm_common.TransactionMetadata transaction_metadata = 1;
-	 */
-	transactionMetadata?: TransactionMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.TokenMetadata give_token_metadata = 2;
-	 */
-	giveTokenMetadata?: TokenMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.TokenMetadata take_token_metadata = 3;
-	 */
-	takeTokenMetadata?: TokenMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.Order canceled_order = 4;
-	 */
-	canceledOrder?: Order;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 order_id = 5;
-	 */
-	orderId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.TokenMetadata give_token_metadata = 2;
+     */
+    giveTokenMetadata?: TokenMetadata;
+    /**
+     * @generated from protobuf field: pmm_common.TokenMetadata take_token_metadata = 3;
+     */
+    takeTokenMetadata?: TokenMetadata;
+    /**
+     * @generated from protobuf field: pmm_common.Order canceled_order = 4;
+     */
+    canceledOrder?: Order;
+    /**
+     * @generated from protobuf field: pmm_common.U256 order_id = 5;
+     */
+    orderId?: U256;
 }
 /**
  * @generated from protobuf message pmm_common.EventSentOrderCancelDst
  */
 export interface EventSentOrderCancelDst {
-	/**
-	 * @generated from protobuf field: pmm_common.TransactionMetadata transaction_metadata = 1;
-	 */
-	transactionMetadata?: TransactionMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 order_id = 2;
-	 */
-	orderId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 submission_id = 3;
-	 */
-	submissionId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.Address cancel_beneficiary_src = 4;
-	 */
-	cancelBeneficiarySrc?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.U256 order_id = 2;
+     */
+    orderId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.U256 submission_id = 3;
+     */
+    submissionId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.Address cancel_beneficiary_src = 4;
+     */
+    cancelBeneficiarySrc?: Address;
 }
 /**
  * @generated from protobuf message pmm_common.EventClaimedUnlockSrc
  */
 export interface EventClaimedUnlockSrc {
-	/**
-	 * @generated from protobuf field: pmm_common.TransactionMetadata transaction_metadata = 1;
-	 */
-	transactionMetadata?: TransactionMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 order_id = 2;
-	 */
-	orderId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 submission_id = 3;
-	 */
-	submissionId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.Address unlock_beneficiary_src = 4;
-	 */
-	unlockBeneficiarySrc?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.U256 order_id = 2;
+     */
+    orderId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.U256 submission_id = 3;
+     */
+    submissionId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.Address unlock_beneficiary_src = 4;
+     */
+    unlockBeneficiarySrc?: Address;
 }
 /**
  * @generated from protobuf message pmm_common.EventClaimedOrderCancelSrc
  */
 export interface EventClaimedOrderCancelSrc {
-	/**
-	 * @generated from protobuf field: pmm_common.TransactionMetadata transaction_metadata = 1;
-	 */
-	transactionMetadata?: TransactionMetadata;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 order_id = 2;
-	 */
-	orderId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.U256 submission_id = 3;
-	 */
-	submissionId?: U256;
-	/**
-	 * @generated from protobuf field: pmm_common.Address cancel_beneficiary_src = 4;
-	 */
-	cancelBeneficiarySrc?: Address;
+    /**
+     * @generated from protobuf field: pmm_common.U256 order_id = 2;
+     */
+    orderId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.U256 submission_id = 3;
+     */
+    submissionId?: U256;
+    /**
+     * @generated from protobuf field: pmm_common.Address cancel_beneficiary_src = 4;
+     */
+    cancelBeneficiarySrc?: Address;
 }
 /**
  * @generated from protobuf message pmm_common.PmmEvent
  */
 export interface PmmEvent {
-	/**
-	 * @generated from protobuf oneof: event
-	 */
-	event:
-		| {
-				oneofKind: "createdSrc";
-				/**
-				 * @generated from protobuf field: pmm_common.EventCreatedSrc created_src = 1;
-				 */
-				createdSrc: EventCreatedSrc;
-		  }
-		| {
-				oneofKind: "fulfilledDst";
-				/**
-				 * @generated from protobuf field: pmm_common.EventFulfilledDst fulfilled_dst = 2;
-				 */
-				fulfilledDst: EventFulfilledDst;
-		  }
-		| {
-				oneofKind: "sendUnlockDst";
-				/**
-				 * @generated from protobuf field: pmm_common.EventSentUnlockDst send_unlock_dst = 3;
-				 */
-				sendUnlockDst: EventSentUnlockDst;
-		  }
-		| {
-				oneofKind: "orderCancelledDst";
-				/**
-				 * @generated from protobuf field: pmm_common.EventOrderCancelledDst order_cancelled_dst = 4;
-				 */
-				orderCancelledDst: EventOrderCancelledDst;
-		  }
-		| {
-				oneofKind: "sendOrderCancelDst";
-				/**
-				 * @generated from protobuf field: pmm_common.EventSentOrderCancelDst send_order_cancel_dst = 5;
-				 */
-				sendOrderCancelDst: EventSentOrderCancelDst;
-		  }
-		| {
-				oneofKind: "claimedUnlockSrc";
-				/**
-				 * @generated from protobuf field: pmm_common.EventClaimedUnlockSrc claimed_unlock_src = 6;
-				 */
-				claimedUnlockSrc: EventClaimedUnlockSrc;
-		  }
-		| {
-				oneofKind: "claimedOrderCancelSrc";
-				/**
-				 * @generated from protobuf field: pmm_common.EventClaimedOrderCancelSrc claimed_order_cancel_src = 7;
-				 */
-				claimedOrderCancelSrc: EventClaimedOrderCancelSrc;
-		  }
-		| {
-				oneofKind: undefined;
-		  };
+    /**
+     * @generated from protobuf field: pmm_common.TransactionMetadata transaction_metadata = 1;
+     */
+    transactionMetadata?: TransactionMetadata;
+    /**
+     * @generated from protobuf oneof: event
+     */
+    event: {
+        oneofKind: "createdSrc";
+        /**
+         * @generated from protobuf field: pmm_common.EventCreatedSrc created_src = 2;
+         */
+        createdSrc: EventCreatedSrc;
+    } | {
+        oneofKind: "fulfilledDst";
+        /**
+         * @generated from protobuf field: pmm_common.EventFulfilledDst fulfilled_dst = 3;
+         */
+        fulfilledDst: EventFulfilledDst;
+    } | {
+        oneofKind: "sendUnlockDst";
+        /**
+         * @generated from protobuf field: pmm_common.EventSentUnlockDst send_unlock_dst = 4;
+         */
+        sendUnlockDst: EventSentUnlockDst;
+    } | {
+        oneofKind: "orderCancelledDst";
+        /**
+         * @generated from protobuf field: pmm_common.EventOrderCancelledDst order_cancelled_dst = 5;
+         */
+        orderCancelledDst: EventOrderCancelledDst;
+    } | {
+        oneofKind: "sendOrderCancelDst";
+        /**
+         * @generated from protobuf field: pmm_common.EventSentOrderCancelDst send_order_cancel_dst = 6;
+         */
+        sendOrderCancelDst: EventSentOrderCancelDst;
+    } | {
+        oneofKind: "claimedUnlockSrc";
+        /**
+         * @generated from protobuf field: pmm_common.EventClaimedUnlockSrc claimed_unlock_src = 7;
+         */
+        claimedUnlockSrc: EventClaimedUnlockSrc;
+    } | {
+        oneofKind: "claimedOrderCancelSrc";
+        /**
+         * @generated from protobuf field: pmm_common.EventClaimedOrderCancelSrc claimed_order_cancel_src = 8;
+         */
+        claimedOrderCancelSrc: EventClaimedOrderCancelSrc;
+    } | {
+        oneofKind: undefined;
+    };
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class U256$Type extends MessageType<U256> {
-	constructor() {
-		super("pmm_common.U256", [
-			{ no: 1, name: "limb1", kind: "scalar", T: 6 /*ScalarType.FIXED64*/, L: 0 /*LongType.BIGINT*/ },
-			{ no: 2, name: "limb2", kind: "scalar", T: 6 /*ScalarType.FIXED64*/, L: 0 /*LongType.BIGINT*/ },
-			{ no: 3, name: "limb3", kind: "scalar", T: 6 /*ScalarType.FIXED64*/, L: 0 /*LongType.BIGINT*/ },
-			{ no: 4, name: "limb4", kind: "scalar", T: 6 /*ScalarType.FIXED64*/, L: 0 /*LongType.BIGINT*/ },
-		]);
-	}
-	create(value?: PartialMessage<U256>): U256 {
-		const message = { limb1: 0n, limb2: 0n, limb3: 0n, limb4: 0n };
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<U256>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: U256): U256 {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* fixed64 limb1 */ 1:
-					message.limb1 = reader.fixed64().toBigInt();
-					break;
-				case /* fixed64 limb2 */ 2:
-					message.limb2 = reader.fixed64().toBigInt();
-					break;
-				case /* fixed64 limb3 */ 3:
-					message.limb3 = reader.fixed64().toBigInt();
-					break;
-				case /* fixed64 limb4 */ 4:
-					message.limb4 = reader.fixed64().toBigInt();
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: U256, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* fixed64 limb1 = 1; */
-		if (message.limb1 !== 0n) writer.tag(1, WireType.Bit64).fixed64(message.limb1);
-		/* fixed64 limb2 = 2; */
-		if (message.limb2 !== 0n) writer.tag(2, WireType.Bit64).fixed64(message.limb2);
-		/* fixed64 limb3 = 3; */
-		if (message.limb3 !== 0n) writer.tag(3, WireType.Bit64).fixed64(message.limb3);
-		/* fixed64 limb4 = 4; */
-		if (message.limb4 !== 0n) writer.tag(4, WireType.Bit64).fixed64(message.limb4);
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.U256", [
+            { no: 1, name: "limb1", kind: "scalar", T: 6 /*ScalarType.FIXED64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 2, name: "limb2", kind: "scalar", T: 6 /*ScalarType.FIXED64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 3, name: "limb3", kind: "scalar", T: 6 /*ScalarType.FIXED64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 4, name: "limb4", kind: "scalar", T: 6 /*ScalarType.FIXED64*/, L: 0 /*LongType.BIGINT*/ }
+        ]);
+    }
+    create(value?: PartialMessage<U256>): U256 {
+        const message = { limb1: 0n, limb2: 0n, limb3: 0n, limb4: 0n };
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<U256>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: U256): U256 {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* fixed64 limb1 */ 1:
+                    message.limb1 = reader.fixed64().toBigInt();
+                    break;
+                case /* fixed64 limb2 */ 2:
+                    message.limb2 = reader.fixed64().toBigInt();
+                    break;
+                case /* fixed64 limb3 */ 3:
+                    message.limb3 = reader.fixed64().toBigInt();
+                    break;
+                case /* fixed64 limb4 */ 4:
+                    message.limb4 = reader.fixed64().toBigInt();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: U256, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* fixed64 limb1 = 1; */
+        if (message.limb1 !== 0n)
+            writer.tag(1, WireType.Bit64).fixed64(message.limb1);
+        /* fixed64 limb2 = 2; */
+        if (message.limb2 !== 0n)
+            writer.tag(2, WireType.Bit64).fixed64(message.limb2);
+        /* fixed64 limb3 = 3; */
+        if (message.limb3 !== 0n)
+            writer.tag(3, WireType.Bit64).fixed64(message.limb3);
+        /* fixed64 limb4 = 4; */
+        if (message.limb4 !== 0n)
+            writer.tag(4, WireType.Bit64).fixed64(message.limb4);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.U256
@@ -528,40 +507,46 @@ class U256$Type extends MessageType<U256> {
 export const U256 = new U256$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Address$Type extends MessageType<Address> {
-	constructor() {
-		super("pmm_common.Address", [{ no: 1, name: "address", kind: "scalar", T: 12 /*ScalarType.BYTES*/ }]);
-	}
-	create(value?: PartialMessage<Address>): Address {
-		const message = { address: new Uint8Array(0) };
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<Address>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Address): Address {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* bytes address */ 1:
-					message.address = reader.bytes();
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: Address, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* bytes address = 1; */
-		if (message.address.length) writer.tag(1, WireType.LengthDelimited).bytes(message.address);
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.Address", [
+            { no: 1, name: "address", kind: "scalar", T: 12 /*ScalarType.BYTES*/ }
+        ]);
+    }
+    create(value?: PartialMessage<Address>): Address {
+        const message = { address: new Uint8Array(0) };
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<Address>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Address): Address {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* bytes address */ 1:
+                    message.address = reader.bytes();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Address, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* bytes address = 1; */
+        if (message.address.length)
+            writer.tag(1, WireType.LengthDelimited).bytes(message.address);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.Address
@@ -569,66 +554,74 @@ class Address$Type extends MessageType<Address> {
 export const Address = new Address$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class TokenMetadata$Type extends MessageType<TokenMetadata> {
-	constructor() {
-		super("pmm_common.TokenMetadata", [
-			{ no: 1, name: "chain_id", kind: "message", T: () => U256 },
-			{ no: 2, name: "token_address", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
-			{ no: 3, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-			{ no: 4, name: "symbol", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-			{ no: 5, name: "decimals", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
-		]);
-	}
-	create(value?: PartialMessage<TokenMetadata>): TokenMetadata {
-		const message = { tokenAddress: new Uint8Array(0), name: "", symbol: "", decimals: 0 };
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<TokenMetadata>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: TokenMetadata): TokenMetadata {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.U256 chain_id */ 1:
-					message.chainId = U256.internalBinaryRead(reader, reader.uint32(), options, message.chainId);
-					break;
-				case /* bytes token_address */ 2:
-					message.tokenAddress = reader.bytes();
-					break;
-				case /* string name */ 3:
-					message.name = reader.string();
-					break;
-				case /* string symbol */ 4:
-					message.symbol = reader.string();
-					break;
-				case /* uint32 decimals */ 5:
-					message.decimals = reader.uint32();
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: TokenMetadata, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.U256 chain_id = 1; */
-		if (message.chainId) U256.internalBinaryWrite(message.chainId, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-		/* bytes token_address = 2; */
-		if (message.tokenAddress.length) writer.tag(2, WireType.LengthDelimited).bytes(message.tokenAddress);
-		/* string name = 3; */
-		if (message.name !== "") writer.tag(3, WireType.LengthDelimited).string(message.name);
-		/* string symbol = 4; */
-		if (message.symbol !== "") writer.tag(4, WireType.LengthDelimited).string(message.symbol);
-		/* uint32 decimals = 5; */
-		if (message.decimals !== 0) writer.tag(5, WireType.Varint).uint32(message.decimals);
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.TokenMetadata", [
+            { no: 1, name: "chain_id", kind: "message", T: () => U256 },
+            { no: 2, name: "token_address", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
+            { no: 3, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 4, name: "symbol", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 5, name: "decimals", kind: "scalar", T: 13 /*ScalarType.UINT32*/ }
+        ]);
+    }
+    create(value?: PartialMessage<TokenMetadata>): TokenMetadata {
+        const message = { tokenAddress: new Uint8Array(0), name: "", symbol: "", decimals: 0 };
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<TokenMetadata>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: TokenMetadata): TokenMetadata {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.U256 chain_id */ 1:
+                    message.chainId = U256.internalBinaryRead(reader, reader.uint32(), options, message.chainId);
+                    break;
+                case /* bytes token_address */ 2:
+                    message.tokenAddress = reader.bytes();
+                    break;
+                case /* string name */ 3:
+                    message.name = reader.string();
+                    break;
+                case /* string symbol */ 4:
+                    message.symbol = reader.string();
+                    break;
+                case /* uint32 decimals */ 5:
+                    message.decimals = reader.uint32();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: TokenMetadata, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.U256 chain_id = 1; */
+        if (message.chainId)
+            U256.internalBinaryWrite(message.chainId, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* bytes token_address = 2; */
+        if (message.tokenAddress.length)
+            writer.tag(2, WireType.LengthDelimited).bytes(message.tokenAddress);
+        /* string name = 3; */
+        if (message.name !== "")
+            writer.tag(3, WireType.LengthDelimited).string(message.name);
+        /* string symbol = 4; */
+        if (message.symbol !== "")
+            writer.tag(4, WireType.LengthDelimited).string(message.symbol);
+        /* uint32 decimals = 5; */
+        if (message.decimals !== 0)
+            writer.tag(5, WireType.Varint).uint32(message.decimals);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.TokenMetadata
@@ -636,84 +629,88 @@ class TokenMetadata$Type extends MessageType<TokenMetadata> {
 export const TokenMetadata = new TokenMetadata$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class TransactionMetadata$Type extends MessageType<TransactionMetadata> {
-	constructor() {
-		super("pmm_common.TransactionMetadata", [
-			{ no: 1, name: "transaction_hash", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
-			{ no: 2, name: "block_hash", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
-			{ no: 3, name: "block_time", kind: "scalar", T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
-			{ no: 4, name: "block_number", kind: "scalar", T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
-			{ no: 5, name: "tracked_by_reader_timestamp", kind: "scalar", T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
-			{ no: 6, name: "initiator", kind: "message", T: () => Address },
-		]);
-	}
-	create(value?: PartialMessage<TransactionMetadata>): TransactionMetadata {
-		const message = {
-			transactionHash: new Uint8Array(0),
-			blockHash: new Uint8Array(0),
-			blockTime: 0n,
-			blockNumber: 0n,
-			trackedByReaderTimestamp: 0n,
-		};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<TransactionMetadata>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(
-		reader: IBinaryReader,
-		length: number,
-		options: BinaryReadOptions,
-		target?: TransactionMetadata,
-	): TransactionMetadata {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* bytes transaction_hash */ 1:
-					message.transactionHash = reader.bytes();
-					break;
-				case /* bytes block_hash */ 2:
-					message.blockHash = reader.bytes();
-					break;
-				case /* uint64 block_time */ 3:
-					message.blockTime = reader.uint64().toBigInt();
-					break;
-				case /* uint64 block_number */ 4:
-					message.blockNumber = reader.uint64().toBigInt();
-					break;
-				case /* uint64 tracked_by_reader_timestamp */ 5:
-					message.trackedByReaderTimestamp = reader.uint64().toBigInt();
-					break;
-				case /* pmm_common.Address initiator */ 6:
-					message.initiator = Address.internalBinaryRead(reader, reader.uint32(), options, message.initiator);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: TransactionMetadata, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* bytes transaction_hash = 1; */
-		if (message.transactionHash.length) writer.tag(1, WireType.LengthDelimited).bytes(message.transactionHash);
-		/* bytes block_hash = 2; */
-		if (message.blockHash.length) writer.tag(2, WireType.LengthDelimited).bytes(message.blockHash);
-		/* uint64 block_time = 3; */
-		if (message.blockTime !== 0n) writer.tag(3, WireType.Varint).uint64(message.blockTime);
-		/* uint64 block_number = 4; */
-		if (message.blockNumber !== 0n) writer.tag(4, WireType.Varint).uint64(message.blockNumber);
-		/* uint64 tracked_by_reader_timestamp = 5; */
-		if (message.trackedByReaderTimestamp !== 0n) writer.tag(5, WireType.Varint).uint64(message.trackedByReaderTimestamp);
-		/* pmm_common.Address initiator = 6; */
-		if (message.initiator)
-			Address.internalBinaryWrite(message.initiator, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.TransactionMetadata", [
+            { no: 1, name: "chain_id", kind: "message", T: () => U256 },
+            { no: 2, name: "transaction_hash", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
+            { no: 3, name: "block_hash", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
+            { no: 4, name: "block_time", kind: "scalar", T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 5, name: "block_number", kind: "scalar", T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 6, name: "tracked_by_reader_timestamp", kind: "scalar", T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 7, name: "initiator", kind: "message", T: () => Address }
+        ]);
+    }
+    create(value?: PartialMessage<TransactionMetadata>): TransactionMetadata {
+        const message = { transactionHash: new Uint8Array(0), blockHash: new Uint8Array(0), blockTime: 0n, blockNumber: 0n, trackedByReaderTimestamp: 0n };
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<TransactionMetadata>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: TransactionMetadata): TransactionMetadata {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.U256 chain_id */ 1:
+                    message.chainId = U256.internalBinaryRead(reader, reader.uint32(), options, message.chainId);
+                    break;
+                case /* bytes transaction_hash */ 2:
+                    message.transactionHash = reader.bytes();
+                    break;
+                case /* bytes block_hash */ 3:
+                    message.blockHash = reader.bytes();
+                    break;
+                case /* uint64 block_time */ 4:
+                    message.blockTime = reader.uint64().toBigInt();
+                    break;
+                case /* uint64 block_number */ 5:
+                    message.blockNumber = reader.uint64().toBigInt();
+                    break;
+                case /* uint64 tracked_by_reader_timestamp */ 6:
+                    message.trackedByReaderTimestamp = reader.uint64().toBigInt();
+                    break;
+                case /* pmm_common.Address initiator */ 7:
+                    message.initiator = Address.internalBinaryRead(reader, reader.uint32(), options, message.initiator);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: TransactionMetadata, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.U256 chain_id = 1; */
+        if (message.chainId)
+            U256.internalBinaryWrite(message.chainId, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* bytes transaction_hash = 2; */
+        if (message.transactionHash.length)
+            writer.tag(2, WireType.LengthDelimited).bytes(message.transactionHash);
+        /* bytes block_hash = 3; */
+        if (message.blockHash.length)
+            writer.tag(3, WireType.LengthDelimited).bytes(message.blockHash);
+        /* uint64 block_time = 4; */
+        if (message.blockTime !== 0n)
+            writer.tag(4, WireType.Varint).uint64(message.blockTime);
+        /* uint64 block_number = 5; */
+        if (message.blockNumber !== 0n)
+            writer.tag(5, WireType.Varint).uint64(message.blockNumber);
+        /* uint64 tracked_by_reader_timestamp = 6; */
+        if (message.trackedByReaderTimestamp !== 0n)
+            writer.tag(6, WireType.Varint).uint64(message.trackedByReaderTimestamp);
+        /* pmm_common.Address initiator = 7; */
+        if (message.initiator)
+            Address.internalBinaryWrite(message.initiator, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.TransactionMetadata
@@ -721,55 +718,60 @@ class TransactionMetadata$Type extends MessageType<TransactionMetadata> {
 export const TransactionMetadata = new TransactionMetadata$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Offer$Type extends MessageType<Offer> {
-	constructor() {
-		super("pmm_common.Offer", [
-			{ no: 1, name: "chain_id", kind: "message", T: () => U256 },
-			{ no: 2, name: "token_address", kind: "message", T: () => Address },
-			{ no: 3, name: "amount", kind: "message", T: () => U256 },
-		]);
-	}
-	create(value?: PartialMessage<Offer>): Offer {
-		const message = {};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<Offer>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Offer): Offer {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.U256 chain_id */ 1:
-					message.chainId = U256.internalBinaryRead(reader, reader.uint32(), options, message.chainId);
-					break;
-				case /* pmm_common.Address token_address */ 2:
-					message.tokenAddress = Address.internalBinaryRead(reader, reader.uint32(), options, message.tokenAddress);
-					break;
-				case /* pmm_common.U256 amount */ 3:
-					message.amount = U256.internalBinaryRead(reader, reader.uint32(), options, message.amount);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: Offer, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.U256 chain_id = 1; */
-		if (message.chainId) U256.internalBinaryWrite(message.chainId, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address token_address = 2; */
-		if (message.tokenAddress)
-			Address.internalBinaryWrite(message.tokenAddress, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 amount = 3; */
-		if (message.amount) U256.internalBinaryWrite(message.amount, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.Offer", [
+            { no: 1, name: "chain_id", kind: "message", T: () => U256 },
+            { no: 2, name: "token_address", kind: "message", T: () => Address },
+            { no: 3, name: "amount", kind: "message", T: () => U256 }
+        ]);
+    }
+    create(value?: PartialMessage<Offer>): Offer {
+        const message = {};
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<Offer>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Offer): Offer {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.U256 chain_id */ 1:
+                    message.chainId = U256.internalBinaryRead(reader, reader.uint32(), options, message.chainId);
+                    break;
+                case /* pmm_common.Address token_address */ 2:
+                    message.tokenAddress = Address.internalBinaryRead(reader, reader.uint32(), options, message.tokenAddress);
+                    break;
+                case /* pmm_common.U256 amount */ 3:
+                    message.amount = U256.internalBinaryRead(reader, reader.uint32(), options, message.amount);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Offer, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.U256 chain_id = 1; */
+        if (message.chainId)
+            U256.internalBinaryWrite(message.chainId, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address token_address = 2; */
+        if (message.tokenAddress)
+            Address.internalBinaryWrite(message.tokenAddress, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 amount = 3; */
+        if (message.amount)
+            U256.internalBinaryWrite(message.amount, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.Offer
@@ -777,63 +779,67 @@ class Offer$Type extends MessageType<Offer> {
 export const Offer = new Offer$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class ExternalCallParams$Type extends MessageType<ExternalCallParams> {
-	constructor() {
-		super("pmm_common.ExternalCallParams", [
-			{ no: 1, name: "execution_fee", kind: "message", T: () => U256 },
-			{ no: 2, name: "fallback_address_dst", kind: "message", T: () => Address },
-			{ no: 3, name: "hash_of_external_call", kind: "message", T: () => U256 },
-			{ no: 4, name: "external_call_data", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
-		]);
-	}
-	create(value?: PartialMessage<ExternalCallParams>): ExternalCallParams {
-		const message = { externalCallData: new Uint8Array(0) };
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<ExternalCallParams>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ExternalCallParams): ExternalCallParams {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.U256 execution_fee */ 1:
-					message.executionFee = U256.internalBinaryRead(reader, reader.uint32(), options, message.executionFee);
-					break;
-				case /* pmm_common.Address fallback_address_dst */ 2:
-					message.fallbackAddressDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.fallbackAddressDst);
-					break;
-				case /* pmm_common.U256 hash_of_external_call */ 3:
-					message.hashOfExternalCall = U256.internalBinaryRead(reader, reader.uint32(), options, message.hashOfExternalCall);
-					break;
-				case /* bytes external_call_data */ 4:
-					message.externalCallData = reader.bytes();
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: ExternalCallParams, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.U256 execution_fee = 1; */
-		if (message.executionFee)
-			U256.internalBinaryWrite(message.executionFee, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address fallback_address_dst = 2; */
-		if (message.fallbackAddressDst)
-			Address.internalBinaryWrite(message.fallbackAddressDst, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 hash_of_external_call = 3; */
-		if (message.hashOfExternalCall)
-			U256.internalBinaryWrite(message.hashOfExternalCall, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* bytes external_call_data = 4; */
-		if (message.externalCallData.length) writer.tag(4, WireType.LengthDelimited).bytes(message.externalCallData);
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.ExternalCallParams", [
+            { no: 1, name: "execution_fee", kind: "message", T: () => U256 },
+            { no: 2, name: "fallback_address_dst", kind: "message", T: () => Address },
+            { no: 3, name: "hash_of_external_call", kind: "message", T: () => U256 },
+            { no: 4, name: "external_call_data", kind: "scalar", T: 12 /*ScalarType.BYTES*/ }
+        ]);
+    }
+    create(value?: PartialMessage<ExternalCallParams>): ExternalCallParams {
+        const message = { externalCallData: new Uint8Array(0) };
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<ExternalCallParams>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ExternalCallParams): ExternalCallParams {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.U256 execution_fee */ 1:
+                    message.executionFee = U256.internalBinaryRead(reader, reader.uint32(), options, message.executionFee);
+                    break;
+                case /* pmm_common.Address fallback_address_dst */ 2:
+                    message.fallbackAddressDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.fallbackAddressDst);
+                    break;
+                case /* pmm_common.U256 hash_of_external_call */ 3:
+                    message.hashOfExternalCall = U256.internalBinaryRead(reader, reader.uint32(), options, message.hashOfExternalCall);
+                    break;
+                case /* bytes external_call_data */ 4:
+                    message.externalCallData = reader.bytes();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ExternalCallParams, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.U256 execution_fee = 1; */
+        if (message.executionFee)
+            U256.internalBinaryWrite(message.executionFee, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address fallback_address_dst = 2; */
+        if (message.fallbackAddressDst)
+            Address.internalBinaryWrite(message.fallbackAddressDst, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 hash_of_external_call = 3; */
+        if (message.hashOfExternalCall)
+            U256.internalBinaryWrite(message.hashOfExternalCall, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* bytes external_call_data = 4; */
+        if (message.externalCallData.length)
+            writer.tag(4, WireType.LengthDelimited).bytes(message.externalCallData);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.ExternalCallParams
@@ -841,121 +847,109 @@ class ExternalCallParams$Type extends MessageType<ExternalCallParams> {
 export const ExternalCallParams = new ExternalCallParams$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Order$Type extends MessageType<Order> {
-	constructor() {
-		super("pmm_common.Order", [
-			{ no: 1, name: "maker_order_nonce", kind: "scalar", T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
-			{ no: 2, name: "give", kind: "message", T: () => Offer },
-			{ no: 3, name: "take", kind: "message", T: () => Offer },
-			{ no: 4, name: "maker_src", kind: "message", T: () => Address },
-			{ no: 5, name: "receiver_dst", kind: "message", T: () => Address },
-			{ no: 6, name: "external_call", kind: "message", T: () => ExternalCallParams },
-			{ no: 7, name: "give_patch_authority_src", kind: "message", T: () => Address },
-			{ no: 8, name: "order_authority_address_dst", kind: "message", T: () => Address },
-			{ no: 9, name: "allowed_taker_dst", kind: "message", T: () => Address },
-			{ no: 10, name: "allowed_cancel_beneficiary_src", kind: "message", T: () => Address },
-		]);
-	}
-	create(value?: PartialMessage<Order>): Order {
-		const message = { makerOrderNonce: 0n };
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<Order>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Order): Order {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* uint64 maker_order_nonce */ 1:
-					message.makerOrderNonce = reader.uint64().toBigInt();
-					break;
-				case /* pmm_common.Offer give */ 2:
-					message.give = Offer.internalBinaryRead(reader, reader.uint32(), options, message.give);
-					break;
-				case /* pmm_common.Offer take */ 3:
-					message.take = Offer.internalBinaryRead(reader, reader.uint32(), options, message.take);
-					break;
-				case /* pmm_common.Address maker_src */ 4:
-					message.makerSrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.makerSrc);
-					break;
-				case /* pmm_common.Address receiver_dst */ 5:
-					message.receiverDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.receiverDst);
-					break;
-				case /* pmm_common.ExternalCallParams external_call */ 6:
-					message.externalCall = ExternalCallParams.internalBinaryRead(reader, reader.uint32(), options, message.externalCall);
-					break;
-				case /* pmm_common.Address give_patch_authority_src */ 7:
-					message.givePatchAuthoritySrc = Address.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.givePatchAuthoritySrc,
-					);
-					break;
-				case /* pmm_common.Address order_authority_address_dst */ 8:
-					message.orderAuthorityAddressDst = Address.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.orderAuthorityAddressDst,
-					);
-					break;
-				case /* pmm_common.Address allowed_taker_dst */ 9:
-					message.allowedTakerDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.allowedTakerDst);
-					break;
-				case /* pmm_common.Address allowed_cancel_beneficiary_src */ 10:
-					message.allowedCancelBeneficiarySrc = Address.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.allowedCancelBeneficiarySrc,
-					);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: Order, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* uint64 maker_order_nonce = 1; */
-		if (message.makerOrderNonce !== 0n) writer.tag(1, WireType.Varint).uint64(message.makerOrderNonce);
-		/* pmm_common.Offer give = 2; */
-		if (message.give) Offer.internalBinaryWrite(message.give, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Offer take = 3; */
-		if (message.take) Offer.internalBinaryWrite(message.take, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address maker_src = 4; */
-		if (message.makerSrc) Address.internalBinaryWrite(message.makerSrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address receiver_dst = 5; */
-		if (message.receiverDst)
-			Address.internalBinaryWrite(message.receiverDst, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.ExternalCallParams external_call = 6; */
-		if (message.externalCall)
-			ExternalCallParams.internalBinaryWrite(message.externalCall, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address give_patch_authority_src = 7; */
-		if (message.givePatchAuthoritySrc)
-			Address.internalBinaryWrite(message.givePatchAuthoritySrc, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address order_authority_address_dst = 8; */
-		if (message.orderAuthorityAddressDst)
-			Address.internalBinaryWrite(message.orderAuthorityAddressDst, writer.tag(8, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address allowed_taker_dst = 9; */
-		if (message.allowedTakerDst)
-			Address.internalBinaryWrite(message.allowedTakerDst, writer.tag(9, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address allowed_cancel_beneficiary_src = 10; */
-		if (message.allowedCancelBeneficiarySrc)
-			Address.internalBinaryWrite(
-				message.allowedCancelBeneficiarySrc,
-				writer.tag(10, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.Order", [
+            { no: 1, name: "maker_order_nonce", kind: "scalar", T: 4 /*ScalarType.UINT64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 2, name: "give", kind: "message", T: () => Offer },
+            { no: 3, name: "take", kind: "message", T: () => Offer },
+            { no: 4, name: "maker_src", kind: "message", T: () => Address },
+            { no: 5, name: "receiver_dst", kind: "message", T: () => Address },
+            { no: 6, name: "external_call", kind: "message", T: () => ExternalCallParams },
+            { no: 7, name: "give_patch_authority_src", kind: "message", T: () => Address },
+            { no: 8, name: "order_authority_address_dst", kind: "message", T: () => Address },
+            { no: 9, name: "allowed_taker_dst", kind: "message", T: () => Address },
+            { no: 10, name: "allowed_cancel_beneficiary_src", kind: "message", T: () => Address }
+        ]);
+    }
+    create(value?: PartialMessage<Order>): Order {
+        const message = { makerOrderNonce: 0n };
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<Order>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Order): Order {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* uint64 maker_order_nonce */ 1:
+                    message.makerOrderNonce = reader.uint64().toBigInt();
+                    break;
+                case /* pmm_common.Offer give */ 2:
+                    message.give = Offer.internalBinaryRead(reader, reader.uint32(), options, message.give);
+                    break;
+                case /* pmm_common.Offer take */ 3:
+                    message.take = Offer.internalBinaryRead(reader, reader.uint32(), options, message.take);
+                    break;
+                case /* pmm_common.Address maker_src */ 4:
+                    message.makerSrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.makerSrc);
+                    break;
+                case /* pmm_common.Address receiver_dst */ 5:
+                    message.receiverDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.receiverDst);
+                    break;
+                case /* pmm_common.ExternalCallParams external_call */ 6:
+                    message.externalCall = ExternalCallParams.internalBinaryRead(reader, reader.uint32(), options, message.externalCall);
+                    break;
+                case /* pmm_common.Address give_patch_authority_src */ 7:
+                    message.givePatchAuthoritySrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.givePatchAuthoritySrc);
+                    break;
+                case /* pmm_common.Address order_authority_address_dst */ 8:
+                    message.orderAuthorityAddressDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.orderAuthorityAddressDst);
+                    break;
+                case /* pmm_common.Address allowed_taker_dst */ 9:
+                    message.allowedTakerDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.allowedTakerDst);
+                    break;
+                case /* pmm_common.Address allowed_cancel_beneficiary_src */ 10:
+                    message.allowedCancelBeneficiarySrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.allowedCancelBeneficiarySrc);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Order, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* uint64 maker_order_nonce = 1; */
+        if (message.makerOrderNonce !== 0n)
+            writer.tag(1, WireType.Varint).uint64(message.makerOrderNonce);
+        /* pmm_common.Offer give = 2; */
+        if (message.give)
+            Offer.internalBinaryWrite(message.give, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Offer take = 3; */
+        if (message.take)
+            Offer.internalBinaryWrite(message.take, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address maker_src = 4; */
+        if (message.makerSrc)
+            Address.internalBinaryWrite(message.makerSrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address receiver_dst = 5; */
+        if (message.receiverDst)
+            Address.internalBinaryWrite(message.receiverDst, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.ExternalCallParams external_call = 6; */
+        if (message.externalCall)
+            ExternalCallParams.internalBinaryWrite(message.externalCall, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address give_patch_authority_src = 7; */
+        if (message.givePatchAuthoritySrc)
+            Address.internalBinaryWrite(message.givePatchAuthoritySrc, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address order_authority_address_dst = 8; */
+        if (message.orderAuthorityAddressDst)
+            Address.internalBinaryWrite(message.orderAuthorityAddressDst, writer.tag(8, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address allowed_taker_dst = 9; */
+        if (message.allowedTakerDst)
+            Address.internalBinaryWrite(message.allowedTakerDst, writer.tag(9, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address allowed_cancel_beneficiary_src = 10; */
+        if (message.allowedCancelBeneficiarySrc)
+            Address.internalBinaryWrite(message.allowedCancelBeneficiarySrc, writer.tag(10, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.Order
@@ -963,49 +957,53 @@ class Order$Type extends MessageType<Order> {
 export const Order = new Order$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class AffiliateFee$Type extends MessageType<AffiliateFee> {
-	constructor() {
-		super("pmm_common.AffiliateFee", [
-			{ no: 1, name: "beneficiary_src", kind: "message", T: () => Address },
-			{ no: 2, name: "amount", kind: "message", T: () => U256 },
-		]);
-	}
-	create(value?: PartialMessage<AffiliateFee>): AffiliateFee {
-		const message = {};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<AffiliateFee>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: AffiliateFee): AffiliateFee {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.Address beneficiary_src */ 1:
-					message.beneficiarySrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.beneficiarySrc);
-					break;
-				case /* pmm_common.U256 amount */ 2:
-					message.amount = U256.internalBinaryRead(reader, reader.uint32(), options, message.amount);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: AffiliateFee, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.Address beneficiary_src = 1; */
-		if (message.beneficiarySrc)
-			Address.internalBinaryWrite(message.beneficiarySrc, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 amount = 2; */
-		if (message.amount) U256.internalBinaryWrite(message.amount, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.AffiliateFee", [
+            { no: 1, name: "beneficiary_src", kind: "message", T: () => Address },
+            { no: 2, name: "amount", kind: "message", T: () => U256 }
+        ]);
+    }
+    create(value?: PartialMessage<AffiliateFee>): AffiliateFee {
+        const message = {};
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<AffiliateFee>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: AffiliateFee): AffiliateFee {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.Address beneficiary_src */ 1:
+                    message.beneficiarySrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.beneficiarySrc);
+                    break;
+                case /* pmm_common.U256 amount */ 2:
+                    message.amount = U256.internalBinaryRead(reader, reader.uint32(), options, message.amount);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: AffiliateFee, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.Address beneficiary_src = 1; */
+        if (message.beneficiarySrc)
+            Address.internalBinaryWrite(message.beneficiarySrc, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 amount = 2; */
+        if (message.amount)
+            U256.internalBinaryWrite(message.amount, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.AffiliateFee
@@ -1013,115 +1011,95 @@ class AffiliateFee$Type extends MessageType<AffiliateFee> {
 export const AffiliateFee = new AffiliateFee$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class EventCreatedSrc$Type extends MessageType<EventCreatedSrc> {
-	constructor() {
-		super("pmm_common.EventCreatedSrc", [
-			{ no: 1, name: "transaction_metadata", kind: "message", T: () => TransactionMetadata },
-			{ no: 2, name: "give_token_metadata", kind: "message", T: () => TokenMetadata },
-			{ no: 3, name: "take_token_metadata", kind: "message", T: () => TokenMetadata },
-			{ no: 4, name: "created_order", kind: "message", T: () => Order },
-			{ no: 5, name: "order_id", kind: "message", T: () => U256 },
-			{ no: 6, name: "referral_code", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
-			{ no: 7, name: "affiliate_fee", kind: "message", T: () => AffiliateFee },
-			{ no: 8, name: "fix_fee", kind: "message", T: () => U256 },
-			{ no: 9, name: "percent_fee", kind: "message", T: () => U256 },
-		]);
-	}
-	create(value?: PartialMessage<EventCreatedSrc>): EventCreatedSrc {
-		const message = { referralCode: 0 };
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<EventCreatedSrc>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventCreatedSrc): EventCreatedSrc {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.TransactionMetadata transaction_metadata */ 1:
-					message.transactionMetadata = TransactionMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.transactionMetadata,
-					);
-					break;
-				case /* pmm_common.TokenMetadata give_token_metadata */ 2:
-					message.giveTokenMetadata = TokenMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.giveTokenMetadata,
-					);
-					break;
-				case /* pmm_common.TokenMetadata take_token_metadata */ 3:
-					message.takeTokenMetadata = TokenMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.takeTokenMetadata,
-					);
-					break;
-				case /* pmm_common.Order created_order */ 4:
-					message.createdOrder = Order.internalBinaryRead(reader, reader.uint32(), options, message.createdOrder);
-					break;
-				case /* pmm_common.U256 order_id */ 5:
-					message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
-					break;
-				case /* uint32 referral_code */ 6:
-					message.referralCode = reader.uint32();
-					break;
-				case /* pmm_common.AffiliateFee affiliate_fee */ 7:
-					message.affiliateFee = AffiliateFee.internalBinaryRead(reader, reader.uint32(), options, message.affiliateFee);
-					break;
-				case /* pmm_common.U256 fix_fee */ 8:
-					message.fixFee = U256.internalBinaryRead(reader, reader.uint32(), options, message.fixFee);
-					break;
-				case /* pmm_common.U256 percent_fee */ 9:
-					message.percentFee = U256.internalBinaryRead(reader, reader.uint32(), options, message.percentFee);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: EventCreatedSrc, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.TransactionMetadata transaction_metadata = 1; */
-		if (message.transactionMetadata)
-			TransactionMetadata.internalBinaryWrite(
-				message.transactionMetadata,
-				writer.tag(1, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.TokenMetadata give_token_metadata = 2; */
-		if (message.giveTokenMetadata)
-			TokenMetadata.internalBinaryWrite(message.giveTokenMetadata, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.TokenMetadata take_token_metadata = 3; */
-		if (message.takeTokenMetadata)
-			TokenMetadata.internalBinaryWrite(message.takeTokenMetadata, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Order created_order = 4; */
-		if (message.createdOrder)
-			Order.internalBinaryWrite(message.createdOrder, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 order_id = 5; */
-		if (message.orderId) U256.internalBinaryWrite(message.orderId, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
-		/* uint32 referral_code = 6; */
-		if (message.referralCode !== 0) writer.tag(6, WireType.Varint).uint32(message.referralCode);
-		/* pmm_common.AffiliateFee affiliate_fee = 7; */
-		if (message.affiliateFee)
-			AffiliateFee.internalBinaryWrite(message.affiliateFee, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 fix_fee = 8; */
-		if (message.fixFee) U256.internalBinaryWrite(message.fixFee, writer.tag(8, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 percent_fee = 9; */
-		if (message.percentFee)
-			U256.internalBinaryWrite(message.percentFee, writer.tag(9, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.EventCreatedSrc", [
+            { no: 2, name: "give_token_metadata", kind: "message", T: () => TokenMetadata },
+            { no: 3, name: "take_token_metadata", kind: "message", T: () => TokenMetadata },
+            { no: 4, name: "created_order", kind: "message", T: () => Order },
+            { no: 5, name: "order_id", kind: "message", T: () => U256 },
+            { no: 6, name: "referral_code", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 7, name: "affiliate_fee", kind: "message", T: () => AffiliateFee },
+            { no: 8, name: "fix_fee", kind: "message", T: () => U256 },
+            { no: 9, name: "percent_fee", kind: "message", T: () => U256 }
+        ]);
+    }
+    create(value?: PartialMessage<EventCreatedSrc>): EventCreatedSrc {
+        const message = { referralCode: 0 };
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<EventCreatedSrc>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventCreatedSrc): EventCreatedSrc {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.TokenMetadata give_token_metadata */ 2:
+                    message.giveTokenMetadata = TokenMetadata.internalBinaryRead(reader, reader.uint32(), options, message.giveTokenMetadata);
+                    break;
+                case /* pmm_common.TokenMetadata take_token_metadata */ 3:
+                    message.takeTokenMetadata = TokenMetadata.internalBinaryRead(reader, reader.uint32(), options, message.takeTokenMetadata);
+                    break;
+                case /* pmm_common.Order created_order */ 4:
+                    message.createdOrder = Order.internalBinaryRead(reader, reader.uint32(), options, message.createdOrder);
+                    break;
+                case /* pmm_common.U256 order_id */ 5:
+                    message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
+                    break;
+                case /* uint32 referral_code */ 6:
+                    message.referralCode = reader.uint32();
+                    break;
+                case /* pmm_common.AffiliateFee affiliate_fee */ 7:
+                    message.affiliateFee = AffiliateFee.internalBinaryRead(reader, reader.uint32(), options, message.affiliateFee);
+                    break;
+                case /* pmm_common.U256 fix_fee */ 8:
+                    message.fixFee = U256.internalBinaryRead(reader, reader.uint32(), options, message.fixFee);
+                    break;
+                case /* pmm_common.U256 percent_fee */ 9:
+                    message.percentFee = U256.internalBinaryRead(reader, reader.uint32(), options, message.percentFee);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: EventCreatedSrc, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.TokenMetadata give_token_metadata = 2; */
+        if (message.giveTokenMetadata)
+            TokenMetadata.internalBinaryWrite(message.giveTokenMetadata, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.TokenMetadata take_token_metadata = 3; */
+        if (message.takeTokenMetadata)
+            TokenMetadata.internalBinaryWrite(message.takeTokenMetadata, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Order created_order = 4; */
+        if (message.createdOrder)
+            Order.internalBinaryWrite(message.createdOrder, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 order_id = 5; */
+        if (message.orderId)
+            U256.internalBinaryWrite(message.orderId, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        /* uint32 referral_code = 6; */
+        if (message.referralCode !== 0)
+            writer.tag(6, WireType.Varint).uint32(message.referralCode);
+        /* pmm_common.AffiliateFee affiliate_fee = 7; */
+        if (message.affiliateFee)
+            AffiliateFee.internalBinaryWrite(message.affiliateFee, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 fix_fee = 8; */
+        if (message.fixFee)
+            U256.internalBinaryWrite(message.fixFee, writer.tag(8, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 percent_fee = 9; */
+        if (message.percentFee)
+            U256.internalBinaryWrite(message.percentFee, writer.tag(9, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.EventCreatedSrc
@@ -1129,95 +1107,74 @@ class EventCreatedSrc$Type extends MessageType<EventCreatedSrc> {
 export const EventCreatedSrc = new EventCreatedSrc$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class EventFulfilledDst$Type extends MessageType<EventFulfilledDst> {
-	constructor() {
-		super("pmm_common.EventFulfilledDst", [
-			{ no: 1, name: "transaction_metadata", kind: "message", T: () => TransactionMetadata },
-			{ no: 2, name: "give_token_metadata", kind: "message", T: () => TokenMetadata },
-			{ no: 3, name: "take_token_metadata", kind: "message", T: () => TokenMetadata },
-			{ no: 4, name: "fulfilled_order", kind: "message", T: () => Order },
-			{ no: 5, name: "order_id", kind: "message", T: () => U256 },
-			{ no: 6, name: "taker_dst", kind: "message", T: () => Address },
-		]);
-	}
-	create(value?: PartialMessage<EventFulfilledDst>): EventFulfilledDst {
-		const message = {};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<EventFulfilledDst>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventFulfilledDst): EventFulfilledDst {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.TransactionMetadata transaction_metadata */ 1:
-					message.transactionMetadata = TransactionMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.transactionMetadata,
-					);
-					break;
-				case /* pmm_common.TokenMetadata give_token_metadata */ 2:
-					message.giveTokenMetadata = TokenMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.giveTokenMetadata,
-					);
-					break;
-				case /* pmm_common.TokenMetadata take_token_metadata */ 3:
-					message.takeTokenMetadata = TokenMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.takeTokenMetadata,
-					);
-					break;
-				case /* pmm_common.Order fulfilled_order */ 4:
-					message.fulfilledOrder = Order.internalBinaryRead(reader, reader.uint32(), options, message.fulfilledOrder);
-					break;
-				case /* pmm_common.U256 order_id */ 5:
-					message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
-					break;
-				case /* pmm_common.Address taker_dst */ 6:
-					message.takerDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.takerDst);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: EventFulfilledDst, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.TransactionMetadata transaction_metadata = 1; */
-		if (message.transactionMetadata)
-			TransactionMetadata.internalBinaryWrite(
-				message.transactionMetadata,
-				writer.tag(1, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.TokenMetadata give_token_metadata = 2; */
-		if (message.giveTokenMetadata)
-			TokenMetadata.internalBinaryWrite(message.giveTokenMetadata, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.TokenMetadata take_token_metadata = 3; */
-		if (message.takeTokenMetadata)
-			TokenMetadata.internalBinaryWrite(message.takeTokenMetadata, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Order fulfilled_order = 4; */
-		if (message.fulfilledOrder)
-			Order.internalBinaryWrite(message.fulfilledOrder, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 order_id = 5; */
-		if (message.orderId) U256.internalBinaryWrite(message.orderId, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address taker_dst = 6; */
-		if (message.takerDst) Address.internalBinaryWrite(message.takerDst, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.EventFulfilledDst", [
+            { no: 2, name: "give_token_metadata", kind: "message", T: () => TokenMetadata },
+            { no: 3, name: "take_token_metadata", kind: "message", T: () => TokenMetadata },
+            { no: 4, name: "fulfilled_order", kind: "message", T: () => Order },
+            { no: 5, name: "order_id", kind: "message", T: () => U256 },
+            { no: 6, name: "taker_dst", kind: "message", T: () => Address }
+        ]);
+    }
+    create(value?: PartialMessage<EventFulfilledDst>): EventFulfilledDst {
+        const message = {};
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<EventFulfilledDst>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventFulfilledDst): EventFulfilledDst {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.TokenMetadata give_token_metadata */ 2:
+                    message.giveTokenMetadata = TokenMetadata.internalBinaryRead(reader, reader.uint32(), options, message.giveTokenMetadata);
+                    break;
+                case /* pmm_common.TokenMetadata take_token_metadata */ 3:
+                    message.takeTokenMetadata = TokenMetadata.internalBinaryRead(reader, reader.uint32(), options, message.takeTokenMetadata);
+                    break;
+                case /* pmm_common.Order fulfilled_order */ 4:
+                    message.fulfilledOrder = Order.internalBinaryRead(reader, reader.uint32(), options, message.fulfilledOrder);
+                    break;
+                case /* pmm_common.U256 order_id */ 5:
+                    message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
+                    break;
+                case /* pmm_common.Address taker_dst */ 6:
+                    message.takerDst = Address.internalBinaryRead(reader, reader.uint32(), options, message.takerDst);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: EventFulfilledDst, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.TokenMetadata give_token_metadata = 2; */
+        if (message.giveTokenMetadata)
+            TokenMetadata.internalBinaryWrite(message.giveTokenMetadata, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.TokenMetadata take_token_metadata = 3; */
+        if (message.takeTokenMetadata)
+            TokenMetadata.internalBinaryWrite(message.takeTokenMetadata, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Order fulfilled_order = 4; */
+        if (message.fulfilledOrder)
+            Order.internalBinaryWrite(message.fulfilledOrder, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 order_id = 5; */
+        if (message.orderId)
+            U256.internalBinaryWrite(message.orderId, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address taker_dst = 6; */
+        if (message.takerDst)
+            Address.internalBinaryWrite(message.takerDst, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.EventFulfilledDst
@@ -1225,77 +1182,60 @@ class EventFulfilledDst$Type extends MessageType<EventFulfilledDst> {
 export const EventFulfilledDst = new EventFulfilledDst$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class EventSentUnlockDst$Type extends MessageType<EventSentUnlockDst> {
-	constructor() {
-		super("pmm_common.EventSentUnlockDst", [
-			{ no: 1, name: "transaction_metadata", kind: "message", T: () => TransactionMetadata },
-			{ no: 2, name: "order_id", kind: "message", T: () => U256 },
-			{ no: 3, name: "submission_id", kind: "message", T: () => U256 },
-			{ no: 4, name: "unlock_beneficiary_src", kind: "message", T: () => Address },
-		]);
-	}
-	create(value?: PartialMessage<EventSentUnlockDst>): EventSentUnlockDst {
-		const message = {};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<EventSentUnlockDst>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventSentUnlockDst): EventSentUnlockDst {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.TransactionMetadata transaction_metadata */ 1:
-					message.transactionMetadata = TransactionMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.transactionMetadata,
-					);
-					break;
-				case /* pmm_common.U256 order_id */ 2:
-					message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
-					break;
-				case /* pmm_common.U256 submission_id */ 3:
-					message.submissionId = U256.internalBinaryRead(reader, reader.uint32(), options, message.submissionId);
-					break;
-				case /* pmm_common.Address unlock_beneficiary_src */ 4:
-					message.unlockBeneficiarySrc = Address.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.unlockBeneficiarySrc,
-					);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: EventSentUnlockDst, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.TransactionMetadata transaction_metadata = 1; */
-		if (message.transactionMetadata)
-			TransactionMetadata.internalBinaryWrite(
-				message.transactionMetadata,
-				writer.tag(1, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.U256 order_id = 2; */
-		if (message.orderId) U256.internalBinaryWrite(message.orderId, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 submission_id = 3; */
-		if (message.submissionId)
-			U256.internalBinaryWrite(message.submissionId, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address unlock_beneficiary_src = 4; */
-		if (message.unlockBeneficiarySrc)
-			Address.internalBinaryWrite(message.unlockBeneficiarySrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.EventSentUnlockDst", [
+            { no: 2, name: "order_id", kind: "message", T: () => U256 },
+            { no: 3, name: "submission_id", kind: "message", T: () => U256 },
+            { no: 4, name: "unlock_beneficiary_src", kind: "message", T: () => Address }
+        ]);
+    }
+    create(value?: PartialMessage<EventSentUnlockDst>): EventSentUnlockDst {
+        const message = {};
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<EventSentUnlockDst>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventSentUnlockDst): EventSentUnlockDst {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.U256 order_id */ 2:
+                    message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
+                    break;
+                case /* pmm_common.U256 submission_id */ 3:
+                    message.submissionId = U256.internalBinaryRead(reader, reader.uint32(), options, message.submissionId);
+                    break;
+                case /* pmm_common.Address unlock_beneficiary_src */ 4:
+                    message.unlockBeneficiarySrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.unlockBeneficiarySrc);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: EventSentUnlockDst, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.U256 order_id = 2; */
+        if (message.orderId)
+            U256.internalBinaryWrite(message.orderId, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 submission_id = 3; */
+        if (message.submissionId)
+            U256.internalBinaryWrite(message.submissionId, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address unlock_beneficiary_src = 4; */
+        if (message.unlockBeneficiarySrc)
+            Address.internalBinaryWrite(message.unlockBeneficiarySrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.EventSentUnlockDst
@@ -1303,94 +1243,67 @@ class EventSentUnlockDst$Type extends MessageType<EventSentUnlockDst> {
 export const EventSentUnlockDst = new EventSentUnlockDst$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class EventOrderCancelledDst$Type extends MessageType<EventOrderCancelledDst> {
-	constructor() {
-		super("pmm_common.EventOrderCancelledDst", [
-			{ no: 1, name: "transaction_metadata", kind: "message", T: () => TransactionMetadata },
-			{ no: 2, name: "give_token_metadata", kind: "message", T: () => TokenMetadata },
-			{ no: 3, name: "take_token_metadata", kind: "message", T: () => TokenMetadata },
-			{ no: 4, name: "canceled_order", kind: "message", T: () => Order },
-			{ no: 5, name: "order_id", kind: "message", T: () => U256 },
-		]);
-	}
-	create(value?: PartialMessage<EventOrderCancelledDst>): EventOrderCancelledDst {
-		const message = {};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<EventOrderCancelledDst>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(
-		reader: IBinaryReader,
-		length: number,
-		options: BinaryReadOptions,
-		target?: EventOrderCancelledDst,
-	): EventOrderCancelledDst {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.TransactionMetadata transaction_metadata */ 1:
-					message.transactionMetadata = TransactionMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.transactionMetadata,
-					);
-					break;
-				case /* pmm_common.TokenMetadata give_token_metadata */ 2:
-					message.giveTokenMetadata = TokenMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.giveTokenMetadata,
-					);
-					break;
-				case /* pmm_common.TokenMetadata take_token_metadata */ 3:
-					message.takeTokenMetadata = TokenMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.takeTokenMetadata,
-					);
-					break;
-				case /* pmm_common.Order canceled_order */ 4:
-					message.canceledOrder = Order.internalBinaryRead(reader, reader.uint32(), options, message.canceledOrder);
-					break;
-				case /* pmm_common.U256 order_id */ 5:
-					message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: EventOrderCancelledDst, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.TransactionMetadata transaction_metadata = 1; */
-		if (message.transactionMetadata)
-			TransactionMetadata.internalBinaryWrite(
-				message.transactionMetadata,
-				writer.tag(1, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.TokenMetadata give_token_metadata = 2; */
-		if (message.giveTokenMetadata)
-			TokenMetadata.internalBinaryWrite(message.giveTokenMetadata, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.TokenMetadata take_token_metadata = 3; */
-		if (message.takeTokenMetadata)
-			TokenMetadata.internalBinaryWrite(message.takeTokenMetadata, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Order canceled_order = 4; */
-		if (message.canceledOrder)
-			Order.internalBinaryWrite(message.canceledOrder, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 order_id = 5; */
-		if (message.orderId) U256.internalBinaryWrite(message.orderId, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.EventOrderCancelledDst", [
+            { no: 2, name: "give_token_metadata", kind: "message", T: () => TokenMetadata },
+            { no: 3, name: "take_token_metadata", kind: "message", T: () => TokenMetadata },
+            { no: 4, name: "canceled_order", kind: "message", T: () => Order },
+            { no: 5, name: "order_id", kind: "message", T: () => U256 }
+        ]);
+    }
+    create(value?: PartialMessage<EventOrderCancelledDst>): EventOrderCancelledDst {
+        const message = {};
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<EventOrderCancelledDst>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventOrderCancelledDst): EventOrderCancelledDst {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.TokenMetadata give_token_metadata */ 2:
+                    message.giveTokenMetadata = TokenMetadata.internalBinaryRead(reader, reader.uint32(), options, message.giveTokenMetadata);
+                    break;
+                case /* pmm_common.TokenMetadata take_token_metadata */ 3:
+                    message.takeTokenMetadata = TokenMetadata.internalBinaryRead(reader, reader.uint32(), options, message.takeTokenMetadata);
+                    break;
+                case /* pmm_common.Order canceled_order */ 4:
+                    message.canceledOrder = Order.internalBinaryRead(reader, reader.uint32(), options, message.canceledOrder);
+                    break;
+                case /* pmm_common.U256 order_id */ 5:
+                    message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: EventOrderCancelledDst, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.TokenMetadata give_token_metadata = 2; */
+        if (message.giveTokenMetadata)
+            TokenMetadata.internalBinaryWrite(message.giveTokenMetadata, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.TokenMetadata take_token_metadata = 3; */
+        if (message.takeTokenMetadata)
+            TokenMetadata.internalBinaryWrite(message.takeTokenMetadata, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Order canceled_order = 4; */
+        if (message.canceledOrder)
+            Order.internalBinaryWrite(message.canceledOrder, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 order_id = 5; */
+        if (message.orderId)
+            U256.internalBinaryWrite(message.orderId, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.EventOrderCancelledDst
@@ -1398,82 +1311,60 @@ class EventOrderCancelledDst$Type extends MessageType<EventOrderCancelledDst> {
 export const EventOrderCancelledDst = new EventOrderCancelledDst$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class EventSentOrderCancelDst$Type extends MessageType<EventSentOrderCancelDst> {
-	constructor() {
-		super("pmm_common.EventSentOrderCancelDst", [
-			{ no: 1, name: "transaction_metadata", kind: "message", T: () => TransactionMetadata },
-			{ no: 2, name: "order_id", kind: "message", T: () => U256 },
-			{ no: 3, name: "submission_id", kind: "message", T: () => U256 },
-			{ no: 4, name: "cancel_beneficiary_src", kind: "message", T: () => Address },
-		]);
-	}
-	create(value?: PartialMessage<EventSentOrderCancelDst>): EventSentOrderCancelDst {
-		const message = {};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<EventSentOrderCancelDst>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(
-		reader: IBinaryReader,
-		length: number,
-		options: BinaryReadOptions,
-		target?: EventSentOrderCancelDst,
-	): EventSentOrderCancelDst {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.TransactionMetadata transaction_metadata */ 1:
-					message.transactionMetadata = TransactionMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.transactionMetadata,
-					);
-					break;
-				case /* pmm_common.U256 order_id */ 2:
-					message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
-					break;
-				case /* pmm_common.U256 submission_id */ 3:
-					message.submissionId = U256.internalBinaryRead(reader, reader.uint32(), options, message.submissionId);
-					break;
-				case /* pmm_common.Address cancel_beneficiary_src */ 4:
-					message.cancelBeneficiarySrc = Address.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.cancelBeneficiarySrc,
-					);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: EventSentOrderCancelDst, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.TransactionMetadata transaction_metadata = 1; */
-		if (message.transactionMetadata)
-			TransactionMetadata.internalBinaryWrite(
-				message.transactionMetadata,
-				writer.tag(1, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.U256 order_id = 2; */
-		if (message.orderId) U256.internalBinaryWrite(message.orderId, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 submission_id = 3; */
-		if (message.submissionId)
-			U256.internalBinaryWrite(message.submissionId, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address cancel_beneficiary_src = 4; */
-		if (message.cancelBeneficiarySrc)
-			Address.internalBinaryWrite(message.cancelBeneficiarySrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.EventSentOrderCancelDst", [
+            { no: 2, name: "order_id", kind: "message", T: () => U256 },
+            { no: 3, name: "submission_id", kind: "message", T: () => U256 },
+            { no: 4, name: "cancel_beneficiary_src", kind: "message", T: () => Address }
+        ]);
+    }
+    create(value?: PartialMessage<EventSentOrderCancelDst>): EventSentOrderCancelDst {
+        const message = {};
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<EventSentOrderCancelDst>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventSentOrderCancelDst): EventSentOrderCancelDst {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.U256 order_id */ 2:
+                    message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
+                    break;
+                case /* pmm_common.U256 submission_id */ 3:
+                    message.submissionId = U256.internalBinaryRead(reader, reader.uint32(), options, message.submissionId);
+                    break;
+                case /* pmm_common.Address cancel_beneficiary_src */ 4:
+                    message.cancelBeneficiarySrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.cancelBeneficiarySrc);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: EventSentOrderCancelDst, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.U256 order_id = 2; */
+        if (message.orderId)
+            U256.internalBinaryWrite(message.orderId, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 submission_id = 3; */
+        if (message.submissionId)
+            U256.internalBinaryWrite(message.submissionId, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address cancel_beneficiary_src = 4; */
+        if (message.cancelBeneficiarySrc)
+            Address.internalBinaryWrite(message.cancelBeneficiarySrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.EventSentOrderCancelDst
@@ -1481,82 +1372,60 @@ class EventSentOrderCancelDst$Type extends MessageType<EventSentOrderCancelDst> 
 export const EventSentOrderCancelDst = new EventSentOrderCancelDst$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class EventClaimedUnlockSrc$Type extends MessageType<EventClaimedUnlockSrc> {
-	constructor() {
-		super("pmm_common.EventClaimedUnlockSrc", [
-			{ no: 1, name: "transaction_metadata", kind: "message", T: () => TransactionMetadata },
-			{ no: 2, name: "order_id", kind: "message", T: () => U256 },
-			{ no: 3, name: "submission_id", kind: "message", T: () => U256 },
-			{ no: 4, name: "unlock_beneficiary_src", kind: "message", T: () => Address },
-		]);
-	}
-	create(value?: PartialMessage<EventClaimedUnlockSrc>): EventClaimedUnlockSrc {
-		const message = {};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<EventClaimedUnlockSrc>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(
-		reader: IBinaryReader,
-		length: number,
-		options: BinaryReadOptions,
-		target?: EventClaimedUnlockSrc,
-	): EventClaimedUnlockSrc {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.TransactionMetadata transaction_metadata */ 1:
-					message.transactionMetadata = TransactionMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.transactionMetadata,
-					);
-					break;
-				case /* pmm_common.U256 order_id */ 2:
-					message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
-					break;
-				case /* pmm_common.U256 submission_id */ 3:
-					message.submissionId = U256.internalBinaryRead(reader, reader.uint32(), options, message.submissionId);
-					break;
-				case /* pmm_common.Address unlock_beneficiary_src */ 4:
-					message.unlockBeneficiarySrc = Address.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.unlockBeneficiarySrc,
-					);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: EventClaimedUnlockSrc, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.TransactionMetadata transaction_metadata = 1; */
-		if (message.transactionMetadata)
-			TransactionMetadata.internalBinaryWrite(
-				message.transactionMetadata,
-				writer.tag(1, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.U256 order_id = 2; */
-		if (message.orderId) U256.internalBinaryWrite(message.orderId, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 submission_id = 3; */
-		if (message.submissionId)
-			U256.internalBinaryWrite(message.submissionId, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address unlock_beneficiary_src = 4; */
-		if (message.unlockBeneficiarySrc)
-			Address.internalBinaryWrite(message.unlockBeneficiarySrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.EventClaimedUnlockSrc", [
+            { no: 2, name: "order_id", kind: "message", T: () => U256 },
+            { no: 3, name: "submission_id", kind: "message", T: () => U256 },
+            { no: 4, name: "unlock_beneficiary_src", kind: "message", T: () => Address }
+        ]);
+    }
+    create(value?: PartialMessage<EventClaimedUnlockSrc>): EventClaimedUnlockSrc {
+        const message = {};
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<EventClaimedUnlockSrc>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventClaimedUnlockSrc): EventClaimedUnlockSrc {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.U256 order_id */ 2:
+                    message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
+                    break;
+                case /* pmm_common.U256 submission_id */ 3:
+                    message.submissionId = U256.internalBinaryRead(reader, reader.uint32(), options, message.submissionId);
+                    break;
+                case /* pmm_common.Address unlock_beneficiary_src */ 4:
+                    message.unlockBeneficiarySrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.unlockBeneficiarySrc);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: EventClaimedUnlockSrc, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.U256 order_id = 2; */
+        if (message.orderId)
+            U256.internalBinaryWrite(message.orderId, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 submission_id = 3; */
+        if (message.submissionId)
+            U256.internalBinaryWrite(message.submissionId, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address unlock_beneficiary_src = 4; */
+        if (message.unlockBeneficiarySrc)
+            Address.internalBinaryWrite(message.unlockBeneficiarySrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.EventClaimedUnlockSrc
@@ -1564,82 +1433,60 @@ class EventClaimedUnlockSrc$Type extends MessageType<EventClaimedUnlockSrc> {
 export const EventClaimedUnlockSrc = new EventClaimedUnlockSrc$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class EventClaimedOrderCancelSrc$Type extends MessageType<EventClaimedOrderCancelSrc> {
-	constructor() {
-		super("pmm_common.EventClaimedOrderCancelSrc", [
-			{ no: 1, name: "transaction_metadata", kind: "message", T: () => TransactionMetadata },
-			{ no: 2, name: "order_id", kind: "message", T: () => U256 },
-			{ no: 3, name: "submission_id", kind: "message", T: () => U256 },
-			{ no: 4, name: "cancel_beneficiary_src", kind: "message", T: () => Address },
-		]);
-	}
-	create(value?: PartialMessage<EventClaimedOrderCancelSrc>): EventClaimedOrderCancelSrc {
-		const message = {};
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<EventClaimedOrderCancelSrc>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(
-		reader: IBinaryReader,
-		length: number,
-		options: BinaryReadOptions,
-		target?: EventClaimedOrderCancelSrc,
-	): EventClaimedOrderCancelSrc {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.TransactionMetadata transaction_metadata */ 1:
-					message.transactionMetadata = TransactionMetadata.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.transactionMetadata,
-					);
-					break;
-				case /* pmm_common.U256 order_id */ 2:
-					message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
-					break;
-				case /* pmm_common.U256 submission_id */ 3:
-					message.submissionId = U256.internalBinaryRead(reader, reader.uint32(), options, message.submissionId);
-					break;
-				case /* pmm_common.Address cancel_beneficiary_src */ 4:
-					message.cancelBeneficiarySrc = Address.internalBinaryRead(
-						reader,
-						reader.uint32(),
-						options,
-						message.cancelBeneficiarySrc,
-					);
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: EventClaimedOrderCancelSrc, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.TransactionMetadata transaction_metadata = 1; */
-		if (message.transactionMetadata)
-			TransactionMetadata.internalBinaryWrite(
-				message.transactionMetadata,
-				writer.tag(1, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.U256 order_id = 2; */
-		if (message.orderId) U256.internalBinaryWrite(message.orderId, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.U256 submission_id = 3; */
-		if (message.submissionId)
-			U256.internalBinaryWrite(message.submissionId, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.Address cancel_beneficiary_src = 4; */
-		if (message.cancelBeneficiarySrc)
-			Address.internalBinaryWrite(message.cancelBeneficiarySrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.EventClaimedOrderCancelSrc", [
+            { no: 2, name: "order_id", kind: "message", T: () => U256 },
+            { no: 3, name: "submission_id", kind: "message", T: () => U256 },
+            { no: 4, name: "cancel_beneficiary_src", kind: "message", T: () => Address }
+        ]);
+    }
+    create(value?: PartialMessage<EventClaimedOrderCancelSrc>): EventClaimedOrderCancelSrc {
+        const message = {};
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<EventClaimedOrderCancelSrc>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: EventClaimedOrderCancelSrc): EventClaimedOrderCancelSrc {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.U256 order_id */ 2:
+                    message.orderId = U256.internalBinaryRead(reader, reader.uint32(), options, message.orderId);
+                    break;
+                case /* pmm_common.U256 submission_id */ 3:
+                    message.submissionId = U256.internalBinaryRead(reader, reader.uint32(), options, message.submissionId);
+                    break;
+                case /* pmm_common.Address cancel_beneficiary_src */ 4:
+                    message.cancelBeneficiarySrc = Address.internalBinaryRead(reader, reader.uint32(), options, message.cancelBeneficiarySrc);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: EventClaimedOrderCancelSrc, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.U256 order_id = 2; */
+        if (message.orderId)
+            U256.internalBinaryWrite(message.orderId, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.U256 submission_id = 3; */
+        if (message.submissionId)
+            U256.internalBinaryWrite(message.submissionId, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.Address cancel_beneficiary_src = 4; */
+        if (message.cancelBeneficiarySrc)
+            Address.internalBinaryWrite(message.cancelBeneficiarySrc, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.EventClaimedOrderCancelSrc
@@ -1647,160 +1494,116 @@ class EventClaimedOrderCancelSrc$Type extends MessageType<EventClaimedOrderCance
 export const EventClaimedOrderCancelSrc = new EventClaimedOrderCancelSrc$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class PmmEvent$Type extends MessageType<PmmEvent> {
-	constructor() {
-		super("pmm_common.PmmEvent", [
-			{ no: 1, name: "created_src", kind: "message", oneof: "event", T: () => EventCreatedSrc },
-			{ no: 2, name: "fulfilled_dst", kind: "message", oneof: "event", T: () => EventFulfilledDst },
-			{ no: 3, name: "send_unlock_dst", kind: "message", oneof: "event", T: () => EventSentUnlockDst },
-			{ no: 4, name: "order_cancelled_dst", kind: "message", oneof: "event", T: () => EventOrderCancelledDst },
-			{ no: 5, name: "send_order_cancel_dst", kind: "message", oneof: "event", T: () => EventSentOrderCancelDst },
-			{ no: 6, name: "claimed_unlock_src", kind: "message", oneof: "event", T: () => EventClaimedUnlockSrc },
-			{ no: 7, name: "claimed_order_cancel_src", kind: "message", oneof: "event", T: () => EventClaimedOrderCancelSrc },
-		]);
-	}
-	create(value?: PartialMessage<PmmEvent>): PmmEvent {
-		const message = { event: { oneofKind: undefined } };
-		globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
-		if (value !== undefined) reflectionMergePartial<PmmEvent>(this, message, value);
-		return message;
-	}
-	internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: PmmEvent): PmmEvent {
-		let message = target ?? this.create(),
-			end = reader.pos + length;
-		while (reader.pos < end) {
-			let [fieldNo, wireType] = reader.tag();
-			switch (fieldNo) {
-				case /* pmm_common.EventCreatedSrc created_src */ 1:
-					message.event = {
-						oneofKind: "createdSrc",
-						createdSrc: EventCreatedSrc.internalBinaryRead(reader, reader.uint32(), options, (message.event as any).createdSrc),
-					};
-					break;
-				case /* pmm_common.EventFulfilledDst fulfilled_dst */ 2:
-					message.event = {
-						oneofKind: "fulfilledDst",
-						fulfilledDst: EventFulfilledDst.internalBinaryRead(
-							reader,
-							reader.uint32(),
-							options,
-							(message.event as any).fulfilledDst,
-						),
-					};
-					break;
-				case /* pmm_common.EventSentUnlockDst send_unlock_dst */ 3:
-					message.event = {
-						oneofKind: "sendUnlockDst",
-						sendUnlockDst: EventSentUnlockDst.internalBinaryRead(
-							reader,
-							reader.uint32(),
-							options,
-							(message.event as any).sendUnlockDst,
-						),
-					};
-					break;
-				case /* pmm_common.EventOrderCancelledDst order_cancelled_dst */ 4:
-					message.event = {
-						oneofKind: "orderCancelledDst",
-						orderCancelledDst: EventOrderCancelledDst.internalBinaryRead(
-							reader,
-							reader.uint32(),
-							options,
-							(message.event as any).orderCancelledDst,
-						),
-					};
-					break;
-				case /* pmm_common.EventSentOrderCancelDst send_order_cancel_dst */ 5:
-					message.event = {
-						oneofKind: "sendOrderCancelDst",
-						sendOrderCancelDst: EventSentOrderCancelDst.internalBinaryRead(
-							reader,
-							reader.uint32(),
-							options,
-							(message.event as any).sendOrderCancelDst,
-						),
-					};
-					break;
-				case /* pmm_common.EventClaimedUnlockSrc claimed_unlock_src */ 6:
-					message.event = {
-						oneofKind: "claimedUnlockSrc",
-						claimedUnlockSrc: EventClaimedUnlockSrc.internalBinaryRead(
-							reader,
-							reader.uint32(),
-							options,
-							(message.event as any).claimedUnlockSrc,
-						),
-					};
-					break;
-				case /* pmm_common.EventClaimedOrderCancelSrc claimed_order_cancel_src */ 7:
-					message.event = {
-						oneofKind: "claimedOrderCancelSrc",
-						claimedOrderCancelSrc: EventClaimedOrderCancelSrc.internalBinaryRead(
-							reader,
-							reader.uint32(),
-							options,
-							(message.event as any).claimedOrderCancelSrc,
-						),
-					};
-					break;
-				default:
-					let u = options.readUnknownField;
-					if (u === "throw") throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
-					let d = reader.skip(wireType);
-					if (u !== false) (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
-			}
-		}
-		return message;
-	}
-	internalBinaryWrite(message: PmmEvent, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-		/* pmm_common.EventCreatedSrc created_src = 1; */
-		if (message.event.oneofKind === "createdSrc")
-			EventCreatedSrc.internalBinaryWrite(message.event.createdSrc, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
-		/* pmm_common.EventFulfilledDst fulfilled_dst = 2; */
-		if (message.event.oneofKind === "fulfilledDst")
-			EventFulfilledDst.internalBinaryWrite(
-				message.event.fulfilledDst,
-				writer.tag(2, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.EventSentUnlockDst send_unlock_dst = 3; */
-		if (message.event.oneofKind === "sendUnlockDst")
-			EventSentUnlockDst.internalBinaryWrite(
-				message.event.sendUnlockDst,
-				writer.tag(3, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.EventOrderCancelledDst order_cancelled_dst = 4; */
-		if (message.event.oneofKind === "orderCancelledDst")
-			EventOrderCancelledDst.internalBinaryWrite(
-				message.event.orderCancelledDst,
-				writer.tag(4, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.EventSentOrderCancelDst send_order_cancel_dst = 5; */
-		if (message.event.oneofKind === "sendOrderCancelDst")
-			EventSentOrderCancelDst.internalBinaryWrite(
-				message.event.sendOrderCancelDst,
-				writer.tag(5, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.EventClaimedUnlockSrc claimed_unlock_src = 6; */
-		if (message.event.oneofKind === "claimedUnlockSrc")
-			EventClaimedUnlockSrc.internalBinaryWrite(
-				message.event.claimedUnlockSrc,
-				writer.tag(6, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		/* pmm_common.EventClaimedOrderCancelSrc claimed_order_cancel_src = 7; */
-		if (message.event.oneofKind === "claimedOrderCancelSrc")
-			EventClaimedOrderCancelSrc.internalBinaryWrite(
-				message.event.claimedOrderCancelSrc,
-				writer.tag(7, WireType.LengthDelimited).fork(),
-				options,
-			).join();
-		let u = options.writeUnknownFields;
-		if (u !== false) (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
-		return writer;
-	}
+    constructor() {
+        super("pmm_common.PmmEvent", [
+            { no: 1, name: "transaction_metadata", kind: "message", T: () => TransactionMetadata },
+            { no: 2, name: "created_src", kind: "message", oneof: "event", T: () => EventCreatedSrc },
+            { no: 3, name: "fulfilled_dst", kind: "message", oneof: "event", T: () => EventFulfilledDst },
+            { no: 4, name: "send_unlock_dst", kind: "message", oneof: "event", T: () => EventSentUnlockDst },
+            { no: 5, name: "order_cancelled_dst", kind: "message", oneof: "event", T: () => EventOrderCancelledDst },
+            { no: 6, name: "send_order_cancel_dst", kind: "message", oneof: "event", T: () => EventSentOrderCancelDst },
+            { no: 7, name: "claimed_unlock_src", kind: "message", oneof: "event", T: () => EventClaimedUnlockSrc },
+            { no: 8, name: "claimed_order_cancel_src", kind: "message", oneof: "event", T: () => EventClaimedOrderCancelSrc }
+        ]);
+    }
+    create(value?: PartialMessage<PmmEvent>): PmmEvent {
+        const message = { event: { oneofKind: undefined } };
+        globalThis.Object.defineProperty(message, MESSAGE_TYPE, { enumerable: false, value: this });
+        if (value !== undefined)
+            reflectionMergePartial<PmmEvent>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: PmmEvent): PmmEvent {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* pmm_common.TransactionMetadata transaction_metadata */ 1:
+                    message.transactionMetadata = TransactionMetadata.internalBinaryRead(reader, reader.uint32(), options, message.transactionMetadata);
+                    break;
+                case /* pmm_common.EventCreatedSrc created_src */ 2:
+                    message.event = {
+                        oneofKind: "createdSrc",
+                        createdSrc: EventCreatedSrc.internalBinaryRead(reader, reader.uint32(), options, (message.event as any).createdSrc)
+                    };
+                    break;
+                case /* pmm_common.EventFulfilledDst fulfilled_dst */ 3:
+                    message.event = {
+                        oneofKind: "fulfilledDst",
+                        fulfilledDst: EventFulfilledDst.internalBinaryRead(reader, reader.uint32(), options, (message.event as any).fulfilledDst)
+                    };
+                    break;
+                case /* pmm_common.EventSentUnlockDst send_unlock_dst */ 4:
+                    message.event = {
+                        oneofKind: "sendUnlockDst",
+                        sendUnlockDst: EventSentUnlockDst.internalBinaryRead(reader, reader.uint32(), options, (message.event as any).sendUnlockDst)
+                    };
+                    break;
+                case /* pmm_common.EventOrderCancelledDst order_cancelled_dst */ 5:
+                    message.event = {
+                        oneofKind: "orderCancelledDst",
+                        orderCancelledDst: EventOrderCancelledDst.internalBinaryRead(reader, reader.uint32(), options, (message.event as any).orderCancelledDst)
+                    };
+                    break;
+                case /* pmm_common.EventSentOrderCancelDst send_order_cancel_dst */ 6:
+                    message.event = {
+                        oneofKind: "sendOrderCancelDst",
+                        sendOrderCancelDst: EventSentOrderCancelDst.internalBinaryRead(reader, reader.uint32(), options, (message.event as any).sendOrderCancelDst)
+                    };
+                    break;
+                case /* pmm_common.EventClaimedUnlockSrc claimed_unlock_src */ 7:
+                    message.event = {
+                        oneofKind: "claimedUnlockSrc",
+                        claimedUnlockSrc: EventClaimedUnlockSrc.internalBinaryRead(reader, reader.uint32(), options, (message.event as any).claimedUnlockSrc)
+                    };
+                    break;
+                case /* pmm_common.EventClaimedOrderCancelSrc claimed_order_cancel_src */ 8:
+                    message.event = {
+                        oneofKind: "claimedOrderCancelSrc",
+                        claimedOrderCancelSrc: EventClaimedOrderCancelSrc.internalBinaryRead(reader, reader.uint32(), options, (message.event as any).claimedOrderCancelSrc)
+                    };
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: PmmEvent, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* pmm_common.TransactionMetadata transaction_metadata = 1; */
+        if (message.transactionMetadata)
+            TransactionMetadata.internalBinaryWrite(message.transactionMetadata, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.EventCreatedSrc created_src = 2; */
+        if (message.event.oneofKind === "createdSrc")
+            EventCreatedSrc.internalBinaryWrite(message.event.createdSrc, writer.tag(2, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.EventFulfilledDst fulfilled_dst = 3; */
+        if (message.event.oneofKind === "fulfilledDst")
+            EventFulfilledDst.internalBinaryWrite(message.event.fulfilledDst, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.EventSentUnlockDst send_unlock_dst = 4; */
+        if (message.event.oneofKind === "sendUnlockDst")
+            EventSentUnlockDst.internalBinaryWrite(message.event.sendUnlockDst, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.EventOrderCancelledDst order_cancelled_dst = 5; */
+        if (message.event.oneofKind === "orderCancelledDst")
+            EventOrderCancelledDst.internalBinaryWrite(message.event.orderCancelledDst, writer.tag(5, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.EventSentOrderCancelDst send_order_cancel_dst = 6; */
+        if (message.event.oneofKind === "sendOrderCancelDst")
+            EventSentOrderCancelDst.internalBinaryWrite(message.event.sendOrderCancelDst, writer.tag(6, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.EventClaimedUnlockSrc claimed_unlock_src = 7; */
+        if (message.event.oneofKind === "claimedUnlockSrc")
+            EventClaimedUnlockSrc.internalBinaryWrite(message.event.claimedUnlockSrc, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        /* pmm_common.EventClaimedOrderCancelSrc claimed_order_cancel_src = 8; */
+        if (message.event.oneofKind === "claimedOrderCancelSrc")
+            EventClaimedOrderCancelSrc.internalBinaryWrite(message.event.claimedOrderCancelSrc, writer.tag(8, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
 }
 /**
  * @generated MessageType for protobuf message pmm_common.PmmEvent

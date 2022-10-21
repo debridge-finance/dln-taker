@@ -5,8 +5,8 @@
   "main": "dist/cjs/index.js",
   "scripts": {
     "test": "mocha -r ts-node/register -b -t 100000 ./tests/proto.test.ts",
-    "lint:fix": "prettier src/**/*.ts tests/**/*.ts -w",
-    "lint": "prettier src/**/*.ts tests/**/*.ts --check",
+    "lint:fix": "prettier src/**/*.ts tests/**/*.ts cli/**/*.ts -w",
+    "lint": "prettier src/**/*.ts tests/**/*.ts cli/**/*.ts --check",
     "loop": "node --experimental-fetch -r ts-node/register ./src/index.ts"
   },
   "repository": {
@@ -34,11 +34,12 @@
     "tslib": "^2.4.0"
   },
   "dependencies": {
-    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client",
+    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#common-client",
     "@debridge-finance/solana-utils": "github:debridge-finance/solana-utils",
     "@protobuf-ts/plugin": "^2.8.1",
     "amqplib": "^0.10.3",
-    "bs58": "^5.0.0",
-    "node-fetch": "^3.2.10"
+    "dotenv": "^16.0.3",
+    "node-fetch": "^3.2.10",
+    "web3": "1.8.0"
   }
 }

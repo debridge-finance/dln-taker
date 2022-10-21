@@ -22,15 +22,16 @@ message TokenMetadata {
 }
 
 message TransactionMetadata {
-  bytes transaction_hash             = 1;
-  bytes block_hash                   = 2;
-  uint64 block_time                  = 3;
-  uint64 block_number                = 4;
-  uint64 tracked_by_reader_timestamp = 5;
+  U256 chain_id                      = 1;
+  bytes transaction_hash             = 2;
+  bytes block_hash                   = 3;
+  uint64 block_time                  = 4;
+  uint64 block_number                = 5;
+  uint64 tracked_by_reader_timestamp = 6;
   /// For each type of event
   /// For created order - maker
   /// for fulfill order - taker
-  Address initiator                  = 6;
+  Address initiator                  = 7;
 }
 
 message Offer {
@@ -85,7 +86,6 @@ message AffiliateFee {
 }
 
 message EventCreatedSrc {
-  TransactionMetadata transaction_metadata = 1;
   TokenMetadata give_token_metadata        = 2;
   TokenMetadata take_token_metadata        = 3;
   Order created_order                      = 4;
@@ -97,7 +97,6 @@ message EventCreatedSrc {
 }
 
 message EventFulfilledDst {
-  TransactionMetadata transaction_metadata = 1;
   TokenMetadata give_token_metadata        = 2;
   TokenMetadata take_token_metadata        = 3;
   Order fulfilled_order                    = 4;
@@ -106,14 +105,12 @@ message EventFulfilledDst {
 }
 
 message EventSentUnlockDst {
-  TransactionMetadata transaction_metadata = 1;
   U256 order_id                            = 2;
   U256 submission_id                       = 3;
   Address unlock_beneficiary_src           = 4;
 }
 
 message EventOrderCancelledDst {
-  TransactionMetadata transaction_metadata = 1;
   TokenMetadata give_token_metadata        = 2;
   TokenMetadata take_token_metadata        = 3;
   Order canceled_order                     = 4;
@@ -121,34 +118,32 @@ message EventOrderCancelledDst {
 }
 
 message EventSentOrderCancelDst {
-  TransactionMetadata transaction_metadata = 1;
   U256 order_id                            = 2;
   U256 submission_id                       = 3;
   Address cancel_beneficiary_src           = 4;
 }
 
 message EventClaimedUnlockSrc {
-  TransactionMetadata transaction_metadata = 1;
   U256 order_id                            = 2;
   U256 submission_id                       = 3;
   Address unlock_beneficiary_src           = 4;
 }
 
 message EventClaimedOrderCancelSrc {
-  TransactionMetadata transaction_metadata = 1;
   U256 order_id                            = 2;
   U256 submission_id                       = 3;
   Address cancel_beneficiary_src           = 4;
 }
 
 message PmmEvent {
+  TransactionMetadata transaction_metadata              = 1;
   oneof event {
-    EventCreatedSrc created_src                         = 1;
-    EventFulfilledDst fulfilled_dst                     = 2;
-    EventSentUnlockDst send_unlock_dst                  = 3;
-    EventOrderCancelledDst order_cancelled_dst          = 4;
-    EventSentOrderCancelDst send_order_cancel_dst       = 5;
-    EventClaimedUnlockSrc claimed_unlock_src            = 6;
-    EventClaimedOrderCancelSrc claimed_order_cancel_src = 7;
+    EventCreatedSrc created_src                         = 2;
+    EventFulfilledDst fulfilled_dst                     = 3;
+    EventSentUnlockDst send_unlock_dst                  = 4;
+    EventOrderCancelledDst order_cancelled_dst          = 5;
+    EventSentOrderCancelDst send_order_cancel_dst       = 6;
+    EventClaimedUnlockSrc claimed_unlock_src            = 7;
+    EventClaimedOrderCancelSrc claimed_order_cancel_src = 8;
   }
 }

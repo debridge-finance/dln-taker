@@ -1,14 +1,20 @@
-import { Order, OrderData, Solana } from "@debridge-finance/pmm-client";
-import { GetNextOrder, GetProfit, PriceFeed } from "./interfaces";
-import { Connection, Keypair, Transaction, PublicKey, TransactionInstruction, SYSVAR_RENT_PUBKEY, SystemProgram } from "@solana/web3.js";
+import { ChainId, Evm, Order, OrderData, OrderState, PMMClient, Solana } from "@debridge-finance/pmm-client";
+import { AdapterContainer, Config, GetNextOrder, GetProfit, PriceFeed, ProviderAdapter } from "./interfaces";
+import { Connection, Keypair, Transaction, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import client, { Connection as MQConnection } from "amqplib";
 import { PmmEvent } from "./pmm_common";
-import { eventToOrderData } from "./helpers";
-import bs58 from "bs58";
-import { ASSOCIATED_TOKEN_PROGRAM_ID, findAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@debridge-finance/solana-utils";
+import { eventToOrderData, readEnv } from "./helpers";
+import { helpers } from "@debridge-finance/solana-utils";
+import Web3 from "web3";
+
+(BigInt.prototype as any).toJSON = function () {
+	return this.toString();
+};
+
+const CHAINS = Object.values(ChainId).map((v) => v.toString());
 
 class CalimerApi implements PriceFeed {
-	async getUsdPrice(chainId: bigint, tokenAddress: string): Promise<bigint> {
+	async getUsdPrice(chainId: ChainId, tokenAddress: string): Promise<bigint> {
 		console.log(`Getting price of token: ${tokenAddress}, chain: ${chainId}`);
 		const multiplier = 1e4;
 		const query = `https://claimerapi.debridge.io/TokenPrice/usd_price?chainId=${chainId}&tokenAddress=0x${tokenAddress}`;
@@ -25,15 +31,70 @@ class CalimerApi implements PriceFeed {
 
 class ProfitChecker implements GetProfit {
 	private feeMap: Record<string, bigint> = {
-		"1": 1234n,
+		"-1": 1234n,
 	};
 
-	async getProfit(dstChainId: bigint, giveUsdAmount: bigint, takeUsdAmount: bigint): Promise<bigint> {
+	async getProfit(dstChainId: ChainId, giveUsdAmount: bigint, takeUsdAmount: bigint): Promise<bigint> {
 		const delta = giveUsdAmount - takeUsdAmount;
 		if (Object.keys(this.feeMap).includes(dstChainId.toString())) {
 			return delta - this.feeMap[dstChainId.toString()];
 		}
 		return delta;
+	}
+}
+
+class SolanaProvider implements ProviderAdapter {
+	public wallet: Parameters<typeof helpers.sendAll>["1"];
+
+	constructor(public connection: Connection, wallet: Keypair) {
+		this.wallet = {
+			publicKey: wallet.publicKey,
+			signAllTransactions: (txs: Transaction[]) => {
+				txs.map((tx) => {
+					tx.partialSign(wallet);
+				});
+				return Promise.resolve(txs);
+			},
+			signTransaction: (tx: Transaction) => {
+				tx.sign(wallet);
+				return Promise.resolve(tx);
+			},
+		};
+	}
+
+	async sendTransaction(data: unknown) {
+		const txid = await helpers.sendAll(
+			this.connection,
+			this.wallet,
+			[new Transaction().add(data as Transaction | TransactionInstruction)],
+			undefined,
+			undefined,
+			false,
+			true,
+		);
+		console.log(`[Solana] Sent tx: ${txid}`);
+		return txid;
+	}
+}
+
+class EvmProvider implements ProviderAdapter {
+	wallet: never;
+
+	constructor(public connection: Web3) { }
+
+	async sendTransaction(data: unknown) {
+		const tx = data as { data: string; to: string; value: number };
+		const gasLimit = await this.connection.eth.estimateGas(tx);
+		const gasPrice = await this.connection.eth.getGasPrice();
+		const result = await this.connection.eth.sendTransaction({
+			...tx,
+			from: this.connection.eth.defaultAccount!,
+			gasPrice,
+			gas: gasLimit,
+		});
+		console.log(`[EVM] Sent tx: ${result.transactionHash}`);
+
+		return result;
 	}
 }
 
@@ -44,8 +105,8 @@ type EmptyTuple = [];
 type Head<T extends unknown[]> = T extends [...infer U, unknown] ? U : unknown[];
 type OmitLastParam<F> = F extends (...args: infer P) => infer Ret
 	? Head<P> extends EmptyTuple
-		? () => Ret
-		: (...args: Head<P>) => Ret
+	? () => Ret
+	: (...args: Head<P>) => Ret
 	: never;
 
 function wrapIntoAbortController<T extends (...args: any[]) => any>(fn: T, ...args: Parameters<OmitLastParam<T>>) {
@@ -55,23 +116,20 @@ function wrapIntoAbortController<T extends (...args: any[]) => any>(fn: T, ...ar
 	return controller;
 }
 
-async function sleep(milliSeconds: number) {
-	return new Promise<void>((resolve, reject) => {
-		setTimeout(resolve, milliSeconds);
-	});
-}
-
 class NextOrder implements GetNextOrder {
 	private queue: client.ConsumeMessage[] = [];
 	private mqConnection: MQConnection;
+	private initialized: boolean;
 
-	constructor(public initialized: boolean = false) {}
+	constructor(private config: Pick<Config, "RABBIT_URL" | "QUEUE_NAME">, private enabledChains: ChainId[]) {
+		this.initialized = false;
+	}
 
-	async init(queueName: string) {
-		this.mqConnection = await client.connect("amqp://127.0.0.1:5672");
+	async init() {
+		this.mqConnection = await client.connect(this.config.RABBIT_URL);
 		const channel = await this.mqConnection.createChannel();
-		await channel.assertQueue(queueName, { durable: false });
-		channel.consume(queueName, (msg) => {
+		await channel.assertQueue(this.config.QUEUE_NAME, { durable: true, deadLetterExchange: "mm-dlx" });
+		channel.consume(this.config.QUEUE_NAME, (msg) => {
 			if (msg) {
 				this.queue.push(msg);
 			}
@@ -80,75 +138,34 @@ class NextOrder implements GetNextOrder {
 	}
 
 	async getNextOrder(): Promise<OrderData | null> {
-		if (!this.initialized) await this.init("PmmDevnetEvents");
+		if (!this.initialized) await this.init();
 		while (true) {
 			if (this.queue.length != 0) {
 				const firstIn = this.queue.shift();
 				const decoded = PmmEvent.fromBinary(firstIn!.content);
 				if (decoded.event.oneofKind === "createdSrc") {
-					if (decoded.event.createdSrc.createdOrder?.externalCall !== undefined) return null;
+					// disable execution of orders with ext call
+					if (decoded.event.createdSrc.createdOrder?.externalCall !== undefined) continue;
+					// console.log(JSON.stringify(decoded.event));
 					const orderData = eventToOrderData(decoded.event.createdSrc.createdOrder!);
-					console.log(decoded.event.createdSrc.createdOrder);
-					if (orderData.take.chainId === 1n && orderData.take.tokenAddress.equals(Buffer.from(Array.from({length: 20}).fill(0) as number[]))) return null;
-					
-					// if (blacklist.includes(decoded.event.createdSrc.createdOrder!.makerOrderNonce )) return null;
+					// skip order if give.chainId or take.chainId not in supported chains list
+					if (!this.enabledChains.includes(orderData.take.chainId) || !this.enabledChains.includes(orderData.give.chainId))
+						continue;
+					console.log(orderData);
+
 					return orderData;
 				}
 				return null;
 			}
-			await sleep(2000);
+			await helpers.sleep(2000);
 		}
 	}
 }
 
-function createAssociatedWallet(owner: PublicKey, tokenMint: PublicKey, associatedAccount: PublicKey) {
-	return new TransactionInstruction({
-			programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-			keys: [
-				{
-					pubkey: owner,
-					isSigner: true,
-					isWritable: true,
-				},
-				{
-					pubkey: associatedAccount,
-					isSigner: false,
-					isWritable: true,
-				},
-				{
-					pubkey: owner,
-					isSigner: false,
-					isWritable: false,
-				},
-				{
-					pubkey: tokenMint,
-					isSigner: false,
-					isWritable: false,
-				},
-				{
-					pubkey: SystemProgram.programId,
-					isSigner: false,
-					isWritable: false,
-				},
-				{
-					pubkey: TOKEN_PROGRAM_ID,
-					isSigner: false,
-					isWritable: false,
-				},
-				{
-					pubkey: SYSVAR_RENT_PUBKEY,
-					isSigner: false,
-					isWritable: false,
-				},
-			],
-		});
-	}
-
 async function orderProcessor(
-	connection: Connection,
-	dstClient: Solana.PMMDst,
-	taker: Keypair,
-	beneficiary: Buffer,
+	client: PMMClient,
+	beneficiaryMap: Map<ChainId, string>,
+	providers: AdapterContainer,
 	order: OrderData,
 	priceFeed: PriceFeed,
 	profitChecker: GetProfit,
@@ -157,9 +174,10 @@ async function orderProcessor(
 ): Promise<bigint | undefined> {
 	if (signal.aborted) return undefined;
 
-	const givePrice = await priceFeed.getUsdPrice(order.give.chainId, order.give.tokenAddress.toString("hex"));
-	if (signal.aborted) return undefined;
-	const takePrice = await priceFeed.getUsdPrice(order.take.chainId, order.take.tokenAddress.toString("hex"));
+	const [givePrice, takePrice] = await Promise.all([
+		priceFeed.getUsdPrice(order.give.chainId, Buffer.from(order.give.tokenAddress).toString("hex")),
+		priceFeed.getUsdPrice(order.take.chainId, Buffer.from(order.take.tokenAddress).toString("hex")),
+	]);
 	if (signal.aborted) return undefined;
 	const giveUsdAmonut = givePrice * order.give.amount;
 	const takeUsdAmount = takePrice * order.take.amount;
@@ -168,81 +186,110 @@ async function orderProcessor(
 	if (signal.aborted) return undefined;
 
 	if (profit < expectedProfit) return undefined;
-	const takeMint = new PublicKey(order.take.tokenAddress);
-	const [takerWallet] = await findAssociatedTokenAddress(taker.publicKey, takeMint, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID);
-	let walletExists = await connection.getAccountInfo(takerWallet);
-	console.log(walletExists);
-	if (signal.aborted) return undefined;
-	if (walletExists === null) {
-		const walletCreateIx = createAssociatedWallet(taker.publicKey, takeMint, takerWallet);
-		try {
-			await connection.sendTransaction(new Transaction().add(walletCreateIx), [taker]);
-		} catch {}
 
-		let walletInitialized = false;
-		while (!walletInitialized) {
-			if (signal.aborted) return undefined;
-			const data = await connection.getAccountInfo(takerWallet);
-			if (data !== null && data.owner.equals(TOKEN_PROGRAM_ID)) walletInitialized = true;
-			if (signal.aborted) return undefined;
-			await sleep(3000);
-		}
-	}
+	let fulfillIx;
+	// taker = signer
+	if (order.take.chainId === ChainId.Solana)
+		fulfillIx = await client.fulfillOrder<ChainId.Solana>(order, {
+			taker: (providers[order.take.chainId].wallet as { publicKey: PublicKey }).publicKey,
+		});
+	else
+		fulfillIx = await client.fulfillOrder<ChainId.Ethereum>(order, {
+			web3: providers[order.take.chainId].connection as Web3,
+			fulfillAmount: Number(order.take.amount),
+			permit: "0x",
+		});
 	if (signal.aborted) return undefined;
 
-	const fulfillIx = await dstClient.fulfillOrder(taker.publicKey, order);
-	if (signal.aborted) return undefined;
-	await connection.sendTransaction(new Transaction().add(fulfillIx), [taker]);
+	console.log(fulfillIx);
+
+	/*const txId = await providers[order.take.chainId].sendTransaction(fulfillIx);
+	console.log(`Fulfill: ${txId}`);
+	*/
 	if (signal.aborted) return undefined;
 
-	const orderId = Buffer.from(Order.calculateId(order).slice(2), "hex");
-	const [orderState] = await dstClient.getTakeOrderStateAddress(orderId);
-	let stateExists = false;
-	while (!stateExists) {
+	const web3Payload =
+		order.give.chainId === ChainId.Solana
+			? {
+				web3: providers[order.take.chainId].connection as Web3,
+			}
+			: undefined;
+	let state = await client.getTakeOrderStatus(order, web3Payload);
+	while (state && state.status !== OrderState.Fulfilled) {
 		if (signal.aborted) return undefined;
-		const data = await connection.getAccountInfo(orderState);
-		if (data !== null && data.owner.equals(dstClient.program.programId)) stateExists = true;
+		state = await client.getTakeOrderStatus(order, web3Payload);
 		if (signal.aborted) return undefined;
-		await sleep(3000);
+		await helpers.sleep(2000);
 	}
 	// TODO calc execution fee
-	const unlockIx = await dstClient.sendUnlock(taker.publicKey, order, beneficiary, 0n);
-	if (signal.aborted) return undefined;
-	await connection.sendTransaction(new Transaction().add(unlockIx), [taker]);
-}
+	let unlockIx;
+	if (order.take.chainId === ChainId.Solana)
+		unlockIx = await client.sendUnlockOrder<ChainId.Solana>(order, beneficiaryMap.get(order.give.chainId)!, 0n, {
+			unlocker: (providers[order.take.chainId].wallet as { publicKey: PublicKey }).publicKey,
+		});
+	else
+		unlockIx = await client.sendUnlockOrder<ChainId.Polygon>(order, beneficiaryMap.get(order.give.chainId)!, 0n, {
+			web3: providers[order.take.chainId].connection as Web3,
+			reward: 0,
+		});
 
-function getWallet(): Keypair {
-	if (process.env.WALLET_DATA) {
-		const keypairData = bs58.decode(process.env.WALLET_DATA);
-		return Keypair.fromSecretKey(keypairData);
-		
-	} else if (process.env.ANCHOR_WALLET) {
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-		const fileData = require("fs").readFileSync(process.env.ANCHOR_WALLET, {
-			encoding: "utf-8",
-		}) as string;
-		const keypairData = Buffer.from(JSON.parse(fileData) as number[]);
-		const keypair: Keypair = Keypair.fromSecretKey(keypairData);
-		return keypair;
-	} else {
-		throw new Error("No wallet data provided!");
-	}
+	if (signal.aborted) return undefined;
+
+	const txId2 = await providers[order.take.chainId].sendTransaction(unlockIx);
+	console.log(`Send unlock: ${txId2}`);
+
 }
 
 async function main() {
+	const [config, enabledChains] = readEnv();
+
 	const taskMap = new Map<string, ReturnType<typeof wrapIntoAbortController>>();
-	const orderBroker = new NextOrder();
-	await orderBroker.init("PmmDevnetEvents");
-	const expectedProfit = 123n; // TODO: move to env
-	const connection = new Connection("https://api.devnet.solana.com"); // TODO: get connection endpoint from env
-	const dstClient = new Solana.PMMDst(
-		"dstFoo3xGxv23giLZBuyo9rRwXHdDMeySj7XXMj1Rqn",
-		"F1nSne66G8qCrTVBa1wgDrRFHMGj8pZUZiqgxUrVtaAQ",
-		"14bkTTDfycEShjiurAv1yGupxvsQcWevReLNnpzZgaMh",
-		connection,
-	); // TODO: get pmm dst/debridge/debridge settings addresses from env
-	const taker: Keypair = getWallet(); // TODO: get taker wallet from env
-	const beneficiary = Buffer.from(Array.from({ length: 20 }).fill(0) as number[]);
+	const orderBroker = new NextOrder(config, enabledChains);
+
+	const adapters = {} as AdapterContainer;
+	const pmmClient = new PMMClient({});
+	const beneficiaryMap: Map<ChainId, string> = new Map();
+
+	type EvmChainInfo = NonNullable<ConstructorParameters<typeof Evm.PmmEvmClient>[0]>["addresses"];
+	const evmAddresses = {} as EvmChainInfo;
+
+	for (const chain of enabledChains) {
+		if (chain === ChainId.Solana) {
+			adapters[chain] = new SolanaProvider(
+				new Connection(config[chain].RPC_URL),
+				Keypair.fromSecretKey(helpers.hexToBuffer(config[chain].WALLET)),
+			);
+			pmmClient.updateClient(
+				chain,
+				new Solana.PmmClient(
+					adapters[chain].connection as Connection,
+					config[chain].PMM_SRC,
+					config[chain].PMM_DST,
+					config[chain].DEBRIDGE,
+					config[chain].DEBRIDGE_SETTINGS!,
+				),
+			);
+		} else {
+			const web3 = new Web3(config[chain].RPC_URL);
+			const account = web3.eth.accounts.privateKeyToAccount(config[chain].WALLET);
+			web3.eth.accounts.wallet.add(account);
+			web3.eth.defaultAccount = account.address;
+			adapters[chain] = new EvmProvider(web3);
+			evmAddresses[chain] = {
+				deBridgeGateAddress: config[chain].DEBRIDGE,
+				pmmDestinationAddress: config[chain].PMM_DST,
+				pmmSourceAddress: config[chain].PMM_SRC,
+			} as EvmChainInfo[number];
+		}
+		beneficiaryMap.set(chain, config[chain].BENEFICIARY);
+	}
+
+	const evmClient = new Evm.PmmEvmClient({ addresses: evmAddresses, enableContractsCache: true });
+	for (const chain of Object.keys(evmAddresses)) {
+		pmmClient.updateClient(Number(chain), evmClient);
+	}
+
+	await orderBroker.init();
 
 	let previousOrderId: string | null = null;
 	while (true) {
@@ -257,12 +304,12 @@ async function main() {
 			previousOrderId = Order.calculateId(order);
 			taskMap.set(
 				previousOrderId,
-				wrapIntoAbortController(orderProcessor, connection, dstClient, taker, beneficiary, order, feed, checker, expectedProfit),
+				wrapIntoAbortController(orderProcessor, pmmClient, beneficiaryMap, adapters, order, feed, checker, config.EXPECTED_PROFIT),
 			);
 		}
 	}
 }
 
 main()
-	.then(() => {})
+	.then(() => { })
 	.catch(console.error);
