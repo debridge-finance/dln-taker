@@ -15,14 +15,22 @@ export type Config = {
 	EXPECTED_PROFIT: bigint;
 	RABBIT_URL: string;
 	QUEUE_NAME: string;
+	CREATED_EVENT_TIMEOUT: number;
 };
 
 export interface PriceFeed {
 	getUsdPrice(chainId: ChainId, tokenAddress: string): Promise<bigint>;
 }
 
+export type NextOrderInfo = {
+	orderId: string;
+	type: "created" | "fulfilled" | "other";
+	order: OrderData | null,
+	taker?: string;
+}
+
 export interface GetNextOrder {
-	getNextOrder(): Promise<OrderData | null>;
+	getNextOrder(): Promise<NextOrderInfo>;
 }
 
 export interface GetProfit {
@@ -32,6 +40,7 @@ export interface GetProfit {
 export type ProviderAdapter = {
 	connection: unknown;
 	wallet: unknown;
+	address: string;
 	sendTransaction: (data: unknown) => Promise<unknown>;
 };
 

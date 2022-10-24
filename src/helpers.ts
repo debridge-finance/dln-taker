@@ -3,17 +3,22 @@ import { ChainId, OrderData } from "@debridge-finance/pmm-client";
 import { ChainConfig, Config } from "./interfaces";
 import { config } from "dotenv";
 
+export function timeDiff(timestamp: number) {
+	return (Date.now() / 1000) - timestamp;
+}
+
 export function readEnv(): [Config, ChainId[]] {
 	const { parsed } = config({ path: "./src/.env" });
 	if (!parsed) throw new Error("Failed to parse config");
 
 	let enabledChains = [];
-	if (["EXPECTED_PROFIT", "RABBIT_URL", "QUEUE_NAME"].map((v) => v in parsed).find((v) => v === false) !== undefined)
+	if (["EXPECTED_PROFIT", "RABBIT_URL", "QUEUE_NAME", "CREATED_EVENT_TIMEOUT"].map((v) => v in parsed).find((v) => v === false) !== undefined)
 		throw new Error("Wrong config");
 	let result = {
 		EXPECTED_PROFIT: BigInt(parsed.EXPECTED_PROFIT),
 		RABBIT_URL: parsed.RABBIT_URL,
 		QUEUE_NAME: parsed.QUEUE_NAME,
+		CREATED_EVENT_TIMEOUT: Number(parsed.CREATED_EVENT_TIMEOUT),
 	} as Config;
 	const keys = ["DEBRIDGE", "PMM_DST", "PMM_SRC", "RPC_URL", "BENEFICIARY", "WALLET"];
 	for (const chain of Object.values(ChainId) as number[]) {

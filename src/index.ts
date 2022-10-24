@@ -1,17 +1,15 @@
 import { ChainId, Evm, Order, OrderData, OrderState, PMMClient, Solana } from "@debridge-finance/pmm-client";
-import { AdapterContainer, Config, GetNextOrder, GetProfit, PriceFeed, ProviderAdapter } from "./interfaces";
+import { AdapterContainer, Config, GetNextOrder, GetProfit, NextOrderInfo, PriceFeed, ProviderAdapter } from "./interfaces";
 import { Connection, Keypair, Transaction, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import client, { Connection as MQConnection } from "amqplib";
 import { PmmEvent } from "./pmm_common";
-import { eventToOrderData, readEnv } from "./helpers";
+import { eventToOrderData, readEnv, timeDiff, U256ToBytesBE } from "./helpers";
 import { helpers } from "@debridge-finance/solana-utils";
 import Web3 from "web3";
 
 (BigInt.prototype as any).toJSON = function () {
 	return this.toString();
 };
-
-const CHAINS = Object.values(ChainId).map((v) => v.toString());
 
 class CalimerApi implements PriceFeed {
 	async getUsdPrice(chainId: ChainId, tokenAddress: string): Promise<bigint> {
@@ -62,6 +60,12 @@ class SolanaProvider implements ProviderAdapter {
 		};
 	}
 
+
+	public get address(): string {
+		return helpers.bufferToHex(this.wallet.publicKey.toBuffer());
+	}
+
+
 	async sendTransaction(data: unknown) {
 		const txid = await helpers.sendAll(
 			this.connection,
@@ -81,6 +85,10 @@ class EvmProvider implements ProviderAdapter {
 	wallet: never;
 
 	constructor(public connection: Web3) { }
+
+	public get address(): string {
+		return this.connection.eth.defaultAccount!;
+	}
 
 	async sendTransaction(data: unknown) {
 		const tx = data as { data: string; to: string; value: number };
@@ -121,7 +129,7 @@ class NextOrder implements GetNextOrder {
 	private mqConnection: MQConnection;
 	private initialized: boolean;
 
-	constructor(private config: Pick<Config, "RABBIT_URL" | "QUEUE_NAME">, private enabledChains: ChainId[]) {
+	constructor(private config: Pick<Config, "RABBIT_URL" | "QUEUE_NAME">, private enabledChains: ChainId[], private eventTimeout: number) {
 		this.initialized = false;
 	}
 
@@ -137,25 +145,74 @@ class NextOrder implements GetNextOrder {
 		this.initialized = true;
 	}
 
-	async getNextOrder(): Promise<OrderData | null> {
+	async getNextOrder(): Promise<NextOrderInfo> {
 		if (!this.initialized) await this.init();
 		while (true) {
 			if (this.queue.length != 0) {
 				const firstIn = this.queue.shift();
 				const decoded = PmmEvent.fromBinary(firstIn!.content);
-				if (decoded.event.oneofKind === "createdSrc") {
-					// disable execution of orders with ext call
-					if (decoded.event.createdSrc.createdOrder?.externalCall !== undefined) continue;
-					// console.log(JSON.stringify(decoded.event));
-					const orderData = eventToOrderData(decoded.event.createdSrc.createdOrder!);
-					// skip order if give.chainId or take.chainId not in supported chains list
-					if (!this.enabledChains.includes(orderData.take.chainId) || !this.enabledChains.includes(orderData.give.chainId))
-						continue;
-					console.log(orderData);
-
-					return orderData;
+				switch (decoded.event.oneofKind) {
+					case "createdSrc": {
+						const orderData = eventToOrderData(decoded.event.createdSrc.createdOrder!);
+						console.log(timeDiff(Number(decoded.transactionMetadata?.trackedByReaderTimestamp!)));
+						console.log(this.enabledChains, orderData.take.chainId, orderData.give.chainId);
+						if (
+							!this.enabledChains.includes(orderData.take.chainId) ||
+							!this.enabledChains.includes(orderData.give.chainId) ||
+							timeDiff(Number(decoded.transactionMetadata?.trackedByReaderTimestamp!)) > this.eventTimeout
+						)
+							continue;
+						console.log(orderData);
+						return {
+							type: "created",
+							orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.createdSrc.orderId!)),
+							order: orderData,
+						}
+					}
+					case "claimedOrderCancelSrc": {
+						return {
+							type: "other",
+							orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.claimedOrderCancelSrc.orderId!)),
+							order: null,
+						}
+					}
+					case "claimedUnlockSrc": {
+						return {
+							type: "other",
+							orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.claimedUnlockSrc.orderId!)),
+							order: null,
+						}
+					}
+					case "fulfilledDst": {
+						return {
+							type: "fulfilled",
+							orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.fulfilledDst.orderId!)),
+							order: eventToOrderData(decoded.event.fulfilledDst.fulfilledOrder!),
+							taker: helpers.bufferToHex(Buffer.from(decoded.event.fulfilledDst.takerDst?.address!)),
+						}
+					}
+					case "orderCancelledDst": {
+						return {
+							type: "other",
+							orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.orderCancelledDst.orderId!)),
+							order: null,
+						}
+					}
+					case "sendOrderCancelDst": {
+						return {
+							type: "other",
+							orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.sendOrderCancelDst.orderId!)),
+							order: null,
+						}
+					}
+					case "sendUnlockDst": {
+						return {
+							type: "other",
+							orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.sendUnlockDst.orderId!)),
+							order: null,
+						}
+					}
 				}
-				return null;
 			}
 			await helpers.sleep(2000);
 		}
@@ -185,6 +242,7 @@ async function orderProcessor(
 	const profit = await profitChecker.getProfit(order.take.chainId, giveUsdAmonut, takeUsdAmount);
 	if (signal.aborted) return undefined;
 
+	console.log(`Profit is: ${profit}`);
 	if (profit < expectedProfit) return undefined;
 
 	let fulfillIx;
@@ -203,9 +261,9 @@ async function orderProcessor(
 
 	console.log(fulfillIx);
 
-	/*const txId = await providers[order.take.chainId].sendTransaction(fulfillIx);
-	console.log(`Fulfill: ${txId}`);
-	*/
+	const txId = await providers[order.take.chainId].sendTransaction(fulfillIx);
+	console.log(`Fulfill: ${txId} `);
+
 	if (signal.aborted) return undefined;
 
 	const web3Payload =
@@ -236,7 +294,7 @@ async function orderProcessor(
 	if (signal.aborted) return undefined;
 
 	const txId2 = await providers[order.take.chainId].sendTransaction(unlockIx);
-	console.log(`Send unlock: ${txId2}`);
+	console.log(`Send unlock: ${txId2} `);
 
 }
 
@@ -244,7 +302,7 @@ async function main() {
 	const [config, enabledChains] = readEnv();
 
 	const taskMap = new Map<string, ReturnType<typeof wrapIntoAbortController>>();
-	const orderBroker = new NextOrder(config, enabledChains);
+	const orderBroker = new NextOrder({ QUEUE_NAME: config.QUEUE_NAME, RABBIT_URL: config.RABBIT_URL }, enabledChains, config.CREATED_EVENT_TIMEOUT);
 
 	const adapters = {} as AdapterContainer;
 	const pmmClient = new PMMClient({});
@@ -290,22 +348,23 @@ async function main() {
 	}
 
 	await orderBroker.init();
+	const takers = enabledChains.map((chain) => adapters[chain].address);
+	console.log(takers);
 
-	let previousOrderId: string | null = null;
 	while (true) {
-		const order = await orderBroker.getNextOrder();
-		if (order === null) {
-			if (previousOrderId !== null) {
-				const task = taskMap.get(previousOrderId);
-				task?.abort();
-			}
-		} else {
-			console.debug(order);
-			previousOrderId = Order.calculateId(order);
+		const { order, orderId, type, taker } = await orderBroker.getNextOrder();
+		console.log(type, order);
+		if (type === "created") {
 			taskMap.set(
-				previousOrderId,
-				wrapIntoAbortController(orderProcessor, pmmClient, beneficiaryMap, adapters, order, feed, checker, config.EXPECTED_PROFIT),
+				orderId,
+				wrapIntoAbortController(orderProcessor, pmmClient, beneficiaryMap, adapters, order!, feed, checker, config.EXPECTED_PROFIT),
 			);
+		} else {
+			const task = taskMap.get(orderId);
+			if (task === undefined) continue;
+			if (type === "fulfilled" && takers.includes(taker!)) continue;
+			task?.abort();
+
 		}
 	}
 }
