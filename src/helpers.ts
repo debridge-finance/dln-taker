@@ -64,15 +64,27 @@ export function U256ToBigint(u: U256) {
 
 function BytesToU64(data: Buffer, encoding: "le" | "be"): bigint {
 	let result: bigint = 0n;
-	const beOrder = [0, 1, 2, 3, 4, 5, 6, 7];
+	const leOrder = [0, 1, 2, 3, 4, 5, 6, 7];
 	let counter = 0;
-	for (let i of encoding === "le" ? beOrder.reverse() : beOrder) {
+	for (const i of encoding === "be" ? leOrder.reverse() : leOrder) {
 		result += BigInt(data[i]) << BigInt(8 * counter);
+		counter += 1;
 	}
 	return result;
 }
 
-export function BytesBEToU256(data: Buffer) { }
+export function bytesBEToU256(data: Buffer) {
+	return {
+		limb4: BytesToU64(data.subarray(0, 8), "be"),
+		limb3: BytesToU64(data.subarray(8, 16), "be"),
+		limb2: BytesToU64(data.subarray(16, 24), "be"),
+		limb1: BytesToU64(data.subarray(24, 32), "be"),
+	};
+}
+
+export function bytesBEToBigint(data: Buffer) {
+	return U256ToBigint(bytesBEToU256(data));
+}
 
 export function bigintToU256(n: bigint): U256 {
 	const u64Mask = 0xffffffffffffffffn;
