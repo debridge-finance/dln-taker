@@ -1,5 +1,5 @@
 import { helpers } from "@debridge-finance/solana-utils";
-import { eventToOrderData, timeDiff, U256ToBytesBE } from "./helpers";
+import { eventToOrderData, timeDiff, U256 } from "./helpers";
 import { Config, GetNextOrder, NextOrderInfo } from "./interfaces";
 import { PmmEvent } from "./pmm_common";
 import client, { Connection as MQConnection } from "amqplib";
@@ -46,28 +46,28 @@ export class RabbitNextOrder implements GetNextOrder {
                         console.log(orderData);
                         return {
                             type: "created",
-                            orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.createdSrc.orderId!)),
+                            orderId: helpers.bufferToHex(U256.toBytesBE(decoded.event.createdSrc.orderId!)),
                             order: orderData,
                         }
                     }
                     case "claimedOrderCancelSrc": {
                         return {
                             type: "other",
-                            orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.claimedOrderCancelSrc.orderId!)),
+                            orderId: helpers.bufferToHex(U256.toBytesBE(decoded.event.claimedOrderCancelSrc.orderId!)),
                             order: null,
                         }
                     }
                     case "claimedUnlockSrc": {
                         return {
                             type: "other",
-                            orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.claimedUnlockSrc.orderId!)),
+                            orderId: helpers.bufferToHex(U256.toBytesBE(decoded.event.claimedUnlockSrc.orderId!)),
                             order: null,
                         }
                     }
                     case "fulfilledDst": {
                         return {
                             type: "fulfilled",
-                            orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.fulfilledDst.orderId!)),
+                            orderId: helpers.bufferToHex(U256.toBytesBE(decoded.event.fulfilledDst.orderId!)),
                             order: eventToOrderData(decoded.event.fulfilledDst.fulfilledOrder!),
                             taker: helpers.bufferToHex(Buffer.from(decoded.event.fulfilledDst.takerDst?.address!)),
                         }
@@ -75,21 +75,21 @@ export class RabbitNextOrder implements GetNextOrder {
                     case "orderCancelledDst": {
                         return {
                             type: "other",
-                            orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.orderCancelledDst.orderId!)),
+                            orderId: helpers.bufferToHex(U256.toBytesBE(decoded.event.orderCancelledDst.orderId!)),
                             order: null,
                         }
                     }
                     case "sendOrderCancelDst": {
                         return {
                             type: "other",
-                            orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.sendOrderCancelDst.orderId!)),
+                            orderId: helpers.bufferToHex(U256.toBytesBE(decoded.event.sendOrderCancelDst.orderId!)),
                             order: null,
                         }
                     }
                     case "sendUnlockDst": {
                         return {
                             type: "other",
-                            orderId: helpers.bufferToHex(U256ToBytesBE(decoded.event.sendUnlockDst.orderId!)),
+                            orderId: helpers.bufferToHex(U256.toBytesBE(decoded.event.sendUnlockDst.orderId!)),
                             order: null,
                         }
                     }

@@ -1,24 +1,25 @@
-import { ChainId, Evm, Order, OrderData, OrderState, PMMClient, Solana } from "@debridge-finance/pmm-client";
-import { AdapterContainer, Config, GetNextOrder, GetProfit, NextOrderInfo, PriceFeed, ProviderAdapter } from "./interfaces";
+import { ChainId, Evm, OrderData, OrderState, PMMClient, Solana } from "@debridge-finance/pmm-client";
+import { AdapterContainer, GetProfit, PriceFeed, ProviderAdapter } from "./interfaces";
 import { Connection, Keypair, Transaction, PublicKey, TransactionInstruction } from "@solana/web3.js";
-import { eventToOrderData, readEnv, timeDiff, U256ToBytesBE } from "./helpers";
-import { helpers } from "@debridge-finance/solana-utils";
+import { readEnv } from "./helpers";
+import { helpers, WRAPPED_SOL_MINT } from "@debridge-finance/solana-utils";
 import Web3 from "web3";
 import { RabbitNextOrder } from "./rabbitmq.order.feed";
+import BigNumber from "bignumber.js";
 
 (BigInt.prototype as any).toJSON = function () {
 	return this.toString();
 };
 
 class CalimerApi implements PriceFeed {
-	async getUsdPrice(chainId: ChainId, tokenAddress: string): Promise<bigint> {
+	async getUsdPrice(chainId: ChainId, tokenAddress: string): Promise<number> {
 		console.log(`Getting price of token: ${tokenAddress}, chain: ${chainId}`);
 		const multiplier = 1e4;
 		const query = `https://claimerapi.debridge.io/TokenPrice/usd_price?chainId=${chainId}&tokenAddress=0x${tokenAddress}`;
 		// @ts-expect-error
 		const response = await fetch(query);
 		if (response.status === 200) {
-			return BigInt(Math.floor(multiplier * Number(await response.text())));
+			return Number(await response.text());
 		} else {
 			const parsedJson = (await response.json()) as { message: string };
 			throw new Error(parsedJson.message);
@@ -135,16 +136,24 @@ async function orderProcessor(
 ): Promise<bigint | undefined> {
 	if (signal.aborted) return undefined;
 
-	const [givePrice, takePrice] = await Promise.all([
+	const evmNative = "0x0000000000000000000000000000000000000000";
+	const solanaNative = WRAPPED_SOL_MINT.toBase58();
+
+	const [giveNativePrice, takeNativePrice, givePrice, takePrice] = await Promise.all([
+		priceFeed.getUsdPrice(order.give.chainId, order.give.chainId != ChainId.Solana ? evmNative : solanaNative),
+		priceFeed.getUsdPrice(order.take.chainId, order.take.chainId != ChainId.Solana ? evmNative : solanaNative),
 		priceFeed.getUsdPrice(order.give.chainId, Buffer.from(order.give.tokenAddress).toString("hex")),
 		priceFeed.getUsdPrice(order.take.chainId, Buffer.from(order.take.tokenAddress).toString("hex")),
 	]);
 	if (signal.aborted) return undefined;
-	const giveUsdAmount = givePrice * order.give.amount;
-	const takeUsdAmount = takePrice * order.take.amount;
+	const giveWeb3 = order.give.chainId != ChainId.Solana ? providers[order.give.chainId].connection as Web3 : undefined;
+	const takeWeb3 = order.take.chainId != ChainId.Solana ? providers[order.take.chainId].connection as Web3 : undefined;
+	const fees = await client.getTakerFlowCost(order, giveNativePrice, takeNativePrice, { giveWeb3: (giveWeb3 || takeWeb3)!, takeWeb3: (takeWeb3 || giveWeb3)! });
 
-	const profit = await profitChecker.getProfit(order.take.chainId, giveUsdAmount, takeUsdAmount);
-	console.log(giveUsdAmount, takeUsdAmount);
+	const giveUsdAmount = BigNumber(givePrice).multipliedBy(order.give.amount.toString());
+	const takeUsdAmount = BigNumber(takePrice).multipliedBy(order.take.amount.toString());
+	const profit = takeUsdAmount.minus(giveUsdAmount).minus(fees.total);
+	if (profit.lt(expectedProfit.toString())) return undefined;
 	if (signal.aborted) return undefined;
 
 	console.log(`Profit is: ${profit}`);
@@ -169,8 +178,6 @@ async function orderProcessor(
 	const txId = await providers[order.take.chainId].sendTransaction(fulfillIx);
 	console.log(`Fulfill: ${txId} `);
 
-	if (signal.aborted) return undefined;
-
 	const web3Payload =
 		order.give.chainId === ChainId.Solana
 			? {
@@ -179,24 +186,20 @@ async function orderProcessor(
 			: undefined;
 	let state = await client.getTakeOrderStatus(order, web3Payload);
 	while (state === null || state.status !== OrderState.Fulfilled) {
-		if (signal.aborted) return undefined;
 		state = await client.getTakeOrderStatus(order, web3Payload);
-		if (signal.aborted) return undefined;
 		await helpers.sleep(2000);
 	}
-	// TODO calc execution fee
+
 	let unlockIx;
 	if (order.take.chainId === ChainId.Solana)
-		unlockIx = await client.sendUnlockOrder<ChainId.Solana>(order, beneficiaryMap.get(order.give.chainId)!, 0n, {
+		unlockIx = await client.sendUnlockOrder<ChainId.Solana>(order, beneficiaryMap.get(order.give.chainId)!, fees.executionFees.claimCost + fees.executionFees.executionCost, {
 			unlocker: (providers[order.take.chainId].wallet as { publicKey: PublicKey }).publicKey,
 		});
 	else
-		unlockIx = await client.sendUnlockOrder<ChainId.Polygon>(order, beneficiaryMap.get(order.give.chainId)!, 0n, {
+		unlockIx = await client.sendUnlockOrder<ChainId.Polygon>(order, beneficiaryMap.get(order.give.chainId)!, fees.executionFees.claimCost + fees.executionFees.executionCost, {
 			web3: providers[order.take.chainId].connection as Web3,
-			reward: 0,
+			reward: fees.executionFees.claimCost.toString(),
 		});
-
-	if (signal.aborted) return undefined;
 
 	const txId2 = await providers[order.take.chainId].sendTransaction(unlockIx);
 	console.log(`Send unlock: ${txId2} `);
