@@ -1,6 +1,6 @@
 import { ChainId } from "@debridge-finance/pmm-client";
 import { PriceFeed } from "../interfaces";
-import axios, {AxiosInstance} from "axios";
+import axios, {AxiosInstance, AxiosRequestConfig} from "axios";
 import logger from "loglevel";
 import { helpers } from "@debridge-finance/solana-utils";
 import { PublicKey } from "@solana/web3.js";
@@ -22,8 +22,14 @@ export class CoingeckoPriceFeed implements PriceFeed {
     constructor(private token?: string) {
         this.axiosInstance = axios.create({
             adapter: setupCache({
-                maxAge: 5 * 60 * 1000 // caching 5m
-            }).adapter
+                maxAge: 5 * 60 * 1000, // caching 5m
+                debug: false,
+                key: (req: AxiosRequestConfig) => { return req.url as string; },
+                clearOnStale: true,
+                exclude: {
+                    query: false
+                },
+            }).adapter,
         });
         if (token) {
             this.domain = "https://pro-api.coingecko.com";
