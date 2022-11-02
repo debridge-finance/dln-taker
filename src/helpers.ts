@@ -13,12 +13,13 @@ export function readEnv(): [Config, ChainId[]] {
 	if (!parsed) throw new Error("Failed to parse config");
 
 	let enabledChains = [];
-	if (["EXPECTED_PROFIT", "RABBIT_URL", "QUEUE_NAME", "CREATED_EVENT_TIMEOUT"].map((v) => v in parsed).find((v) => v === false) !== undefined)
+	if (["EXPECTED_PROFIT", "WS_URL", "CREATED_EVENT_TIMEOUT"].map((v) => v in parsed).find((v) => v === false) !== undefined)
 		throw new Error("Wrong config");
 	let result = {
 		EXPECTED_PROFIT: BigInt(parsed.EXPECTED_PROFIT),
-		RABBIT_URL: parsed.RABBIT_URL,
-		QUEUE_NAME: parsed.QUEUE_NAME,
+		//RABBIT_URL: parsed.RABBIT_URL,
+		//QUEUE_NAME: parsed.QUEUE_NAME,
+		WS_URL: parsed.WS_URL,
 		CREATED_EVENT_TIMEOUT: Number(parsed.CREATED_EVENT_TIMEOUT),
 	} as Config;
 	const keys = ["DEBRIDGE", "PMM_DST", "PMM_SRC", "RPC_URL", "BENEFICIARY", "WALLET"];

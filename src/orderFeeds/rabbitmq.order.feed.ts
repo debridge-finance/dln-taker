@@ -1,7 +1,7 @@
 import { helpers } from "@debridge-finance/solana-utils";
-import { eventToOrderData, timeDiff, U256 } from "./helpers";
-import { Config, GetNextOrder, NextOrderInfo } from "./interfaces";
-import { PmmEvent } from "./pmm_common";
+import { eventToOrderData, timeDiff, U256 } from "../helpers";
+import { Config, GetNextOrder, NextOrderInfo } from "../interfaces";
+import { PmmEvent } from "../pmm_common";
 import client, { Connection as MQConnection } from "amqplib";
 import { ChainId } from "@debridge-finance/pmm-client";
 

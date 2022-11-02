@@ -13,8 +13,9 @@ export type ChainConfig = {
 export type Config = {
 	[chain: number]: ChainConfig;
 	EXPECTED_PROFIT: bigint;
-	RABBIT_URL: string;
-	QUEUE_NAME: string;
+	//RABBIT_URL: string;
+	//QUEUE_NAME: string;
+	WS_URL: string;
 	CREATED_EVENT_TIMEOUT: number;
 };
 

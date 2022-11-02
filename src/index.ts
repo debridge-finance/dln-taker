@@ -4,42 +4,14 @@ import { Connection, Keypair, Transaction, PublicKey, TransactionInstruction } f
 import { readEnv } from "./helpers";
 import { helpers, WRAPPED_SOL_MINT } from "@debridge-finance/solana-utils";
 import Web3 from "web3";
-import { RabbitNextOrder } from "./rabbitmq.order.feed";
+import { RabbitNextOrder } from "./orderFeeds/rabbitmq.order.feed";
 import BigNumber from "bignumber.js";
+import { WsNextOrder } from "./orderFeeds/ws.order.feed";
+import { CalimerApi } from "./priceFeeds/claimerapi.price.feed";
 
 (BigInt.prototype as any).toJSON = function () {
 	return this.toString();
 };
-
-class CalimerApi implements PriceFeed {
-	async getUsdPrice(chainId: ChainId, tokenAddress: string): Promise<number> {
-		console.log(`Getting price of token: ${tokenAddress}, chain: ${chainId}`);
-		const multiplier = 1e4;
-		const query = `https://claimerapi.debridge.io/TokenPrice/usd_price?chainId=${chainId}&tokenAddress=0x${tokenAddress}`;
-		// @ts-expect-error
-		const response = await fetch(query);
-		if (response.status === 200) {
-			return Number(await response.text());
-		} else {
-			const parsedJson = (await response.json()) as { message: string };
-			throw new Error(parsedJson.message);
-		}
-	}
-}
-
-class ProfitChecker implements GetProfit {
-	private feeMap: Record<string, bigint> = {
-		"-1": 1234n,
-	};
-
-	async getProfit(dstChainId: ChainId, giveUsdAmount: bigint, takeUsdAmount: bigint): Promise<bigint> {
-		const delta = giveUsdAmount - takeUsdAmount;
-		if (Object.keys(this.feeMap).includes(dstChainId.toString())) {
-			return delta - this.feeMap[dstChainId.toString()];
-		}
-		return delta;
-	}
-}
 
 class SolanaProvider implements ProviderAdapter {
 	public wallet: Parameters<typeof helpers.sendAll>["1"];
@@ -107,7 +79,6 @@ class EvmProvider implements ProviderAdapter {
 }
 
 const feed = new CalimerApi();
-const checker = new ProfitChecker();
 
 type EmptyTuple = [];
 type Head<T extends unknown[]> = T extends [...infer U, unknown] ? U : unknown[];
@@ -130,30 +101,30 @@ async function orderProcessor(
 	providers: AdapterContainer,
 	order: OrderData,
 	priceFeed: PriceFeed,
-	profitChecker: GetProfit,
 	expectedProfit: bigint,
 	signal: AbortSignal,
 ): Promise<bigint | undefined> {
 	if (signal.aborted) return undefined;
 
 	const evmNative = "0x0000000000000000000000000000000000000000";
-	const solanaNative = WRAPPED_SOL_MINT.toBase58();
+	const solanaNative = helpers.bufferToHex(WRAPPED_SOL_MINT.toBuffer());
 
 	const [giveNativePrice, takeNativePrice, givePrice, takePrice] = await Promise.all([
 		priceFeed.getUsdPrice(order.give.chainId, order.give.chainId != ChainId.Solana ? evmNative : solanaNative),
 		priceFeed.getUsdPrice(order.take.chainId, order.take.chainId != ChainId.Solana ? evmNative : solanaNative),
-		priceFeed.getUsdPrice(order.give.chainId, Buffer.from(order.give.tokenAddress).toString("hex")),
-		priceFeed.getUsdPrice(order.take.chainId, Buffer.from(order.take.tokenAddress).toString("hex")),
+		priceFeed.getUsdPrice(order.give.chainId, helpers.bufferToHex(Buffer.from(order.give.tokenAddress))),
+		priceFeed.getUsdPrice(order.take.chainId, helpers.bufferToHex(Buffer.from(order.take.tokenAddress))),
 	]);
 	if (signal.aborted) return undefined;
 	const giveWeb3 = order.give.chainId != ChainId.Solana ? providers[order.give.chainId].connection as Web3 : undefined;
 	const takeWeb3 = order.take.chainId != ChainId.Solana ? providers[order.take.chainId].connection as Web3 : undefined;
 	const fees = await client.getTakerFlowCost(order, giveNativePrice, takeNativePrice, { giveWeb3: (giveWeb3 || takeWeb3)!, takeWeb3: (takeWeb3 || giveWeb3)! });
 
+	// TODO: get decimals for token
 	const giveUsdAmount = BigNumber(givePrice).multipliedBy(order.give.amount.toString());
 	const takeUsdAmount = BigNumber(takePrice).multipliedBy(order.take.amount.toString());
 	const profit = takeUsdAmount.minus(giveUsdAmount).minus(fees.total);
-	if (profit.lt(expectedProfit.toString())) return undefined;
+	// if (profit.lt(expectedProfit.toString())) return undefined;
 	if (signal.aborted) return undefined;
 
 	console.log(`Profit is: ${profit}`);
@@ -192,11 +163,11 @@ async function orderProcessor(
 
 	let unlockIx;
 	if (order.take.chainId === ChainId.Solana)
-		unlockIx = await client.sendUnlockOrder<ChainId.Solana>(order, beneficiaryMap.get(order.give.chainId)!, fees.executionFees.claimCost + fees.executionFees.executionCost, {
+		unlockIx = await client.sendUnlockOrder<ChainId.Solana>(order, beneficiaryMap.get(order.give.chainId)!, fees.executionFees.total, {
 			unlocker: (providers[order.take.chainId].wallet as { publicKey: PublicKey }).publicKey,
 		});
 	else
-		unlockIx = await client.sendUnlockOrder<ChainId.Polygon>(order, beneficiaryMap.get(order.give.chainId)!, fees.executionFees.claimCost + fees.executionFees.executionCost, {
+		unlockIx = await client.sendUnlockOrder<ChainId.Polygon>(order, beneficiaryMap.get(order.give.chainId)!, fees.executionFees.total, {
 			web3: providers[order.take.chainId].connection as Web3,
 			reward: fees.executionFees.claimCost.toString(),
 		});
@@ -210,7 +181,10 @@ async function main() {
 	const [config, enabledChains] = readEnv();
 
 	const taskMap = new Map<string, ReturnType<typeof wrapIntoAbortController>>();
-	const orderBroker = new RabbitNextOrder({ QUEUE_NAME: config.QUEUE_NAME, RABBIT_URL: config.RABBIT_URL }, enabledChains, config.CREATED_EVENT_TIMEOUT);
+	//const orderBroker = new RabbitNextOrder({ QUEUE_NAME: config.QUEUE_NAME, RABBIT_URL: config.RABBIT_URL }, enabledChains, config.CREATED_EVENT_TIMEOUT);
+	// await orderBroker.init();
+
+	const orderBroker = new WsNextOrder(config.WS_URL, enabledChains);
 
 	const adapters = {} as AdapterContainer;
 	const pmmClient = new PMMClient({});
@@ -251,13 +225,15 @@ async function main() {
 	}
 
 	const evmClient = new Evm.PmmEvmClient({ addresses: evmAddresses, enableContractsCache: true });
+	const initSolana = (pmmClient.getClient(ChainId.Solana) as Solana.PmmClient).destination.debridge.init();
+
 	for (const chain of Object.keys(evmAddresses)) {
 		pmmClient.updateClient(Number(chain), evmClient);
 	}
 
-	await orderBroker.init();
 	const takers = enabledChains.map((chain) => adapters[chain].address);
 	console.log(takers);
+	await initSolana;
 
 	while (true) {
 		const { order, orderId, type, taker } = await orderBroker.getNextOrder();
@@ -265,7 +241,7 @@ async function main() {
 		if (type === "created") {
 			taskMap.set(
 				orderId,
-				wrapIntoAbortController(orderProcessor, pmmClient, beneficiaryMap, adapters, order!, feed, checker, config.EXPECTED_PROFIT),
+				wrapIntoAbortController(orderProcessor, pmmClient, beneficiaryMap, adapters, order!, feed, config.EXPECTED_PROFIT),
 			);
 		} else {
 			const task = taskMap.get(orderId);
