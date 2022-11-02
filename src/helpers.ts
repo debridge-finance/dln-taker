@@ -16,7 +16,7 @@ export function readEnv(): [Config, ChainId[]] {
 	if (["EXPECTED_PROFIT", "WS_URL", "CREATED_EVENT_TIMEOUT"].map((v) => v in parsed).find((v) => v === false) !== undefined)
 		throw new Error("Wrong config");
 	let result = {
-		EXPECTED_PROFIT: BigInt(parsed.EXPECTED_PROFIT),
+		EXPECTED_PROFIT: Number(parsed.EXPECTED_PROFIT),
 		//RABBIT_URL: parsed.RABBIT_URL,
 		//QUEUE_NAME: parsed.QUEUE_NAME,
 		WS_URL: parsed.WS_URL,

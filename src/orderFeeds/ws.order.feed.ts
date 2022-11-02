@@ -3,7 +3,6 @@ import { ChainId, Offer, Order, OrderData } from "@debridge-finance/pmm-client";
 import { U256 } from "../helpers";
 import { helpers } from "@debridge-finance/solana-utils";
 import WebSocket from 'ws';
-import { info } from "console";
 
 type WsOrderOffer = {
     chain_id: string;

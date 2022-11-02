@@ -26,7 +26,7 @@ export class CoingeckoPriceFeed implements PriceFeed {
         }
     }
 
-    async getUsdPriceWithDecimals(chainId: ChainId, token: string): Promise<{ price: number; decimals: number; }> {
+    async getUsdPriceWithDecimals(chainId: ChainId, token: string): Promise<number> {
         const coinGeckoChainId = this.getCoinGeckoChainId(chainId);
         let tokenAddress = token;
         if (chainId === ChainId.Solana) {
@@ -37,7 +37,7 @@ export class CoingeckoPriceFeed implements PriceFeed {
                     tokenAddress,
                 )
             ) {
-                return { price: 1, decimals: 6 }; //todo
+                return 1; //todo
             }
         } else {
             const evmNative = "0x0000000000000000000000000000000000000000";
@@ -55,13 +55,13 @@ export class CoingeckoPriceFeed implements PriceFeed {
         return response.data[tokenAddress][this.currency];
     }
 
-    async getGasPrice(chainId: ChainId): Promise<{ price: number, decimals: number }> {
+    async getGasPrice(chainId: ChainId): Promise<number> {
         const getNativeCoinName = this.getNativeCoinName(chainId);
         const url = this.domain + this.endpointGasPrice + `?ids=${getNativeCoinName}&vs_currencies=${this.currency}`;
         logger.log("CoinGeckoPriceTokenService", "url", url);
         const response = await axios.get(url + this.api_key);
         logger.log("CoinGeckoPriceTokenService", "response", response.data);
-        return { price: response.data[getNativeCoinName][this.currency], decimals: 18 };
+        return response.data[getNativeCoinName][this.currency];
     }
 
     private getNativeCoinName(chainId: ChainId): string | never {

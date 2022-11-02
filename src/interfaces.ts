@@ -12,7 +12,7 @@ export type ChainConfig = {
 
 export type Config = {
 	[chain: number]: ChainConfig;
-	EXPECTED_PROFIT: bigint;
+	EXPECTED_PROFIT: number;
 	//RABBIT_URL: string;
 	//QUEUE_NAME: string;
 	WS_URL: string;
@@ -20,7 +20,7 @@ export type Config = {
 };
 
 export interface PriceFeed {
-	getUsdPriceWithDecimals(chainId: ChainId, tokenAddress: string): Promise<{ price: number, decimals: number }>;
+	getUsdPriceWithDecimals(chainId: ChainId, tokenAddress: string): Promise<number>;
 }
 
 export type NextOrderInfo = {
