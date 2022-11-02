@@ -21,28 +21,29 @@
   },
   "homepage": "https://github.com/debridge-finance/market-maker-executor#readme",
   "devDependencies": {
-    "@types/amqplib": "^0.8.2",
-    "@types/chai": "^4.3.3",
-    "@types/mocha": "^9.1.1",
-    "@types/node": "^18.7.18",
-    "assert": "^2.0.0",
-    "eslint": "^8.23.1",
-    "eslint-config-prettier": "^8.5.0",
-    "mocha": "^10.0.0",
-    "prettier": "^2.7.1",
-    "rimraf": "^3.0.2",
-    "ts-node": "^10.9.1",
-    "tslib": "^2.4.0"
+    "@types/amqplib": "0.8.2",
+    "@types/chai": "4.3.3",
+    "@types/mocha": "9.1.1",
+    "@types/node": "18.11.9",
+    "assert": "2.0.0",
+    "eslint": "8.26.0",
+    "eslint-config-prettier": "8.5.0",
+    "mocha": "10.1.0",
+    "prettier": "2.7.1",
+    "rimraf": "3.0.2",
+    "ts-node": "10.9.1",
+    "tslib": "2.4.1"
   },
   "dependencies": {
     "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#common-client",
     "@debridge-finance/solana-utils": "github:debridge-finance/solana-utils",
-    "@protobuf-ts/plugin": "^2.8.1",
-    "amqplib": "^0.10.3",
-    "bignumber.js": "^9.1.0",
-    "dotenv": "^16.0.3",
-    "node-fetch": "^3.2.10",
+    "@protobuf-ts/plugin": "2.8.1",
+    "amqplib": "0.10.3",
+    "axios-cache-adapter": "2.7.3",
+    "bignumber.js": "9.1.0",
+    "dotenv": "16.0.3",
+    "node-fetch": "3.2.10",
     "web3": "1.8.0",
-    "ws": "^8.10.0"
+    "ws": "8.10.0"
   }
 }

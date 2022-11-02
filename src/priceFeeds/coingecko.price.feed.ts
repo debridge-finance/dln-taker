@@ -1,9 +1,10 @@
 import { ChainId } from "@debridge-finance/pmm-client";
 import { PriceFeed } from "../interfaces";
-import axios from "axios";
+import axios, {AxiosInstance} from "axios";
 import logger from "loglevel";
 import { helpers } from "@debridge-finance/solana-utils";
 import { PublicKey } from "@solana/web3.js";
+import {setupCache} from "axios-cache-adapter";
 
 export class CoingeckoPriceFeed implements PriceFeed {
     private readonly domain;
@@ -16,7 +17,14 @@ export class CoingeckoPriceFeed implements PriceFeed {
 
     private readonly api_key: string;
 
+    private readonly axiosInstance: AxiosInstance;
+
     constructor(private token?: string) {
+        this.axiosInstance = axios.create({
+            adapter: setupCache({
+                maxAge: 5 * 60 * 1000 // caching 5m
+            }).adapter
+        });
         if (token) {
             this.domain = "https://pro-api.coingecko.com";
             this.api_key = `&x_cg_pro_api_key=${token}`;
@@ -49,7 +57,7 @@ export class CoingeckoPriceFeed implements PriceFeed {
             coinGeckoChainId +
             `?contract_addresses=${tokenAddress}&vs_currencies=${this.currency}`;
         logger.log("CoinGeckoPriceTokenService", "url", url);
-        const response = await axios.get(url + this.api_key);
+        const response = await this.axiosInstance.get(url + this.api_key);
         logger.log("CoinGeckoPriceTokenService", "response", response.data);
 
         return response.data[tokenAddress][this.currency];
@@ -59,7 +67,7 @@ export class CoingeckoPriceFeed implements PriceFeed {
         const getNativeCoinName = this.getNativeCoinName(chainId);
         const url = this.domain + this.endpointGasPrice + `?ids=${getNativeCoinName}&vs_currencies=${this.currency}`;
         logger.log("CoinGeckoPriceTokenService", "url", url);
-        const response = await axios.get(url + this.api_key);
+        const response = await this.axiosInstance.get(url + this.api_key);
         logger.log("CoinGeckoPriceTokenService", "response", response.data);
         return response.data[getNativeCoinName][this.currency];
     }
