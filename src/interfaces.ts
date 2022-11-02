@@ -20,7 +20,7 @@ export type Config = {
 };
 
 export interface PriceFeed {
-	getUsdPrice(chainId: ChainId, tokenAddress: string): Promise<number>;
+	getUsdPriceWithDecimals(chainId: ChainId, tokenAddress: string): Promise<{ price: number, decimals: number }>;
 }
 
 export type NextOrderInfo = {
