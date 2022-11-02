@@ -106,6 +106,8 @@ async function orderProcessor(
 ): Promise<bigint | undefined> {
 	if (signal.aborted) return undefined;
 
+	const giveWeb3 = order.give.chainId != ChainId.Solana ? providers[order.give.chainId].connection as Web3 : undefined;
+	const takeWeb3 = order.take.chainId != ChainId.Solana ? providers[order.take.chainId].connection as Web3 : undefined;
 	const evmNative = "0x0000000000000000000000000000000000000000";
 	const solanaNative = helpers.bufferToHex(WRAPPED_SOL_MINT.toBuffer());
 
@@ -117,12 +119,10 @@ async function orderProcessor(
 		priceFeed.getUsdPriceWithDecimals(order.take.chainId, order.take.chainId != ChainId.Solana ? evmNative : solanaNative),
 		priceFeed.getUsdPriceWithDecimals(order.give.chainId, giveAddress),
 		priceFeed.getUsdPriceWithDecimals(order.take.chainId, takeAddress),
-		client.getDecimals(order.give.chainId, giveAddress),
-		client.getDecimals(order.take.chainId, takeAddress),
+		client.getDecimals(order.give.chainId, giveAddress, giveWeb3),
+		client.getDecimals(order.take.chainId, takeAddress, takeWeb3),
 	]);
 	if (signal.aborted) return undefined;
-	const giveWeb3 = order.give.chainId != ChainId.Solana ? providers[order.give.chainId].connection as Web3 : undefined;
-	const takeWeb3 = order.take.chainId != ChainId.Solana ? providers[order.take.chainId].connection as Web3 : undefined;
 	const fees = await client.getTakerFlowCost(order, giveNativePrice, takeNativePrice, { giveWeb3: (giveWeb3 || takeWeb3)!, takeWeb3: (takeWeb3 || giveWeb3)! });
 
 	const giveUsdAmount = BigNumber(givePrice).
@@ -132,10 +132,11 @@ async function orderProcessor(
 		multipliedBy(order.take.amount.toString()).
 		dividedBy(new BigNumber(10).pow(takeDecimals));
 	const profit = takeUsdAmount.minus(giveUsdAmount).minus(fees.usdTotal);
-	if (profit.lt(expectedProfit)) return undefined;
+	console.log(fees.executionFees);
+	console.log(`Profit is: ${profit}, fees: ${fees.usdTotal}, giveAmount: ${giveUsdAmount}, takeAmount: ${takeUsdAmount}`);
+	//if (profit.lt(expectedProfit)) return undefined;
 	if (signal.aborted) return undefined;
 
-	console.log(`Profit is: ${profit}`);
 	// if (profit < expectedProfit) return undefined;
 
 	let fulfillIx;
@@ -157,22 +158,16 @@ async function orderProcessor(
 	const txId = await providers[order.take.chainId].sendTransaction(fulfillIx);
 	console.log(`Fulfill: ${txId} `);
 
-	const web3Payload =
-		order.give.chainId === ChainId.Solana
-			? {
-				web3: providers[order.take.chainId].connection as Web3,
-			}
-			: undefined;
-	let state = await client.getTakeOrderStatus(order, web3Payload);
+	let state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
 	while (state === null || state.status !== OrderState.Fulfilled) {
-		state = await client.getTakeOrderStatus(order, web3Payload);
+		state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
 		await helpers.sleep(2000);
 	}
 
 	let unlockIx;
 
 	// calc amount to send with transfer fee
-	const executionFeeAmount = await client.getAmountToSend(order.take.chainId, order.give.chainId, fees.executionFees.total)
+	const executionFeeAmount = await client.getAmountToSend(order.take.chainId, order.give.chainId, fees.executionFees.total, takeWeb3);
 	if (order.take.chainId === ChainId.Solana)
 		unlockIx = await client.sendUnlockOrder<ChainId.Solana>(order, beneficiaryMap.get(order.give.chainId)!, executionFeeAmount, {
 			unlocker: (providers[order.take.chainId].wallet as { publicKey: PublicKey }).publicKey,
