@@ -1,10 +1,9 @@
 import { ChainId, Evm, OrderData, OrderState, PMMClient, Solana } from "@debridge-finance/pmm-client";
-import { AdapterContainer, GetProfit, PriceFeed, ProviderAdapter } from "./interfaces";
+import { AdapterContainer, PriceFeed, ProviderAdapter } from "./interfaces";
 import { Connection, Keypair, Transaction, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { readEnv } from "./helpers";
 import { helpers, WRAPPED_SOL_MINT } from "@debridge-finance/solana-utils";
 import Web3 from "web3";
-import { RabbitNextOrder } from "./orderFeeds/rabbitmq.order.feed";
 import BigNumber from "bignumber.js";
 import { WsNextOrder } from "./orderFeeds/ws.order.feed";
 import { CoingeckoPriceFeed } from "./priceFeeds/coingecko.price.feed";
@@ -155,8 +154,14 @@ async function orderProcessor(
 
 	console.log(fulfillIx);
 
-	const txId = await providers[order.take.chainId].sendTransaction(fulfillIx);
-	console.log(`Fulfill: ${txId} `);
+	try {
+		const txId = await providers[order.take.chainId].sendTransaction(fulfillIx);
+		console.log(`Fulfill: ${txId} `);
+	} catch (e) {
+		// TODO: monitoring
+		console.error(e);
+		return undefined;
+	}
 
 	let state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
 	while (state === null || state.status !== OrderState.Fulfilled) {
@@ -168,18 +173,34 @@ async function orderProcessor(
 
 	// calc amount to send with transfer fee
 	const executionFeeAmount = await client.getAmountToSend(order.take.chainId, order.give.chainId, fees.executionFees.total, takeWeb3);
-	if (order.take.chainId === ChainId.Solana)
+	if (order.take.chainId === ChainId.Solana) {
 		unlockIx = await client.sendUnlockOrder<ChainId.Solana>(order, beneficiaryMap.get(order.give.chainId)!, executionFeeAmount, {
 			unlocker: (providers[order.take.chainId].wallet as { publicKey: PublicKey }).publicKey,
 		});
-	else
+	} else {
+		let rewards = order.give.chainId === ChainId.Solana ?
+			{
+				reward1: fees.executionFees.rewards[0].toString(),
+				reward2: fees.executionFees.rewards[1].toString(),
+			} : {
+				reward1: "0",
+				reward2: "0",
+			}
+
 		unlockIx = await client.sendUnlockOrder<ChainId.Polygon>(order, beneficiaryMap.get(order.give.chainId)!, executionFeeAmount, {
 			web3: providers[order.take.chainId].connection as Web3,
-			reward: fees.executionFees.claimCost.toString(),
+			...rewards
 		});
+	}
 
-	const txId2 = await providers[order.take.chainId].sendTransaction(unlockIx);
-	console.log(`Send unlock: ${txId2} `);
+	try {
+		const txId2 = await providers[order.take.chainId].sendTransaction(unlockIx);
+		console.log(`Send unlock: ${txId2} `);
+	} catch (e) {
+		// TODO: monitoring
+		console.error(e);
+		return undefined;
+	}
 
 }
 

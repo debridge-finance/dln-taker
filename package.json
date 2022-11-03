@@ -43,7 +43,6 @@
     "axios-cache-adapter": "2.7.3",
     "bignumber.js": "9.1.0",
     "dotenv": "16.0.3",
-    "node-fetch": "3.2.10",
     "web3": "1.8.0",
     "ws": "8.10.0"
   }
