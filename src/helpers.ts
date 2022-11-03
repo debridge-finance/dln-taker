@@ -9,7 +9,7 @@ export function timeDiff(timestamp: number) {
 }
 
 export function readEnv(): [Config, ChainId[]] {
-	const { parsed } = config({ path: "./src/.env" });
+	const { parsed } = config({ path: ".env" });
 	if (!parsed) throw new Error("Failed to parse config");
 
 	let enabledChains = [];
