@@ -1,5 +1,8 @@
 # market-maker-executor
 
+# Requirements
+ NodeJs version >= 16
+
 # How to run
 1. Install dependencies: `npm i`. You need access to the following private repos:
   - github:debridge-finance/solana-pmm-client
