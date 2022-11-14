@@ -6,8 +6,9 @@ export class ExecutorEngine {
   private readonly executors: Executor[];
 
   constructor(executorConfigs: ExecutorConfig[]) {
+    const orderFulfilledMap = new Map<string, boolean>();
     this.executors = executorConfigs.map(config => {
-      return new Executor(config);
+      return new Executor(config, orderFulfilledMap);
     });
   }
 

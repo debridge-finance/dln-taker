@@ -14,12 +14,16 @@ type address = string;
  */
 export type OrderValidator = (order: OrderData, client: PMMClient, config: ExecutorConfig) => Promise<boolean>;
 
+export interface OrderProcessorContext {
+    client: PMMClient;
+    orderFulfilledMap: Map<string, boolean>;
+}
+
 /**
  * Represents an order fulfillment engine. Cannot be chained, but can be nested.
  *
- * TODO discuss arguments!
  */
-export type OrderProcessor = (order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, client: PMMClient) => Promise<void>;
+export type OrderProcessor = (orderId: string, order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, context: OrderProcessorContext) => Promise<void>;
 
 /**
  * Represents a chain configuration where orders can be fulfilled.
@@ -84,11 +88,6 @@ export type FulfillableChainConfig = {
      * The private key for the wallet with funds to fulfill orders
      */
     wallet: string,
-
-    /**
-     * The list of order input tokens the taker is willing to accept.
-     */
-    whitelistedGiveTokens: address[] | "ANY",
 
     /**
      * Represents a list of validators which filter out orders from the orders feed to be fulfilled

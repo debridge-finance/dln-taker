@@ -1,4 +1,4 @@
-import {ExecutorConfig, FulfillableChainConfig, OrderProcessor} from "./config";
+import {ExecutorConfig, FulfillableChainConfig, OrderProcessor, OrderProcessorContext} from "./config";
 import {Address} from "./pmm_common";
 import {ChainId, OrderData, OrderState, PMMClient} from "@debridge-finance/pmm-client";
 import {Connection, Keypair, PublicKey, Transaction, TransactionInstruction} from "@solana/web3.js";
@@ -74,7 +74,7 @@ async function sendTransaction(fulfillableChainConfig: FulfillableChainConfig, d
  * Represents an order fulfillment engine which fulfills orders taking the exact amount from the wallet
  */
 export function matchProcessor(): OrderProcessor {
-    return async (order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, client: PMMClient) => {
+    return async (orderId: string, order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, context: OrderProcessorContext) => {
         let giveWeb3: Web3;
         if (order.give.chainId !== ChainId.Solana) {
             giveWeb3 = new Web3(fulfillableChainConfig!.chainRpc);
@@ -93,24 +93,24 @@ export function matchProcessor(): OrderProcessor {
             executorConfig.priceTokenService!.getPrice(order.take.chainId, order.take.chainId !== ChainId.Solana ? evmNativeTokenAddress : solanaNativeTokenAddress),
             executorConfig.priceTokenService!.getPrice(order.give.chainId, giveAddress),
             executorConfig.priceTokenService!.getPrice(order.take.chainId, takeAddress),
-            client.getDecimals(order.give.chainId, giveAddress, giveWeb3!),
-            client.getDecimals(order.take.chainId, takeAddress, takeWeb3!),
+            context.client.getDecimals(order.give.chainId, giveAddress, giveWeb3!),
+            context.client.getDecimals(order.take.chainId, takeAddress, takeWeb3!),
         ]);
-        const fees = await client.getTakerFlowCost(order, giveNativePrice, takeNativePrice, { giveWeb3: giveWeb3!, takeWeb3: takeWeb3! });
+        const fees = await context.client.getTakerFlowCost(order, giveNativePrice, takeNativePrice, { giveWeb3: giveWeb3!, takeWeb3: takeWeb3! });
         logger.log(`matchProcessor fees=${JSON.stringify(fees)}`);
 
-        const executionFeeAmount = await client.getAmountToSend(order.take.chainId, order.give.chainId, fees.executionFees.total, takeWeb3!);
+        const executionFeeAmount = await context.client.getAmountToSend(order.take.chainId, order.give.chainId, fees.executionFees.total, takeWeb3!);
 
         let fulfillTx;
         if (order.take.chainId === ChainId.Solana) {
             const wallet = new PublicKey(fulfillableChainConfig.wallet);
-            fulfillTx = await client.fulfillOrder<ChainId.Solana>(order, {
+            fulfillTx = await context.client.fulfillOrder<ChainId.Solana>(order, {
                 taker: wallet,
             });
             logger.log(`matchProcessor fulfillTx is created in solana ${JSON.stringify(fulfillTx)}`);
         }
         else {
-            fulfillTx = await client.fulfillOrder<ChainId.Ethereum>(order, {
+            fulfillTx = await context.client.fulfillOrder<ChainId.Ethereum>(order, {
                 web3: createWeb3WithPrivateKey(fulfillableChainConfig.chainRpc, fulfillableChainConfig.wallet),
                 fulfillAmount: Number(order.take.amount),
                 permit: "0x",
@@ -118,23 +118,23 @@ export function matchProcessor(): OrderProcessor {
             logger.log(`matchProcessor fulfillTx is created in ${order.take.chainId} ${JSON.stringify(fulfillTx)}`);
         }
 
-        let state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
-        if (state === null) {
+        if (context.orderFulfilledMap.has(orderId)) {
+            context.orderFulfilledMap.delete(orderId);
             throw new MarketMakerExecutorError(MarketMakerExecutorErrorType.OrderIsFulfilled);
-        }//todo change to abort
+        }
 
         await sendTransaction(fulfillableChainConfig, fulfillTx);
 
-        state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
+        let state = await context.client.getTakeOrderStatus(order, { web3: takeWeb3! });
         while (state === null || state.status !== OrderState.Fulfilled) {
-            state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
+            state = await context.client.getTakeOrderStatus(order, { web3: takeWeb3! });
             logger.log(`matchProcessor state=${JSON.stringify(state)}`);
             await helpers.sleep(2000);
         }
 
         let unlockTx;
         if (order.take.chainId === ChainId.Solana) {
-            unlockTx = await client.sendUnlockOrder<ChainId.Solana>(order, fulfillableChainConfig.wallet!, executionFeeAmount, {
+            unlockTx = await context.client.sendUnlockOrder<ChainId.Solana>(order, fulfillableChainConfig.wallet!, executionFeeAmount, {
                 unlocker: new PublicKey(fulfillableChainConfig.wallet),
             });
         } else {
@@ -146,7 +146,7 @@ export function matchProcessor(): OrderProcessor {
                   reward1: "0",
                   reward2: "0",
               }
-            unlockTx = await client.sendUnlockOrder<ChainId.Polygon>(order, fulfillableChainConfig.beneficiary!, executionFeeAmount, {
+            unlockTx = await context.client.sendUnlockOrder<ChainId.Polygon>(order, fulfillableChainConfig.beneficiary!, executionFeeAmount, {
                 web3: createWeb3WithPrivateKey(fulfillableChainConfig.chainRpc, fulfillableChainConfig.wallet),
                 ...rewards
             });
@@ -159,8 +159,8 @@ export function matchProcessor(): OrderProcessor {
  * Represents an order fulfillment engine which swaps the given asset (inputToken) to a token
  * requested in the order
  */
-export function preswapProcessor(inputToken: Address, slippage: number): (order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, client: PMMClient) => Promise<void> {
-    return async (order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, client: PMMClient) => {
+export function preswapProcessor(inputToken: Address, slippage: number): OrderProcessor {
+    return async (orderId: string, order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, context: OrderProcessorContext) => {
         let giveWeb3: Web3;
         if (order.give.chainId !== ChainId.Solana) {
             giveWeb3 = new Web3(fulfillableChainConfig!.chainRpc);
@@ -179,25 +179,25 @@ export function preswapProcessor(inputToken: Address, slippage: number): (order:
             executorConfig.priceTokenService!.getPrice(order.take.chainId, order.take.chainId !== ChainId.Solana ? evmNativeTokenAddress : solanaNativeTokenAddress),
             executorConfig.priceTokenService!.getPrice(order.give.chainId, giveAddress),
             executorConfig.priceTokenService!.getPrice(order.take.chainId, takeAddress),
-            client.getDecimals(order.give.chainId, giveAddress, giveWeb3!),
-            client.getDecimals(order.take.chainId, takeAddress, takeWeb3!),
+            context.client.getDecimals(order.give.chainId, giveAddress, giveWeb3!),
+            context.client.getDecimals(order.take.chainId, takeAddress, takeWeb3!),
         ]);
-        const fees = await client.getTakerFlowCost(order, giveNativePrice, takeNativePrice, { giveWeb3: giveWeb3!, takeWeb3: takeWeb3! });
+        const fees = await context.client.getTakerFlowCost(order, giveNativePrice, takeNativePrice, { giveWeb3: giveWeb3!, takeWeb3: takeWeb3! });
         logger.log(`preswapProcessor fees=${JSON.stringify(fees)}`);
 
-        const executionFeeAmount = await client.getAmountToSend(order.take.chainId, order.give.chainId, fees.executionFees.total, takeWeb3!);
+        const executionFeeAmount = await context.client.getAmountToSend(order.take.chainId, order.give.chainId, fees.executionFees.total, takeWeb3!);
 
         let fulfillTx;
         if (order.take.chainId === ChainId.Solana) {
             const wallet = new PublicKey(fulfillableChainConfig.wallet);
-            fulfillTx = await client.preswapAndFulfillOrder<ChainId.Solana>(order, {
+            fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Solana>(order, {
                 taker: wallet,
                 swapToken: inputToken as unknown as string,
             });
             logger.log(`preswapProcessor fulfillTx is created in solana ${JSON.stringify(fulfillTx)}`);
         }
         else {
-            fulfillTx = await client.preswapAndFulfillOrder<ChainId.Ethereum>(order, {
+            fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Ethereum>(order, {
                 web3: createWeb3WithPrivateKey(fulfillableChainConfig.chainRpc, fulfillableChainConfig.wallet),
                 fulfillAmount: Number(order.take.amount),
                 permit: "0x",
@@ -209,23 +209,23 @@ export function preswapProcessor(inputToken: Address, slippage: number): (order:
             });
             logger.log(`preswapProcessor fulfillTx is created in ${order.take.chainId} ${JSON.stringify(fulfillTx)}`);
         }
-        let state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
-        if (state === null) {
+        if (context.orderFulfilledMap.has(orderId)) {
+            context.orderFulfilledMap.delete(orderId);
             throw new MarketMakerExecutorError(MarketMakerExecutorErrorType.OrderIsFulfilled);
         }
 
         await sendTransaction(fulfillableChainConfig, fulfillTx);
 
-        state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
+        let state = await context.client.getTakeOrderStatus(order, { web3: takeWeb3! });
         while (state === null || state.status !== OrderState.Fulfilled) {
-            state = await client.getTakeOrderStatus(order, { web3: takeWeb3! });
+            state = await context.client.getTakeOrderStatus(order, { web3: takeWeb3! });
             logger.log(`preswapProcessor state=${JSON.stringify(state)}`);
             await helpers.sleep(2000);
         }
 
         let unlockTx;
         if (order.take.chainId === ChainId.Solana) {
-            unlockTx = await client.sendUnlockOrder<ChainId.Solana>(order, fulfillableChainConfig.wallet!, executionFeeAmount, {
+            unlockTx = await context.client.sendUnlockOrder<ChainId.Solana>(order, fulfillableChainConfig.wallet!, executionFeeAmount, {
                 unlocker: new PublicKey(fulfillableChainConfig.wallet),
             });
         } else {
@@ -237,7 +237,7 @@ export function preswapProcessor(inputToken: Address, slippage: number): (order:
                   reward1: "0",
                   reward2: "0",
               }
-            unlockTx = await client.sendUnlockOrder<ChainId.Polygon>(order, fulfillableChainConfig.beneficiary!, executionFeeAmount, {
+            unlockTx = await context.client.sendUnlockOrder<ChainId.Polygon>(order, fulfillableChainConfig.beneficiary!, executionFeeAmount, {
                 web3: createWeb3WithPrivateKey(fulfillableChainConfig.chainRpc, fulfillableChainConfig.wallet),
                 ...rewards
             });

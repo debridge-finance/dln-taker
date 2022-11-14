@@ -1609,22 +1609,3 @@ class PmmEvent$Type extends MessageType<PmmEvent> {
  * @generated MessageType for protobuf message pmm_common.PmmEvent
  */
 export const PmmEvent = new PmmEvent$Type();
-
-
-type EmptyTuple = [];
-type Head<T extends unknown[]> = T extends [...infer U, unknown] ? U : unknown[];
-type OmitLastParam<F> = F extends (...args: infer P) => infer Ret
-  ? Head<P> extends EmptyTuple
-    ? () => Ret
-    : (...args: Head<P>) => Ret
-  : never;
-
-export function wrapIntoAbortController<T extends (...args: any[]) => any>(fn: T, ...args: Parameters<OmitLastParam<T>>) {
-    const controller = new AbortController();
-    const { signal } = controller;
-    fn(...args, signal);
-    return controller;
-}
-
-
-export type AbortControllerMap = Map<string, ReturnType<typeof wrapIntoAbortController>>

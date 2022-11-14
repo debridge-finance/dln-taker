@@ -7,14 +7,26 @@ import logger from "loglevel";
 
 
 /**
- * checks if maker is one of allowed todo
+ * checks if maker is one of allowed
  */
 export function isValidMaker(addresses: string[]): OrderValidator {
   return async (order: OrderData, pmmClient: PMMClient, config: ExecutorConfig) => {
     const result = addresses.map(address => address.toLowerCase()).includes(helpers.bufferToHex(Buffer.from(order.maker)));
     logger.log(`isValidMaker result=${result}`);
 
-    return result;//todo fix
+    return result;
+  };
+}
+
+/**
+ * checks if give token adrress is one of allowed
+ */
+export function isValidGiveTokenAddress(addresses: string[]): OrderValidator {
+  return async (order: OrderData, pmmClient: PMMClient, config: ExecutorConfig) => {
+    const result = addresses.map(address => address.toLowerCase()).includes(helpers.bufferToHex(Buffer.from(order.give.tokenAddress)));
+    logger.log(`isValidGiveTokenAddress result=${result}`);
+
+    return result;
   };
 }
 

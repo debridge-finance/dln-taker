@@ -2,7 +2,6 @@ import {ExecutorConfig, FulfillableChainConfig} from "./config";
 import {NextOrderInfo} from "./interfaces";
 import {ChainId, Evm, PMMClient, Solana} from "@debridge-finance/pmm-client";
 import logger from "loglevel";
-import {helpers} from "@debridge-finance/solana-utils";
 import {CoingeckoPriceFeed} from "./priceFeeds/coingecko.price.feed";
 import {OneInchConnector} from "./swapConnector/one.inch.connector";
 import {Connection, PublicKey} from "@solana/web3.js";
@@ -12,7 +11,7 @@ export class Executor {
   private solanaConnection: Connection;
   private pmmClient: PMMClient;
 
-  constructor(private readonly config: ExecutorConfig) {
+  constructor(private readonly config: ExecutorConfig, private readonly orderFulfilledMap: Map<string, boolean>) {
   }
 
   async init() {
@@ -81,15 +80,12 @@ export class Executor {
         if (nextOrderInfo.type === 'created') {
           logger.log(`execute ${orderId} processing is started`);
           const fulfillableChainConfig = this.config.fulfillableChains.find(it => nextOrderInfo.order?.take.chainId === it.chain);
-          if (Array.isArray(fulfillableChainConfig!.whitelistedGiveTokens)) {
-            fulfillableChainConfig!.whitelistedGiveTokens = fulfillableChainConfig!.whitelistedGiveTokens!.map(it => {
-              return it.toLowerCase();
-            });
-          }
 
           await this.processing(nextOrderInfo, fulfillableChainConfig!);
 
           logger.log(`execute ${orderId} processing is finished`);
+        } else if(nextOrderInfo.type === 'fulfilled') {
+          this.orderFulfilledMap.set(orderId, true);
         }
       }
     } catch (e) {
@@ -99,14 +95,6 @@ export class Executor {
 
   private async processing(nextOrderInfo: NextOrderInfo, fulfillableChainConfig: FulfillableChainConfig): Promise<boolean> {
     const order = nextOrderInfo.order!;
-    const giveTokenAddress = helpers.bufferToHex(Buffer.from(order.give.tokenAddress));
-
-    logger.log('Validation whitelistedGiveTokens is started');
-    if (Array.isArray(fulfillableChainConfig.whitelistedGiveTokens) && !fulfillableChainConfig.whitelistedGiveTokens.includes(giveTokenAddress)) {
-      logger.error('Validation whitelistedGiveTokens is failed');
-      return false;
-    }//todo move to validator
-    logger.log('Validation whitelistedGiveTokens is finished');
 
     logger.log('Order validation is started');
     const orderValidators = await Promise.all(fulfillableChainConfig.orderValidators?.map(validator => {
@@ -120,7 +108,10 @@ export class Executor {
     logger.log('Order validation is finished');
 
     logger.log(`OrderProcessor is started`);
-    await fulfillableChainConfig.orderProcessor!(nextOrderInfo.order!, this.config, fulfillableChainConfig, this.pmmClient);
+    await fulfillableChainConfig.orderProcessor!(nextOrderInfo.orderId, nextOrderInfo.order!, this.config, fulfillableChainConfig, {
+      orderFulfilledMap: this.orderFulfilledMap,
+      client: this.pmmClient,
+    });
     logger.log(`OrderProcessor is finished`);
 
     return true;
