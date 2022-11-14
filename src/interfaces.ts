@@ -19,10 +19,6 @@ export type Config = {
 	CREATED_EVENT_TIMEOUT: number;
 };
 
-export interface PriceFeed {
-	getUsdPriceWithDecimals(chainId: ChainId, tokenAddress: string): Promise<number>;
-}
-
 export type NextOrderInfo = {
 	orderId: string;
 	type: "created" | "fulfilled" | "other";
@@ -30,21 +26,16 @@ export type NextOrderInfo = {
 	taker?: string;
 }
 
-export interface GetNextOrder {
-	getNextOrder(): Promise<NextOrderInfo>;
+export abstract class GetNextOrder {
+	protected enabledChains: ChainId[]
+
+	abstract getNextOrder(): Promise<NextOrderInfo | undefined>;
+
+	setEnabledChains(enabledChains: ChainId[]) {
+		this.enabledChains = enabledChains;
+	}
 }
 
 export interface GetProfit {
 	getProfit(dstChainId: ChainId, giveUsdAmount: bigint, takeUsdAmount: bigint): Promise<bigint>;
 }
-
-export type ProviderAdapter = {
-	connection: unknown;
-	wallet: unknown;
-	address: string;
-	sendTransaction: (data: unknown) => Promise<unknown>;
-};
-
-export type AdapterContainer = {
-	[chainId: number]: ProviderAdapter;
-};

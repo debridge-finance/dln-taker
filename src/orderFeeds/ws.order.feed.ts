@@ -42,7 +42,7 @@ type WsOrderEvent = {
     }
 }
 
-export class WsNextOrder implements GetNextOrder {
+export class WsNextOrder extends GetNextOrder {
     private socket: WebSocket;
     private queue: { order: OrderData, orderId: string, state: OrderChangeStatus, taker?: string }[];
 
@@ -78,7 +78,8 @@ export class WsNextOrder implements GetNextOrder {
         return [status as Exclude<OrderChangeStatusInternal, FulfilledChangeStatus>, undefined];
     }
 
-    constructor(wsUrl: string, private enabledChains: ChainId[]) {
+    constructor(wsUrl: string) {
+        super();
         this.socket = new WebSocket(wsUrl)
         this.queue = [];
         this.socket.on("open", () => {
@@ -97,34 +98,31 @@ export class WsNextOrder implements GetNextOrder {
         })
     }
 
-    async getNextOrder(): Promise<NextOrderInfo> {
-        while (true) {
-            if (this.queue.length > 0) {
-                const orderInfo = this.queue.shift()!;
-                if (!this.enabledChains.includes(orderInfo.order.take.chainId) || !(this.enabledChains.includes(orderInfo.order.give.chainId))) continue;
-                switch (orderInfo.state) {
-                    case "Created":
-                        return {
-                            order: orderInfo.order,
-                            type: "created",
-                            orderId: orderInfo.orderId,
-                        }
-                    case "Fulfilled":
-                        return {
-                            order: orderInfo.order,
-                            type: "fulfilled",
-                            orderId: orderInfo.orderId,
-                            taker: orderInfo.taker
-                        };
-                    default:
-                        return {
-                            order: orderInfo.order,
-                            type: "other",
-                            orderId: orderInfo.orderId,
-                        }
+    async getNextOrder(): Promise<NextOrderInfo | undefined> {
+        while (this.queue.length > 0) {
+            const orderInfo = this.queue.shift()!;
+            if (!this.enabledChains.includes(orderInfo.order.take.chainId) || !(this.enabledChains.includes(orderInfo.order.give.chainId))) continue;
+            switch (orderInfo.state) {
+                case "Created":
+                    return {
+                        order: orderInfo.order,
+                        type: "created",
+                        orderId: orderInfo.orderId,
+                    }
+                case "Fulfilled":
+                    return {
+                        order: orderInfo.order,
+                        type: "fulfilled",
+                        orderId: orderInfo.orderId,
+                        taker: orderInfo.taker
+                    };
+                default:
+                    return {
+                        order: orderInfo.order,
+                        type: "other",
+                        orderId: orderInfo.orderId,
+                    }
                 }
-            }
-            await helpers.sleep(2000);
         }
     }
 }

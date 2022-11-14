@@ -1,6 +1,7 @@
-import { ChainId } from "@debridge-finance/pmm-client"
-import { GetNextOrder } from "./interfaces"
+import {ChainId, PMMClient, PriceTokenService, SwapConnector} from "@debridge-finance/pmm-client"
+import {GetNextOrder} from "./interfaces"
 import { Order } from "./pmm_common";
+import {OrderData} from "@debridge-finance/pmm-client/src/order";
 
 // todo: reuse internal Address representation and remove
 type address = string;
@@ -11,14 +12,14 @@ type address = string;
  *
  * TODO discuss arguments!
  */
-export type OrderValidator = (order: Order, config: ExecutorConfig) => Promise<boolean>;
+export type OrderValidator = (order: OrderData, client: PMMClient, config: ExecutorConfig) => Promise<boolean>;
 
 /**
  * Represents an order fulfillment engine. Cannot be chained, but can be nested.
  *
  * TODO discuss arguments!
  */
-export type OrderProcessor = (order: Order, config: FulfillableChainConfig) => Promise<void>;
+export type OrderProcessor = (order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, client: PMMClient) => Promise<void>;
 
 /**
  * Represents a chain configuration where orders can be fulfilled.
@@ -57,10 +58,15 @@ export type FulfillableChainConfig = {
      */
     deBridge?: address,
 
+    crossChainForwarderAddress?: address;
+
     /**
      * Solana related
      */
-    deBridgeSettings?: any,
+    deBridgeSettings?: {
+        debridge: string;
+        setting: string;
+    },
 
     //
     // taker related
@@ -104,10 +110,22 @@ export type FulfillableChainConfig = {
      * - match() - fulfills the order taking tokens from the wallet, if enough funds presented
      * - preswap() - fulfills the order making a preswap from specific token
      */
-    orderProcessor?: OrderProcessor
+    orderProcessor?: OrderProcessor,
 }
 
-export type ExecutorConfig = {
-    orderFeed: GetNextOrder | string,
-    fulfillableChains: FulfillableChainConfig[]
+export interface ExecutorConfig {
+    /**
+     * Token price provider
+     * default coingecko
+     */
+    priceTokenService?: PriceTokenService;
+
+    /**
+     * Swap connector
+     * default 1inch
+     */
+    swapConnector?: SwapConnector;
+
+    orderFeed: GetNextOrder;
+    fulfillableChains: FulfillableChainConfig[];
 }

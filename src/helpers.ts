@@ -1,39 +1,9 @@
-import { U256 as protoU256, EventCreatedSrc, Order } from "./pmm_common";
+import { Order } from "./pmm_common";
 import { ChainId, OrderData } from "@debridge-finance/pmm-client";
-import { ChainConfig, Config } from "./interfaces";
-import { config } from "dotenv";
 import { helpers } from "@debridge-finance/solana-utils";
 
 export function timeDiff(timestamp: number) {
 	return (Date.now() / 1000) - timestamp;
-}
-
-export function readEnv(): [Config, ChainId[]] {
-	const { parsed } = config({ path: ".env" });
-	if (!parsed) throw new Error("Failed to parse config");
-
-	let enabledChains = [];
-	if (["EXPECTED_PROFIT", "WS_URL", "CREATED_EVENT_TIMEOUT"].map((v) => v in parsed).find((v) => v === false) !== undefined)
-		throw new Error("Wrong config");
-	let result = {
-		EXPECTED_PROFIT: Number(parsed.EXPECTED_PROFIT),
-		//RABBIT_URL: parsed.RABBIT_URL,
-		//QUEUE_NAME: parsed.QUEUE_NAME,
-		WS_URL: parsed.WS_URL,
-		CREATED_EVENT_TIMEOUT: Number(parsed.CREATED_EVENT_TIMEOUT),
-	} as Config;
-	const keys = ["DEBRIDGE", "PMM_DST", "PMM_SRC", "RPC_URL", "BENEFICIARY", "WALLET"];
-	for (const chain of Object.values(ChainId) as number[]) {
-		if (`${chain}.WALLET` in parsed) {
-			enabledChains.push(chain);
-			const chainCfg = Object.fromEntries(keys.map((key) => [key, parsed[`${chain}.${key}`]])) as ChainConfig;
-			if (`${chain}.DEBRIDGE_SETTINGS` in parsed) chainCfg.DEBRIDGE_SETTINGS = parsed[`${chain}.DEBRIDGE_SETTINGS`];
-			result[chain] = chainCfg;
-		}
-	}
-	console.log(result, enabledChains);
-
-	return [result, enabledChains];
 }
 
 function BytesToU64(data: Buffer, encoding: "le" | "be"): bigint {

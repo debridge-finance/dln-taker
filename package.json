@@ -35,7 +35,7 @@
     "tslib": "2.4.1"
   },
   "dependencies": {
-    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#common-client",
+    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#23baf205a57d42b40dd5ccb6b47499a555ccc58d",
     "@debridge-finance/solana-utils": "github:debridge-finance/solana-utils",
     "@protobuf-ts/plugin": "2.8.1",
     "amqplib": "0.10.3",
