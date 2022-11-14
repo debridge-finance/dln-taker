@@ -125,6 +125,28 @@ export interface ExecutorConfig {
      */
     swapConnector?: SwapConnector;
 
+    /**
+     * Represents a list of validators which filter out orders from the orders feed to be fulfilled
+     *
+     * possible chainable validators:
+     *  - srcChainIsRegistered() checks if srcChain is defined (we need to know its beneficiary)
+     *  - orderIsProfitable(bps) checks if order profitability is at least as given (comparing dollar equiv of give and take amounts)
+     *  - giveTokenIsAllowed() checks if order's input token is allowed
+     *  - giveAmountDollarEquiv(min, max) checks if giveAmount's dollar cost is within range
+     *  - takeAmountDollarEquiv(min, max) checks if takeAmount's dollar cost is within range
+     */
+    orderValidators?: OrderValidator[],
+
+    /**
+     * Represents an order processor which fulfills orders. You can create your own modular processor
+     * which reuses one or another existing processor
+     *
+     * possible order processors:
+     * - match() - fulfills the order taking tokens from the wallet, if enough funds presented
+     * - preswap() - fulfills the order making a preswap from specific token
+     */
+    orderProcessor?: OrderProcessor,
+
     orderFeed: GetNextOrder;
     fulfillableChains: FulfillableChainConfig[];
 }
