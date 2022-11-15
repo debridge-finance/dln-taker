@@ -2,6 +2,16 @@
 
 DLN executor is the rule-based daemon service developed to automatically execute orders placed on the deSwap Liquidity Network (DLN) across supported blockchains.
 
+- [About](#about)
+- [Installation](#installation)
+- [Configuration](#configuration)
+	- [Orders feed](#orders-feed)
+	- [Order validators](#order-validators)
+	- [Order processor](#order-processor)
+	- [Supported chains](#supported-chains)
+	- [Price service](#price-service)
+- [Logs](#logs)
+
 ## About
 
 In a nutshell, DLN is an on-chain system of smart contracts where users (we call them *makers*) place their cross-chain exchange orders, giving a specific amount of input token on the source chain (`giveAmount` of the `giveToken` on the `giveChain`) and specifying the outcome they are willing to take on the destination chain (`takeAmount` of the `takeToken` on the `takeChain`). The given amount is being locked by the DLN smart contract on the source chain, and anyone with enough liquidity (called *takers*) can attempt to fulfill the order by calling the DLN smart contract on the destination chain supplying requested amount of tokens the *maker* is willing to take. After the order is being fulfilled, a cross-chain message is sent to the source chain via the deBridge protocol to unlock the funds, effectively completing the order.
@@ -388,11 +398,11 @@ const config: ExecutorConfig = {
 
             // if the order is created on Solana and fulfilled on another chain (e.g. Ethereum),
             // unlocked funds will be sent to this Solana address
-            beneficiary: "F1nSne66G8qCrTVBa1wgDrRFHMGj8pZUZiqgxUrVtaAQ",
+            beneficiary: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
 
             // if the order is created on another chain (e.g. Ethereum), DLN executor would attempt to
             // fulfill such order on behalf of this wallet
-            wallet: "...",
+            wallet: "abc123...",
         },
 
         {
@@ -404,20 +414,36 @@ const config: ExecutorConfig = {
 
             // if the order is created on another chain (e.g. Solana), DLN executor would attempt to
             // fulfill such order on behalf of this wallet
-            wallet: "...",
+            wallet: "abc123...",
         },
     ]
 }
 ```
 
 
-## Price service
+### Price service
 
-Most built in validators and rules applied to orders depend on the current market price of the tokens involved in the order. It is possible to set up a custom service responsible for obtaining current market prices, by setting the `priceTokenService` property:
+Most built in validators and rules applied to orders depend on the current market price of the tokens involved in the order. It is possible to set up a custom service responsible for obtaining current market prices, by setting the `tokenPriceService` property:
 
 ```ts
 const config: ExecutorConfig = {
-    priceTokenService: new CoingeckoPriceFeed(apiKey),
+    tokenPriceService: new CoingeckoPriceFeed(apiKey),
 }
 ```
 
+## Logs
+
+By default, DLN executor prints summary logs to the stdout, indicating the summary of order execution (validation and fulfillment). Example:
+
+```
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Received, give 1500000000000000000000 of 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56 on chain=56, take 1485000000 of 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 on chain=137
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator srcChainDefined: approved, chain=56 defined
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator dstChainDefined: approved, chain=137 defined
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator orderProfitable: approved, profitability 10bps of required 4bps: give $1500, take $1485
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator giveAmountUSDEquivalentBetween: approved, give amount ($1500) within range [$10, $100000]
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator takeAmountUSDEquivalentBetween: approved, take amount ($1485) within range [$10, $100000]
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator whitelistedGiveToken: approved, give token 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56 is in the white list
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator blacklistedTakeToken: approved, take token 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 is not in the black list
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validated: 7/7 passed
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Processed preswapProcessor: fulfilled, swapped 4000000000000000000 of 0x0000000000000000000000000000000000000000 to 1485000000 of 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174
+```
