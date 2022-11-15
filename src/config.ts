@@ -9,8 +9,6 @@ type address = string;
 /**
  * Represents an order validation routine. Can be chained.
  * Returns true if order can be processed, false otherwise.
- *
- * TODO discuss arguments!
  */
 export type OrderValidator = (order: OrderData, client: PMMClient, config: ExecutorConfig) => Promise<boolean>;
 
@@ -64,9 +62,6 @@ export type FulfillableChainConfig = {
 
     crossChainForwarderAddress?: address;
 
-    /**
-     * Solana related
-     */
     deBridgeSettings?: {
         debridge: string;
         setting: string;
@@ -78,9 +73,6 @@ export type FulfillableChainConfig = {
 
     /**
      * Taker controlled address where the orders (fulfilled on other chains) would unlock the funds to.
-     *
-     * This setting is used by another FulfillableChainConfig while fulfilling an order created on this
-     * particular chain.
      */
     beneficiary: address,
 
@@ -90,24 +82,12 @@ export type FulfillableChainConfig = {
     wallet: string,
 
     /**
-     * Represents a list of validators which filter out orders from the orders feed to be fulfilled
-     *
-     * possible chainable validators:
-     *  - srcChainIsRegistered() checks if srcChain is defined (we need to know its beneficiary)
-     *  - orderIsProfitable(bps) checks if order profitability is at least as given (comparing dollar equiv of give and take amounts)
-     *  - giveTokenIsAllowed() checks if order's input token is allowed
-     *  - giveAmountDollarEquiv(min, max) checks if giveAmount's dollar cost is within range
-     *  - takeAmountDollarEquiv(min, max) checks if takeAmount's dollar cost is within range
+     * Represents a list of validators which filter out orders for fulfillment
      */
     orderValidators?: OrderValidator[],
 
     /**
-     * Represents an order processor which fulfills orders. You can create your own modular processor
-     * which reuses one or another existing processor
-     *
-     * possible order processors:
-     * - match() - fulfills the order taking tokens from the wallet, if enough funds presented
-     * - preswap() - fulfills the order making a preswap from specific token
+     * Defines an order processor that implements the fulfillment strategy
      */
     orderProcessor?: OrderProcessor,
 }
@@ -115,35 +95,27 @@ export type FulfillableChainConfig = {
 export interface ExecutorConfig {
     /**
      * Token price provider
-     * default coingecko
+     *
+     * Default: CoingeckoPriceFeed
      */
     priceTokenService?: PriceTokenService;
 
     /**
-     * Swap connector
-     * default 1inch
+     * Swap connector.
+     *
+     * Default: OneInchConnector
      */
     swapConnector?: SwapConnector;
 
     /**
-     * Represents a list of validators which filter out orders from the orders feed to be fulfilled
-     *
-     * possible chainable validators:
-     *  - srcChainIsRegistered() checks if srcChain is defined (we need to know its beneficiary)
-     *  - orderIsProfitable(bps) checks if order profitability is at least as given (comparing dollar equiv of give and take amounts)
-     *  - giveTokenIsAllowed() checks if order's input token is allowed
-     *  - giveAmountDollarEquiv(min, max) checks if giveAmount's dollar cost is within range
-     *  - takeAmountDollarEquiv(min, max) checks if takeAmount's dollar cost is within range
+     * Represents a list of validators which filter out orders for fulfillment
      */
     orderValidators?: OrderValidator[],
 
     /**
-     * Represents an order processor which fulfills orders. You can create your own modular processor
-     * which reuses one or another existing processor
+     * Defines an order processor that implements the fulfillment strategy
      *
-     * possible order processors:
-     * - match() - fulfills the order taking tokens from the wallet, if enough funds presented
-     * - preswap() - fulfills the order making a preswap from specific token
+     * Default: strictProcessor
      */
     orderProcessor?: OrderProcessor,
 

@@ -6,7 +6,7 @@ DLN executor is the rule-based daemon service developed to automatically execute
 
 In a nutshell, DLN is an on-chain system of smart contracts where users (we call them *makers*) place their cross-chain exchange orders, giving a specific amount of input token on the source chain (`giveAmount` of the `giveToken` on the `giveChain`) and specifying the outcome they are willing to take on the destination chain (`takeAmount` of the `takeToken` on the `takeChain`). The given amount is being locked by the DLN smart contract on the source chain, and anyone with enough liquidity (called *takers*) can attempt to fulfill the order by calling the DLN smart contract on the destination chain supplying requested amount of tokens the *maker* is willing to take. After the order is being fulfilled, a cross-chain message is sent to the source chain via the deBridge protocol to unlock the funds, effectively completing the order.
 
-This package is intended to automate the process of order execution: it listens for new orders coming into DLN, filters out those that satisfy custom criteria defined in the config (for example, expected profitability, amount cap, etc), attempts to fulfill them and unlocks funds.
+This package is intended to automate the process of order execution: it listens for new orders coming into DLN, filters out those that satisfy custom criteria defined in the config (for example, expected profitability, amount cap, etc), attempts to fulfill them, and unlocks the funds.
 
 ## Installation
 
@@ -16,14 +16,14 @@ Download the source code from Github, picking the specific version:
 git clone --depth 1 --single-branch --branch v0.2.0 git@github.com:debridge-finance/market-maker-executor.git
 ```
 
-`cd` to the directory and install non-development dependencies:
+`cd` to the directory and install dependencies:
 
 ```sh
 cd market-maker-executor
-npm install --prod
+npm install
 ```
 
-Create a configuration file based on the sample:
+Create a configuration file based on the `sample.config.ts`:
 
 ```sh
 cp sample.config.ts executor.config.ts
@@ -40,16 +40,16 @@ This will keep the executor up and running, listening for new orders and executi
 
 ## Configuration
 
-The config file should represent a Typescript module which exports an Object conforming the [`ExecutorConfig`](src/config.ts) type. This section describes how to configure its properties to be defined explicitly.
+The config file should represent a Typescript module which exports an Object conforming the [`ExecutorConfig`](src/config.ts) type. This section describes how to configure its properties.
 
 
 ### Orders feed
 
-The executor engine must have the source of new orders that are being placed on the DLN smart contracts. There can be different sources feeding the flow of orders (e.g. RPC node, RabbitMQ, etc). deBridge maintains and provides a highly efficient websocket server for speedy order delivery, which is a good way to process new orders, though you can implement your own order feed using the `IOrderFeed` interface.
+The executor engine must have the source of new orders that are being placed on the DLN smart contracts. There can be various source implementations feeding the flow of orders (e.g. RPC node, RabbitMQ, etc). deBridge maintains and provides a highly efficient websocket server for speedy order delivery, though you can implement your own order feed using the `IOrderFeed` interface.
 
 ```ts
 const config: ExecutorConfig = {
-    // use the ws address provided by deBridge.
+    // use the custom ws address provided by deBridge.
     // Could be the IOrderFeed implementation as well
     orderFeed: "ws://127.0.0.1/ws",
 }
@@ -57,20 +57,27 @@ const config: ExecutorConfig = {
 
 ### Order validators
 
-As soon as the executor engine obtains the next order to execute, it passes it through the set of explicitly defined rules called *validators* before making an attempt to fulfill it. Each validator is just a simple async function which accepts an instance of the given order, and returns a boolean result indicating the approval. If, and only if each and every validator has approved the order, it is being passed to fulfillment.
+As soon as the executor engine obtains the next order to execute, it passes it through the set of explicitly defined rules called *validators* before making an attempt to fulfill it.
 
-Validators can be attached globally to the `orderValidators` property, which means they will be called when executing an order from/to any supported chains. This is a useful way to define constraints applicable to all supported chains. For example, let's define the global expected profitability of an order:
+Whenever the order is received, the executor applies three groups of validators:
+1. the global set of validators, defined in the `validators` property
+2. the set of validators defined in the `srcValidators` property from the configuration of the chain the order originating from
+3. the set of validators defined in the `dstValidators` property from the configuration of the chain the order is targeting to
+
+Each validator is just a simple async function which accepts an instance of the given order, and returns a boolean result indicating the approval. If, and only if each and every validator has approved the order, it is being passed to fulfillment.
+
+Validators can be set globally using the `orderValidators` property, which means they will be called when executing an order from/to any supported chain. This is a useful way to define constraints applicable to all supported chains. For example, let's define the global expected profitability of an order:
 
 ```ts
 const config: ExecutorConfig = {
-    orderValidators: [
+    validators: [
         orderIsProfitable(4 /*bps*/),
         // ...
     ],
 }
 ```
 
-Validators can be additionally applied per supported chain, giving the flexibility to set tight constraints on chain-specific context, for example filtering out orders whose input `giveToken` is from the given white list or whose USD equivalent of the outcome (`takeAmount`) is within a specific range:
+Validators can be additionally applied per supported chain (more on this in the [section below](#chain-related-configuration)), giving the flexibility to set tight constraints on chain-specific context, for example filtering out orders whose input `giveToken` is from the given white list or whose USD equivalent of the outcome (`takeAmount`) is within a specific range:
 
 ```ts
 const config: ExecutorConfig = {
@@ -78,12 +85,16 @@ const config: ExecutorConfig = {
         {
             chain: ChainId.BSC,
 
-            orderValidators: [
+            // defines validators for orders coming FROM the BNB Chain
+            srcValidators: [
                 // if the order is coming from BNB chain, accept it only if BUSD is the giveToken
                 whitelistedGiveToken([
                     '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56'
                 ]),
+            ],
 
+            // defines validators for orders coming TO the BNB Chain
+            dstValidators: [
                 // fulfill orders on BNB only if the requested amount from $0 to $10,000
                 takeAmountDollarEquiv(0, 10_000),
             ],
@@ -92,14 +103,14 @@ const config: ExecutorConfig = {
 }
 ```
 
-The engine provides a handy set of built in validators to cover most cases that may arise during fine tuning of the order executor. This section covers all of them.
+The engine provides a handy set of built in validators to cover most cases that may arise during fine tuning of the order executor. Each validator can be applied either globally or per-chain. This section covers all of them.
 
 
-#### `srcChainDefined`
+#### `srcChainDefined()`
 
 Checks if the source chain for the given order is defined in the config. This validator is made for convenience because it won't be possible to fulfill an order if its source chain is not defined in the configuration file.
 
-#### `dstChainDefined`
+#### `dstChainDefined()`
 
 Checks if the destination chain for the given order is defined in the config. This validator is made for convenience because it won't be possible to fulfill an order if its destination chain is not defined in the configuration file.
 
@@ -118,21 +129,23 @@ const config: ExecutorConfig = {
         {
             chain: ChainId.Avalanche,
 
-            orderValidators: [
+            dstValidators: [
                 disableFulfill()
             ],
+
+            // ...
         },
 
         {
             chain: ChainId.Solana,
 
-            orderValidators: [],
+            // ...
         },
 
         {
             chain: ChainId.Ethereum,
 
-            orderValidators: [],
+            // ...
         },
     ]
 }
@@ -148,9 +161,10 @@ For example, assume a user places an order giving 1 ETH (≈$1500) and requestin
 We suggest keeping the profitability of 4 bps:
 
 ```ts
-    orderValidators: [
-        orderIsProfitable(4 /*bps*/),
-    ],
+validators: [
+    // accept orders with 0.04% margin
+    orderIsProfitable(4 /*bps*/),
+],
 ```
 
 #### `giveAmountUSDEquivalentBetween(minUSDEquivalent: number, maxUSDEquivalent: number)`
@@ -158,10 +172,10 @@ We suggest keeping the profitability of 4 bps:
 Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is in the given range. This validator is useful to filter off uncomfortable volumes, e.g. too low (e.g. less than $10) or too high (e.g., more than $100,000).
 
 ```ts
-    orderValidators: [
-        // accept orders with unlock amounts >$10 and <$100K
-        giveAmountUSDEquivalentBetween(10, 100_000),
-    ],
+validators: [
+    // accept orders with unlock amounts >$10 and <$100K
+    giveAmountUSDEquivalentBetween(10, 100_000),
+],
 ```
 
 #### `takeAmountUSDEquivalentBetween(minUSDEquivalent: number, maxUSDEquivalent: number)`
@@ -169,10 +183,10 @@ Checks if the USD equivalent of the order's unlock amount (amount given by the m
 Checks if the USD equivalent of the order's requested amount (amount that should be supplied to fulfill the order successfully) is in the given range. This validator is useful to filter off uncomfortable volumes, e.g. too low (e.g. less than $10) or too high (e.g., more than $100,000).
 
 ```ts
-    orderValidators: [
-        // accept orders with unlock amounts >$10 and <$100K
-        takeAmountUSDEquivalentBetween(10, 100_000),
-    ],
+validators: [
+    // accept orders with unlock amounts >$10 and <$100K
+    takeAmountUSDEquivalentBetween(10, 100_000),
+],
 ```
 
 #### `whitelistedMaker(addresses: string[])`
@@ -193,7 +207,7 @@ const config: ExecutorConfig = {
         {
             chain: ChainId.Ethereum,
 
-            orderValidators: [
+            srcValidators: [
                 // if the order is coming from Ethereum chain, accept ETH and USDT only
                 whitelistedGiveToken([
                     '0x0000000000000000000000000000000000000000',
@@ -222,36 +236,37 @@ Checks if the order's requested token is not in the blacklist. This validator is
 Developing custom validator requires a basic knowledge of Javascript and preferably Typescript. All you need is to define an async function that conforms the [`OrderValidator`](src/config.ts) type. For example, a validator that checks if the order's receiver address (the address where the funds would be sent to) is known:
 
 ```ts
-export function receiverKnown(addresses: string[]): OrderValidator {
+export function receiverKnown(knownReceiverAddress): OrderValidator {
   return async (order: OrderData, pmmClient: PMMClient, config: ExecutorConfig) => {
-    return order.receiver === KNOWN_RECEIVER;
+    return order.receiver === knownReceiverAddress;
   }
 }
 ```
 
-Then this validator can be used in the configuration:
+Then such validator can be used in the configuration:
 
 ```ts
-    orderValidators: [
-        receiverKnown("0x123...890")
-    ],
+validators: [
+    receiverKnown("0x123...890")
+],
 ```
 
 ### Order processor
 
-After the order has been passed the validation, the executor attempts to fulfill the order running the selector order processor. An order processor implements the fulfillment strategy. The DLN executor provides a basic set of extensible processor, that you can use depending on your needs.
+After the order has successfully passed the validation, the executor attempts to fulfill the order by running the given order processor, which implements the fulfillment strategy. This package provides a basic set of extensible processors, that you can use depending on your needs.
 
 A processor can be attached globally to the `orderProcessor` property, which means it will be used for processing valid orders on all supported chains, or it can be set per chain:
 
 ```ts
 const config: ExecutorConfig = {
-    // use processor1 for all chains defined in this list
-    orderProcessor: processor1(),
+    // use strictProcessor for all chains defined in this list
+    orderProcessor: strictProcessor(),
 
     chains: [
         {
             chain: ChainId.Ethereum,
         },
+
         {
             chain: ChainId.Solana,
         },
@@ -259,20 +274,44 @@ const config: ExecutorConfig = {
         {
             chain: ChainId.BSC,
 
-            // explicitly use processor2 for BNB chain
-            orderProcessor: processor2()
+            // explicitly use preswapProcessor for BNB chain
+            orderProcessor: preswapProcessor()
         },
     ]
 }
 ```
 
-#### `StrictProcessor()` (default)
+#### `strictProcessor(approvedTokens: string[])` (default)
 
-A very basic processor attempts to fulfill orders that request tokens presented on the taker's `wallet` (used by the executor to fulfill the orders). For example, if the taker's `wallet` have only ETH and USDT on the given chain, this processor will try to process orders that request ETH and USDT skipping orders that request other tokens (say, USDC).
+A very basic processor attempts to fulfill orders that request tokens presented on the taker's `wallet`. For example, if the taker's `wallet` have only ETH and USDT on the given chain, this processor will attempt to fulfill only those orders that request ETH and USDT, skipping orders that request other tokens (say, USDC).
 
-#### `PreswapProcessor()`
+This processor accepts the list of reserve tokens you are willing to use for order fulfillment. For example, the following configuration will execute orders which request either ETH or USDT:
 
-This processor attempts to fulfill orders making an atomic swap of the minimum necessary amount of tokens being held on the taker's wallet (we call it *taker's reserve token*) to receive the amount of tokens requested by the order and attempt to fulfill the order in a single transaction. If either swap of fulfill fails, the whole transaction gets reverted.
+```ts
+orderProcessor: strictProcessor([
+    '0x0000000000000000000000000000000000000000', // ETH
+    '0xdAC17F958D2ee523a2206206994597C13D831ec7' // USDT
+]),
+```
+
+This processor will set an infinite allowance to the DLN smart contract on first launch to speed up fulfillments.
+
+#### `preswapProcessor(approvedToken: string)`
+
+This processor attempts to fulfill orders making an atomic swap of the minimum necessary amount of tokens being held on the taker's wallet (we call it *taker's reserve token*) to receive the amount of tokens requested by the order and attempt to fulfill the order in a single transaction.
+
+For example, the taker's `wallet` holds $100,000 USDC. Given the order which requests 1 ETH, the `preswapProcessor()` will craft a transaction which does the following atomically:
+1. swaps 1500 USDC to retrieve at least 1 ETH (excess remained will be refunded to the taker's `wallet`)
+2. fulfills the wallet supplying 1 ETH to cover the requested amount
+3. in case swap of fulfill fails, the whole transaction gets reverted.
+
+This processor accepts a token address you are willing to use for order fulfillment. For example, the following configuration will execute orders using USDT as a reserve address, swapping it to the requested token when necessary:
+
+```ts
+orderProcessor: preswapProcessor('0xdAC17F958D2ee523a2206206994597C13D831ec7'), // USDT
+```
+
+This processor will set an infinite allowance to the DLN smart contract on first launch to speed up fulfillments.
 
 ### Supported chains
 
@@ -304,12 +343,12 @@ Each chain must contain a list of network-, chain- and taker-related stuff.
 For each chain, you must define it's ID and the url to the RPC node:
 
 ```ts
-    chains: [
-        {
-            chain: ChainId.Solana,
-            chainRpc: "https://api.mainnet-beta.solana.com/",
-        },
-    ]
+chains: [
+    {
+        chain: ChainId.Solana,
+        chainRpc: "https://api.mainnet-beta.solana.com/",
+    },
+]
 ```
 
 #### Chain related configuration
@@ -317,20 +356,20 @@ For each chain, you must define it's ID and the url to the RPC node:
 A configuration engine preserves a list of defaults representing the mainnet deployments of the DLN smart contracts per each chain. For example, it is well known that the address of the core `deBridgeGate` contract across supported EVM chains is `0x43dE2d77BF8027e25dBD179B491e8d64f38398aA`. However, if you are running the executor against non-production environment, you might have received the list of applicable addresses that must override these defaults.
 
 ```ts
-    chains: [
-        {
-            chain: ChainId.Solana,
-            chainRpc: "https://api.mainnet-beta.solana.com/",
+chains: [
+    {
+        chain: ChainId.Solana,
+        chainRpc: "https://api.mainnet-beta.solana.com/",
 
-            // { this should not be presented in the real world config: mainnet addresses are defined in the internals
-                pmmSrc: "srcTG7YiZkebpJJaCQEuqBznRYqrfcj8a917EcMnNUk",
-                pmmDst: "dstFoo3xGxv23giLZBuyo9rRwXHdDMeySj7XXMj1Rqn",
-                deBridge: "F1nSne66G8qCrTVBa1wgDrRFHMGj8pZUZiqgxUrVtaAQ",
-                deBridgeSettings: "14bkTTDfycEShjiurAv1yGupxvsQcWevReLNnpzZgaMh",
-            // }
+        // { this should not be presented in the real world config: mainnet addresses are defined in the internals
+            pmmSrc: "srcTG7YiZkebpJJaCQEuqBznRYqrfcj8a917EcMnNUk",
+            pmmDst: "dstFoo3xGxv23giLZBuyo9rRwXHdDMeySj7XXMj1Rqn",
+            deBridge: "F1nSne66G8qCrTVBa1wgDrRFHMGj8pZUZiqgxUrVtaAQ",
+            deBridgeSettings: "14bkTTDfycEShjiurAv1yGupxvsQcWevReLNnpzZgaMh",
+        // }
 
-        },
-    ]
+    },
+]
 ```
 
 #### Taker related configuration
@@ -339,7 +378,7 @@ A configuration engine preserves a list of defaults representing the mainnet dep
 
 The `beneficiary` property defines taker controlled address where the orders (fulfilled on the other chains) would unlock the funds to.
 
-The `wallet` property defines the private key for the wallet with the funds to fulfill orders. The DLN executor will sign transactions on behalf of this wallet.
+The `wallet` property defines the private key for the wallet with the funds to fulfill orders. The DLN executor will sign transactions on behalf of this wallet, effectively setting approval, transferring funds, performing swaps and fulfillments.
 
 ```ts
 const config: ExecutorConfig = {
@@ -347,11 +386,11 @@ const config: ExecutorConfig = {
         {
             chain: ChainId.Solana,
 
-            // if the order is created on Solana and fulfilled on Ethereum,
+            // if the order is created on Solana and fulfilled on another chain (e.g. Ethereum),
             // unlocked funds will be sent to this Solana address
             beneficiary: "F1nSne66G8qCrTVBa1wgDrRFHMGj8pZUZiqgxUrVtaAQ",
 
-            // if the order is created on Ethereum, DLN executor would attempt to
+            // if the order is created on another chain (e.g. Ethereum), DLN executor would attempt to
             // fulfill such order on behalf of this wallet
             wallet: "...",
         },
@@ -359,12 +398,11 @@ const config: ExecutorConfig = {
         {
             chain: ChainId.Ethereum,
 
-
-            // if the order is created on Ethereum and fulfilled on Solana,
+            // if the order is created on Ethereum and fulfilled on another chain (e.g. Solana),
             // unlocked funds will be sent to this Ethereum address
             beneficiary: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
 
-            // if the order is created on Solana, DLN executor would attempt to
+            // if the order is created on another chain (e.g. Solana), DLN executor would attempt to
             // fulfill such order on behalf of this wallet
             wallet: "...",
         },
@@ -382,8 +420,4 @@ const config: ExecutorConfig = {
     priceTokenService: new CoingeckoPriceFeed(apiKey),
 }
 ```
-
-
-
-
 
