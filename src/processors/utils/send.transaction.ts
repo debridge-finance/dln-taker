@@ -1,29 +1,44 @@
-import {Connection, Keypair, Transaction, TransactionInstruction} from "@solana/web3.js";
-import {helpers} from "@debridge-finance/solana-utils";
+import { Connection, Keypair, Transaction, TransactionInstruction, VersionedTransaction } from "@solana/web3.js";
+import { helpers } from "@debridge-finance/solana-utils";
 import Web3 from "web3";
-import {ChainId, ZERO_EVM_ADDRESS} from "@debridge-finance/pmm-client";
-import {createWeb3WithPrivateKey} from "./create.web3.with.private.key";
+import { ChainId, ZERO_EVM_ADDRESS } from "@debridge-finance/pmm-client";
+import { createWeb3WithPrivateKey } from "./create.web3.with.private.key";
 import IERC20 from "./ierc20.json";
-import {ChainConfig} from "../../config";
+import { ChainConfig } from "../../config";
+
+function isTransactionInstruction(arg: unknown): arg is TransactionInstruction {
+  const data = arg as Record<string, unknown>;
+  return "programId" in data && "data" in data && "keys" in data;
+}
+
+function isTransaction(arg: unknown): arg is Transaction {
+  const data = arg as Record<string, unknown>;
+  return "instructions" in data && "signature" in data;
+}
+
+function isVersionedTransaction(arg: unknown): arg is VersionedTransaction {
+  const data = arg as Record<string, unknown>;
+
+  return "message" in data && "version" in data;
+}
 
 const sendSolanaTransaction = async (solanaConnection: Connection, keypair: Keypair, data: unknown): Promise<string> => {
-  const wallet = {
-    publicKey: keypair.publicKey,
-    signAllTransactions: (txs: Transaction[]) => {
-      txs.map((tx) => {
-        tx.partialSign(keypair);
-      });
-      return Promise.resolve(txs);
-    },
-    signTransaction: (tx: Transaction) => {
-      tx.sign(keypair);
-      return Promise.resolve(tx);
-    },
-  };
+  console.log(data);
+  let tx: Transaction | VersionedTransaction;
+  if (isTransactionInstruction(data)) {
+    tx = new Transaction().add(data)
+  } else if (isTransaction(data)) {
+    tx = data;
+  } else if (isVersionedTransaction(data)) {
+    tx = data;
+  } else {
+    throw new Error("Don't know how to handle this input. It's not Transaction, VersionedTransaction or TransactionInstruction")
+  }
+  const wallet = new helpers.Wallet(keypair);
   const txid = await helpers.sendAll(
     solanaConnection,
     wallet,
-    [new Transaction().add(data as Transaction | TransactionInstruction)],
+    [tx],
     undefined,
     undefined,
     false,
@@ -50,7 +65,7 @@ export const sendTransaction = async (fulfillableChainConfig: ChainConfig, data:
   if (fulfillableChainConfig.chain === ChainId.Solana) {
     const solanaConnection = new Connection(fulfillableChainConfig.chainRpc);
     const keyPair = Keypair.fromSecretKey(helpers.hexToBuffer(fulfillableChainConfig.wallet));
-    return  sendSolanaTransaction(solanaConnection, keyPair, data);
+    return sendSolanaTransaction(solanaConnection, keyPair, data);
   } else {
     const web3 = await createWeb3WithPrivateKey(fulfillableChainConfig.chainRpc, fulfillableChainConfig.wallet);
     return sendEvmTransaction(web3, data);
@@ -58,7 +73,7 @@ export const sendTransaction = async (fulfillableChainConfig: ChainConfig, data:
 }
 
 export const approve = async (web3: Web3, account: string | null, tokenAddress: string, contractAddress: string) => {
-  if (contractAddress === ZERO_EVM_ADDRESS) return ;
+  if (contractAddress === ZERO_EVM_ADDRESS) return;
   const contract = new web3.eth.Contract(IERC20.abi as any, tokenAddress);
   const gasPrice = await web3.eth.getGasPrice();
   const gas = await contract.methods

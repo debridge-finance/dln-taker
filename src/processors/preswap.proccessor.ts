@@ -1,13 +1,13 @@
-import {OrderProcessor, OrderProcessorContext} from "./order.processor";
-import {ChainId, OrderData, OrderState} from "@debridge-finance/pmm-client";
-import {ChainConfig, ExecutorConfig} from "../config";
+import { OrderProcessor, OrderProcessorContext } from "./order.processor";
+import { ChainId, OrderData, OrderState } from "@debridge-finance/pmm-client";
+import { ChainConfig, ExecutorConfig } from "../config";
 import Web3 from "web3";
-import {evmNativeTokenAddress, solanaNativeTokenAddress} from "../constant";
-import {Keypair} from "@solana/web3.js";
-import {helpers} from "@debridge-finance/solana-utils";
-import {createWeb3WithPrivateKey} from "./utils/create.web3.with.private.key";
-import {MarketMakerExecutorError, MarketMakerExecutorErrorType} from "../error";
-import {sendTransaction} from "./utils/send.transaction";
+import { evmNativeTokenAddress, solanaNativeTokenAddress } from "../constant";
+import { Keypair } from "@solana/web3.js";
+import { helpers } from "@debridge-finance/solana-utils";
+import { createWeb3WithPrivateKey } from "./utils/create.web3.with.private.key";
+import { MarketMakerExecutorError, MarketMakerExecutorErrorType } from "../error";
+import { sendTransaction } from "./utils/send.transaction";
 
 export const preswapProcessor = (inputToken: string, slippage: number): OrderProcessor => {
   return async (orderId: string, order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: ChainConfig, context: OrderProcessorContext) => {
@@ -42,7 +42,7 @@ export const preswapProcessor = (inputToken: string, slippage: number): OrderPro
       logger.debug(`fulfillTx is created in solana ${JSON.stringify(fulfillTx)}`);
     }
     else {
-      fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Ethereum>(order, orderId,  inputToken as unknown as string, {
+      fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Ethereum>(order, orderId, inputToken as unknown as string, {
         web3: createWeb3WithPrivateKey(fulfillableChainConfig.chainRpc, fulfillableChainConfig.wallet),
         fulfillAmount: Number(order.take.amount),
         permit: "0x",
