@@ -20,6 +20,12 @@ export class OneInchConnector implements SwapConnector {
       request.fromTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
     }
 
+    if (
+      request.toTokenAddress === '0x0000000000000000000000000000000000000000'
+    ) {
+      request.toTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+    }
+
     const query = new URLSearchParams({
       fromTokenAddress: request.fromTokenAddress.toString(),
       toTokenAddress: request.toTokenAddress.toString(),
@@ -37,7 +43,7 @@ export class OneInchConnector implements SwapConnector {
 
     try {
       const response = await axios.get(url);
-      logger.log(`OneInchConnector getSwap response ${JSON.stringify(response)}`);
+      logger.log(`OneInchConnector getSwap response ${JSON.stringify(response.data)}`);
 
       return {
         data: response.data.tx.data,

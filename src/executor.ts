@@ -1,24 +1,25 @@
-import {ExecutorConfig, FulfillableChainConfig} from "./config";
+import {ChainConfig, ExecutorConfig} from "./config";
 import {NextOrderInfo} from "./interfaces";
 import {ChainId, Evm, PMMClient, Solana} from "@debridge-finance/pmm-client";
 import logger from "loglevel";
 import {CoingeckoPriceFeed} from "./priceFeeds/coingecko.price.feed";
 import {OneInchConnector} from "./swapConnector/one.inch.connector";
 import {Connection, PublicKey} from "@solana/web3.js";
+import {Logger} from "pino";
 
 export class Executor {
   private isInitialized = false;
   private solanaConnection: Connection;
   private pmmClient: PMMClient;
 
-  constructor(private readonly config: ExecutorConfig, private readonly orderFulfilledMap: Map<string, boolean>) {
+  constructor(private readonly config: ExecutorConfig, private readonly orderFulfilledMap: Map<string, boolean>, private readonly logger: Logger) {
   }
 
   async init() {
     if (this.isInitialized) return;
     const clients = {} as any;
     const evmAddresses = {} as any;
-    const chains = this.config.fulfillableChains.map(chain => {
+    const chains = await Promise.all(this.config.fulfillableChains.map(async chain => {
       const chainId = chain.chain;
       if (chainId === ChainId.Solana) {
         this.solanaConnection = new Connection(chain.chainRpc);
@@ -35,6 +36,7 @@ export class Executor {
           solanaDebridge,
           solanaDebridgeSetting,
         );
+        await clients[chainId].initForFulfillPreswap(chain.beneficiary, [ChainId.BSC, ChainId.Polygon]);
       } else {
         evmAddresses[chainId] = {
           pmmSourceAddress: chain.pmmSrc,
@@ -44,7 +46,7 @@ export class Executor {
         };
       }
       return chainId;
-    });
+    }));
 
     Object.keys(evmAddresses).forEach(address => {
       clients[address] = new Evm.PmmEvmClient({
@@ -77,13 +79,12 @@ export class Executor {
 
       if (nextOrderInfo) {
         const orderId = nextOrderInfo.orderId;
+        const logger = this.logger.child({ orderId });
         if (nextOrderInfo.type === 'created') {
-          logger.log(`execute ${orderId} processing is started`);
+          logger.info(`execute ${orderId} processing is started`);
           const fulfillableChainConfig = this.config.fulfillableChains.find(it => nextOrderInfo.order?.take.chainId === it.chain);
-
-          await this.processing(nextOrderInfo, fulfillableChainConfig!);
-
-          logger.log(`execute ${orderId} processing is finished`);
+          await this.processing(nextOrderInfo, fulfillableChainConfig!, logger);
+          logger.info(`execute ${orderId} processing is finished`);
         } else if(nextOrderInfo.type === 'fulfilled') {
           this.orderFulfilledMap.set(orderId, true);
         }
@@ -93,26 +94,30 @@ export class Executor {
     }
   }
 
-  private async processing(nextOrderInfo: NextOrderInfo, fulfillableChainConfig: FulfillableChainConfig): Promise<boolean> {
+  private async processing(nextOrderInfo: NextOrderInfo, fulfillableChainConfig: ChainConfig, logger: Logger): Promise<boolean> {
     const order = nextOrderInfo.order!;
 
-    logger.log('Order validation is started');
+    logger.info('Order validation is started');
     const orderValidators = await Promise.all(fulfillableChainConfig.orderValidators?.map(validator => {
-      return validator(order, this.pmmClient, this.config) as Promise<boolean>;
+      return validator(order, this.config, {
+        client: this.pmmClient,
+        logger,
+      }) as Promise<boolean>;
     }) || []);
 
     if (!orderValidators.every(it => it)) {
-      logger.error('Order validation is failed');
+      logger.info('Order validation is failed');
       return false;
     }
-    logger.log('Order validation is finished');
+    logger.info('Order validation is finished');
 
-    logger.log(`OrderProcessor is started`);
+    logger.info(`OrderProcessor is started`);
     await fulfillableChainConfig.orderProcessor!(nextOrderInfo.orderId, nextOrderInfo.order!, this.config, fulfillableChainConfig, {
       orderFulfilledMap: this.orderFulfilledMap,
       client: this.pmmClient,
+      logger,
     });
-    logger.log(`OrderProcessor is finished`);
+    logger.info(`OrderProcessor is finished`);
 
     return true;
   }

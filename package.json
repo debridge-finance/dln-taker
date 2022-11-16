@@ -35,14 +35,15 @@
     "tslib": "2.4.1"
   },
   "dependencies": {
-    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#23baf205a57d42b40dd5ccb6b47499a555ccc58d",
-    "@debridge-finance/solana-utils": "github:debridge-finance/solana-utils",
+    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#35ee2b84b678aeb2c46d3da9ac91d384cd71b25d",
+    "@debridge-finance/solana-utils": "github:debridge-finance/solana-utils#817671ae95ca85c5fe262ed181098dfe6d7d4b59",
     "@protobuf-ts/plugin": "2.8.1",
     "amqplib": "0.10.3",
     "axios": "0.21.4",
     "axios-cache-adapter": "2.7.3",
     "bignumber.js": "9.1.0",
     "dotenv": "16.0.3",
+    "pino": "8.7.0",
     "web3": "1.8.0",
     "ws": "8.10.0"
   }

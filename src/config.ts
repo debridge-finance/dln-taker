@@ -2,31 +2,19 @@ import {ChainId, PMMClient, PriceTokenService, SwapConnector} from "@debridge-fi
 import {GetNextOrder} from "./interfaces"
 import { Order } from "./pmm_common";
 import {OrderData} from "@debridge-finance/pmm-client/src/order";
+import {OrderProcessor} from "./processors/order.processor";
+import {OrderValidator} from "./validators/order.validator";
 
 // todo: reuse internal Address representation and remove
 type address = string;
 
-/**
- * Represents an order validation routine. Can be chained.
- * Returns true if order can be processed, false otherwise.
- */
-export type OrderValidator = (order: OrderData, client: PMMClient, config: ExecutorConfig) => Promise<boolean>;
 
-export interface OrderProcessorContext {
-    client: PMMClient;
-    orderFulfilledMap: Map<string, boolean>;
-}
 
-/**
- * Represents an order fulfillment engine. Cannot be chained, but can be nested.
- *
- */
-export type OrderProcessor = (orderId: string, order: OrderData, executorConfig: ExecutorConfig, fulfillableChainConfig: FulfillableChainConfig, context: OrderProcessorContext) => Promise<void>;
 
 /**
  * Represents a chain configuration where orders can be fulfilled.
  */
-export type FulfillableChainConfig = {
+export interface ChainConfig {
     //
     // network related
     //
@@ -34,12 +22,12 @@ export type FulfillableChainConfig = {
     /**
      * Supported chain discriminator
      */
-    chain: ChainId,
+    chain: ChainId;
 
     /**
      * URL to the chain's RPC node
      */
-    chainRpc: string,
+    chainRpc: string;
 
     //
     // chain context related
@@ -48,24 +36,27 @@ export type FulfillableChainConfig = {
     /**
      * Address of the DLN contract responsible for order creation, unlocking and cancellation
      */
-    pmmSrc?: address,
+    pmmSrc?: address;
 
     /**
      * Address of the DLN contract responsible for order fulfillment
      */
-    pmmDst?: address,
+    pmmDst?: address;
 
     /**
      * Address of the deBridgeGate contract responsible for cross-chain messaging (used by pmmDst)
      */
-    deBridge?: address,
+    deBridge?: address;
 
     crossChainForwarderAddress?: address;
 
+    /**
+     * Solana related
+     */
     deBridgeSettings?: {
         debridge: string;
         setting: string;
-    },
+    };
 
     //
     // taker related
@@ -73,52 +64,46 @@ export type FulfillableChainConfig = {
 
     /**
      * Taker controlled address where the orders (fulfilled on other chains) would unlock the funds to.
+     *
+     * This setting is used by another FulfillableChainConfig while fulfilling an order created on this
+     * particular chain.
      */
-    beneficiary: address,
+    beneficiary: address;
 
     /**
      * The private key for the wallet with funds to fulfill orders
      */
-    wallet: string,
+    wallet: string;
 
     /**
-     * Represents a list of validators which filter out orders for fulfillment
+     * Represents a list of validators which filter out orders from the orders feed to be fulfilled
      */
-    orderValidators?: OrderValidator[],
+    orderValidators?: OrderValidator[];
 
     /**
-     * Defines an order processor that implements the fulfillment strategy
+     * Represents an order processor which fulfills orders. You can create your own modular processor
+     * which reuses one or another existing processor
+     *
+     * possible order processors:
+     * - match() - fulfills the order taking tokens from the wallet, if enough funds presented
+     * - preswap() - fulfills the order making a preswap from specific token
      */
-    orderProcessor?: OrderProcessor,
+    orderProcessor?: OrderProcessor;
 }
 
 export interface ExecutorConfig {
     /**
      * Token price provider
-     *
-     * Default: CoingeckoPriceFeed
+     * default coingecko
      */
     priceTokenService?: PriceTokenService;
 
     /**
-     * Swap connector.
-     *
-     * Default: OneInchConnector
+     * Swap connector
+     * default 1inch
      */
     swapConnector?: SwapConnector;
 
-    /**
-     * Represents a list of validators which filter out orders for fulfillment
-     */
-    orderValidators?: OrderValidator[],
-
-    /**
-     * Defines an order processor that implements the fulfillment strategy
-     *
-     * Default: strictProcessor
-     */
-    orderProcessor?: OrderProcessor,
-
     orderFeed: GetNextOrder;
-    fulfillableChains: FulfillableChainConfig[];
+    fulfillableChains: ChainConfig[];
 }
