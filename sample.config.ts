@@ -6,7 +6,7 @@ import * as processors from "./src/processors";
 const config: ExecutorConfig = {
   orderFeed: `${process.env.WSS}`,
 
-  orderValidators: [
+  validators: [
     validators.srcChainDefined(),
     validators.dstChainDefined(),
 
@@ -19,10 +19,14 @@ const config: ExecutorConfig = {
       chainRpc: `${process.env.RPC_POLYGON}`,
 
       // {{{ LIMA
-      crossChainForwarderAddress: "0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd",
-      deBridge: "0xa9a617e8BE4efb0aC315691D2b4dbEC94f5Bb27b",
-      pmmSrc: "0x81BD33D37941F5912C9FB74c8F00FB8d2CaCa327",
-      pmmDst: "0xceD226Cbc7B4473c7578E3b392427d09448f24Ae",
+      environment: {
+        deBridgeContract: "0xa9a617e8BE4efb0aC315691D2b4dbEC94f5Bb27b",
+        pmmSrc: "0x81BD33D37941F5912C9FB74c8F00FB8d2CaCa327",
+        pmmDst: "0xceD226Cbc7B4473c7578E3b392427d09448f24Ae",
+        evm: {
+          forwarderContract: '0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd'
+        }
+      },
       // }}}
 
       takerPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
@@ -42,10 +46,14 @@ const config: ExecutorConfig = {
       chainRpc: "https://bsc-dataseed.binance.org",
 
       // {{{ LIMA
-      crossChainForwarderAddress: "0xce1705632Ced3A1d18Ed2b87ECe5B74526f59b8A",
-      deBridge: "0xa9a617e8BE4efb0aC315691D2b4dbEC94f5Bb27b",
-      pmmSrc: "0x81BD33D37941F5912C9FB74c8F00FB8d2CaCa327",
-      pmmDst: "0xceD226Cbc7B4473c7578E3b392427d09448f24Ae",
+      environment: {
+        deBridgeContract: "0xa9a617e8BE4efb0aC315691D2b4dbEC94f5Bb27b",
+        pmmSrc: "0x81BD33D37941F5912C9FB74c8F00FB8d2CaCa327",
+        pmmDst: "0xceD226Cbc7B4473c7578E3b392427d09448f24Ae",
+        evm: {
+          forwarderContract: '0xce1705632Ced3A1d18Ed2b87ECe5B74526f59b8A'
+        }
+      },
       // }}}
 
       takerPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,

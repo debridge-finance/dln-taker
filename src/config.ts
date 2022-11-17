@@ -10,6 +10,32 @@ import { OrderValidator } from "./validators/order.validator";
 
 type address = string;
 
+type Environment = {
+  /**
+   * Address of the DLN contract responsible for order creation, unlocking and cancellation
+   */
+  pmmSrc?: address;
+
+  /**
+   * Address of the DLN contract responsible for order fulfillment
+   */
+  pmmDst?: address;
+
+  /**
+   * Address of the deBridgeGate contract responsible for cross-chain messaging (used by pmmDst)
+   */
+  deBridgeContract?: address;
+
+  evm?: {
+    forwarderContract?: address;
+  }
+
+  solana?: {
+    solanaDebridge?: string;
+    solanaDebridgeSetting?: string;
+  }
+}
+
 /**
  * Represents a chain configuration where orders can be fulfilled.
  */
@@ -32,33 +58,7 @@ export interface ChainConfig {
   // chain context related
   //
 
-  /**
-   * Address of the DLN contract responsible for order creation, unlocking and cancellation
-   */
-  pmmSrc?: address;
-
-  /**
-   * Address of the DLN contract responsible for order fulfillment
-   */
-  pmmDst?: address;
-
-  /**
-   * Address of the deBridgeGate contract responsible for cross-chain messaging (used by pmmDst)
-   */
-  deBridge?: address;
-
-  /**
-   * EVM: contract address responsible for swaps
-   */
-  crossChainForwarderAddress?: address;
-
-  /**
-   * Internal settings
-   */
-  deBridgeSettings?: {
-    debridge: string;
-    setting: string;
-  };
+  environment?: Environment,
 
   //
   // taker related
@@ -94,7 +94,7 @@ export interface ExecutorConfig {
   /**
    * Represents a list of validators which filter out orders for fulfillment
    */
-  orderValidators?: OrderValidator[];
+  validators?: OrderValidator[];
 
   /**
    * Token price provider

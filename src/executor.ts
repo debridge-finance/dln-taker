@@ -38,13 +38,13 @@ export class Executor {
         if (chainId === ChainId.Solana) {
           this.solanaConnection = new Connection(chain.chainRpc);
 
-          const solanaPmmSrc = new PublicKey(chain.pmmSrc!);
-          const solanaPmmDst = new PublicKey(chain.pmmDst!);
+          const solanaPmmSrc = new PublicKey(chain.environment?.pmmSrc!);
+          const solanaPmmDst = new PublicKey(chain.environment?.pmmDst!);
           const solanaDebridge = new PublicKey(
-            chain.deBridgeSettings!.debridge!
+            chain.environment?.solana?.solanaDebridge!
           );
           const solanaDebridgeSetting = new PublicKey(
-            chain.deBridgeSettings!.setting!
+            chain.environment?.solana?.solanaDebridgeSetting!
           );
 
           clients[chainId] = new Solana.PmmClient(
@@ -61,10 +61,10 @@ export class Executor {
         } else {
           // TODO all these addresses are optional, so we need to provide defaults which represent the mainnet setup
           evmAddresses[chainId] = {
-            pmmSourceAddress: chain.pmmSrc,
-            pmmDestinationAddress: chain.pmmDst,
-            deBridgeGateAddress: chain.deBridge,
-            crossChainForwarderAddress: chain.crossChainForwarderAddress,
+            pmmSourceAddress: chain.environment?.pmmSrc,
+            pmmDestinationAddress: chain.environment?.pmmDst,
+            deBridgeGateAddress: chain.environment?.deBridgeContract,
+            crossChainForwarderAddress: chain.environment?.evm?.forwarderContract
           };
         }
         return chainId;
@@ -135,11 +135,21 @@ export class Executor {
   ): Promise<boolean> {
     const order = nextOrderInfo.order!;
 
-    const listOrderValidators = this.config.orderValidators || [];
+    // to accept an order, all validators must approve the order.
+    // executor invokes three groups of validators:
+    // 1) defined globally (config.validators)
+    // 2) defined as dstValidators under the takeChain config
+    // 3) defined as srcValidators under the giveChain config
+
+    // global validators
+    const listOrderValidators = this.config.validators || [];
+
+    // dstValidators@takeChain
     if (chainConfig.dstValidators && chainConfig.dstValidators.length > 0) {
-      listOrderValidators?.push(...chainConfig.dstValidators);
+      listOrderValidators.push(...chainConfig.dstValidators);
     }
 
+    // srcValidators@giveChain
     const giveChainConfig = this.config.chains.find(
       (chain) => chain.chain === order.give.chainId
     )!;
@@ -147,9 +157,12 @@ export class Executor {
       giveChainConfig.srcValidators &&
       giveChainConfig.srcValidators.length > 0
     ) {
-      listOrderValidators?.push(...giveChainConfig.srcValidators);
+      listOrderValidators.push(...giveChainConfig.srcValidators);
     }
 
+    //
+    // run validators
+    //
     logger.info("Order validation is started");
     const orderValidators = await Promise.all(
       listOrderValidators.map((validator) => {
@@ -166,6 +179,9 @@ export class Executor {
     }
     logger.info("Order validation is finished");
 
+    //
+    // run processor
+    //
     logger.info(`OrderProcessor is started`);
     const orderProcessor =
       chainConfig.orderProcessor || this.config.orderProcessor;
