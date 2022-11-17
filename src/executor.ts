@@ -1,4 +1,5 @@
 import { ChainId, Evm, PMMClient, Solana } from "@debridge-finance/pmm-client";
+import { PmmClient } from "@debridge-finance/pmm-client/src/solana";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Logger } from "pino";
 
@@ -21,8 +22,8 @@ export class Executor {
 
   async init() {
     if (this.isInitialized) return;
-    const clients = {} as any;
-    const evmAddresses = {} as any;
+    const clients: { [key in ChainId]: Solana.PmmClient | Evm.PmmEvmClient } = {} as any;
+    const evmAddresses: { [key in ChainId]: any } = {} as any;
     const chains = await Promise.all(
       this.config.chains.map(async (chain) => {
         const chainId = chain.chain;
@@ -53,11 +54,12 @@ export class Executor {
             solanaDebridge,
             solanaDebridgeSetting
           );
-          await clients[chainId].initForFulfillPreswap(chain.beneficiary, [
+          await (clients[chainId] as Solana.PmmClient).initForFulfillPreswap(new PublicKey(chain.beneficiary), [
             ChainId.BSC,
             ChainId.Polygon,
           ]);
         } else {
+          // TODO all these addresses are optional, so we need to provide defaults which represent the mainnet setup
           evmAddresses[chainId] = {
             pmmSourceAddress: chain.pmmSrc,
             pmmDestinationAddress: chain.pmmDst,
@@ -69,8 +71,8 @@ export class Executor {
       })
     );
 
-    Object.keys(evmAddresses).forEach((address) => {
-      clients[address] = new Evm.PmmEvmClient({
+    Object.keys(evmAddresses).forEach((chainId) => {
+      clients[chainId as any as ChainId] = new Evm.PmmEvmClient({
         enableContractsCache: true,
         addresses: evmAddresses,
       });

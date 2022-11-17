@@ -20,15 +20,20 @@ export class ExecutorEngine {
     });
   }
 
+  async init() {
+    return Promise.all(
+      this.executors.map(async (executor) => executor.init())
+    );
+  }
+
   async start() {
     while (true) {
       await Promise.all(
         this.executors.map(async (executor) => {
-          await executor.init();
           return executor.execute();
         })
       );
-      await helpers.sleep(2 * 1000); // todo
+      await helpers.sleep(1 * 1000); // todo
     }
   }
 }

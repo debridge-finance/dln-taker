@@ -12,7 +12,7 @@ import { whiteListedMarker } from "./validators/white.listed.marker";
   return this.toString();
 };
 
-function main() {
+async function main() {
   const config = [
     {
       // orderProcessor: strictProcessor(['0x0000000000000000000000000000000000000000']),
@@ -85,7 +85,11 @@ function main() {
       ],
     } as ExecutorConfig,
   ];
-  new ExecutorEngine(config).start();
+
+  const executor = new ExecutorEngine(config)
+  await executor.init();
+  await executor.start();
 }
 
-main();
+main()
+  .catch(e => console.error("Executor failed:", (e as Error).message))
