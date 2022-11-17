@@ -1,13 +1,9 @@
-import {ChainId, PMMClient, PriceTokenService, SwapConnector} from "@debridge-finance/pmm-client"
+import {ChainId, PriceTokenService, SwapConnector} from "@debridge-finance/pmm-client"
 import {GetNextOrder} from "./interfaces"
-import { Order } from "./pmm_common";
-import {OrderData} from "@debridge-finance/pmm-client/src/order";
 import {OrderProcessor} from "./processors/order.processor";
 import {OrderValidator} from "./validators/order.validator";
 
-// todo: reuse internal Address representation and remove
 type address = string;
-
 
 /**
  * Represents a chain configuration where orders can be fulfilled.
@@ -46,10 +42,13 @@ export interface ChainConfig {
      */
     deBridge?: address;
 
+    /**
+     * EVM: contract address responsible for swaps
+     */
     crossChainForwarderAddress?: address;
 
     /**
-     * Solana related
+     * Internal settings
      */
     deBridgeSettings?: {
         debridge: string;
@@ -62,9 +61,6 @@ export interface ChainConfig {
 
     /**
      * Taker controlled address where the orders (fulfilled on other chains) would unlock the funds to.
-     *
-     * This setting is used by another FulfillableChainConfig while fulfilling an order created on this
-     * particular chain.
      */
     beneficiary: address;
 
@@ -73,37 +69,50 @@ export interface ChainConfig {
      */
     takerPrivateKey: string;
 
+    /**
+     * Represents a list of validators which filter out orders for fulfillment
+     */
     srcValidators?: OrderValidator[];
 
+    /**
+     * Represents a list of validators which filter out orders for fulfillment
+     */
     dstValidators?: OrderValidator[];
 
     /**
-     * Represents an order processor which fulfills orders. You can create your own modular processor
-     * which reuses one or another existing processor
-     *
-     * possible order processors:
-     * - match() - fulfills the order taking tokens from the wallet, if enough funds presented
-     * - preswap() - fulfills the order making a preswap from specific token
+     * Defines an order processor that implements the fulfillment strategy
      */
     orderProcessor?: OrderProcessor;
 }
 
 export interface ExecutorConfig {
+    /**
+     * Represents a list of validators which filter out orders for fulfillment
+     */
     orderValidators?: OrderValidator[];
 
     /**
      * Token price provider
-     * default coingecko
+     * Default: CoingeckoPriceFeed
      */
     tokenPriceService?: PriceTokenService;
 
     /**
      * Swap connector
-     * default 1inch
+     * Default: OneInchConnector
      */
     swapConnector?: SwapConnector;
 
+    /**
+     * Source of orders
+     */
     orderFeed: string | GetNextOrder;
+
+    /**
+     * Defines an order processor that implements the fulfillment strategy
+     * Default: strictProcessor
+     */
+    orderProcessor?: OrderProcessor;
 
     chains: ChainConfig[];
 }
