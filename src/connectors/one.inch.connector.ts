@@ -2,7 +2,7 @@ import axios from "axios";
 import { ChainId, SwapConnector } from "@debridge-finance/pmm-client";
 
 export class OneInchConnector implements SwapConnector {
-	constructor(private readonly apiServerOneInch: string) {}
+	constructor(private readonly apiServerOneInch: string) { }
 
 	async getSwap(request: {
 		chainId: ChainId;
@@ -15,6 +15,9 @@ export class OneInchConnector implements SwapConnector {
 	}): Promise<{ data: string; to: string; value: string }> {
 		if (request.fromTokenAddress === "0x0000000000000000000000000000000000000000") {
 			request.fromTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+		}
+		if (request.toTokenAddress === "0x0000000000000000000000000000000000000000") {
+			request.toTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 		}
 
 		const query = new URLSearchParams({

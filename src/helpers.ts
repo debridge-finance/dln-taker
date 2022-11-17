@@ -28,6 +28,7 @@ export function readEnv(): [Config, ChainId[]] {
 			enabledChains.push(chain);
 			const chainCfg = Object.fromEntries(keys.map((key) => [key, parsed[`${chain}.${key}`]])) as ChainConfig;
 			if (`${chain}.DEBRIDGE_SETTINGS` in parsed) chainCfg.DEBRIDGE_SETTINGS = parsed[`${chain}.DEBRIDGE_SETTINGS`];
+			if (`${chain}.PMM_FORWARDER` in parsed) chainCfg.PMM_FORWARDER = parsed[`${chain}.PMM_FORWARDER`];
 			result[chain] = chainCfg;
 		}
 	}

@@ -120,7 +120,7 @@ async function orderProcessor(
 	let preswapToken = preswapMap.get(order.take.chainId)!;
 	// taker = signer
 	if (order.take.chainId === ChainId.Solana)
-		preswapFulfillMeta = await client.preswapAndFulfillOrder<ChainId.Solana>(order, orderId, preswapToken, { taker: (providers[order.take.chainId].wallet as { publicKey: PublicKey }).publicKey })
+		preswapFulfillMeta = await client.preswapAndFulfillOrder<ChainId.Solana>(order, orderId, preswapToken, { taker: (providers[order.take.chainId].wallet as { publicKey: PublicKey }).publicKey, slippageBps: 200 })
 	else
 		preswapFulfillMeta = await client.preswapAndFulfillOrder<ChainId.Ethereum>(order, orderId, preswapToken, {
 			web3: providers[order.take.chainId].connection as Web3,
@@ -256,6 +256,7 @@ async function main() {
 				deBridgeGateAddress: config[chain].DEBRIDGE,
 				pmmDestinationAddress: config[chain].PMM_DST,
 				pmmSourceAddress: config[chain].PMM_SRC,
+				crossChainForwarderAddress: config[chain].PMM_FORWARDER,
 			} as EvmChainInfo[number];
 			swapConnectors.set(chain, oneInchConnector);
 		}

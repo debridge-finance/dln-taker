@@ -5,6 +5,7 @@ export type ChainConfig = {
 	PMM_DST: string;
 	DEBRIDGE: string;
 	DEBRIDGE_SETTINGS?: string;
+	PMM_FORWARDER?: string;
 	WALLET: string;
 	RPC_URL: string;
 	BENEFICIARY: string;
