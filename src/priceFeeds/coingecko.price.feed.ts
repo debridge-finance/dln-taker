@@ -6,6 +6,8 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { PublicKey } from "@solana/web3.js";
 import { setupCache } from "axios-cache-adapter";
 
+logger.setLevel("DEBUG");
+
 export class CoingeckoPriceFeed implements PriceFeed {
 	private readonly domain;
 
@@ -54,12 +56,17 @@ export class CoingeckoPriceFeed implements PriceFeed {
 			if (["Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"].includes(tokenAddress)) {
 				return 1; //todo
 			}
+		} else {
+			tokenAddress = tokenAddress.toLowerCase();
 		}
 		const url =
 			this.domain + this.endpointTokenPrice + coinGeckoChainId + `?contract_addresses=${tokenAddress}&vs_currencies=${this.currency}`;
 		logger.log(`CoinGeckoPriceTokenService url ${url}`);
+		console.log(`CoinGeckoPriceTokenService url ${url}`);
+
 		const response = await axios.get(url + this.api_key);
 		logger.log(`CoinGeckoPriceTokenService response ${JSON.stringify(response.data)}`);
+		console.log(`CoinGeckoPriceTokenService response ${JSON.stringify(response.data)}`);
 
 		return response.data[tokenAddress][this.currency];
 	}
