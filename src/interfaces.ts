@@ -21,6 +21,7 @@ export type Config = {
 
 export interface PriceFeed {
 	getUsdPriceWithDecimals(chainId: ChainId, tokenAddress: string): Promise<number>;
+	getPrice(chainId: ChainId, tokenAddress: string): Promise<number>;
 }
 
 export type NextOrderInfo = {
