@@ -26,6 +26,14 @@ export class Executor {
     const chains = await Promise.all(
       this.config.chains.map(async (chain) => {
         const chainId = chain.chain;
+
+        // console.log(chainId, chain.orderProcessor, this.config.orderProcessor)
+        if (!chain.orderProcessor && !this.config.orderProcessor) {
+          throw new Error(
+            `OrderProcessor is specified neither globally (config.orderProcessor) nor for chain ${ChainId[chainId]} (config.chains.<bsc>.orderProcessor)`
+          );
+        }
+
         if (chainId === ChainId.Solana) {
           this.solanaConnection = new Connection(chain.chainRpc);
 
@@ -104,10 +112,10 @@ export class Executor {
         const logger = this.logger.child({ orderId });
         if (nextOrderInfo.type === "created") {
           logger.info(`execute ${orderId} processing is started`);
-          const fulfillableChainConfig = this.config.chains.find(
+          const chainConfig = this.config.chains.find(
             (it) => nextOrderInfo.order?.take.chainId === it.chain
           );
-          await this.processing(nextOrderInfo, fulfillableChainConfig!, logger);
+          await this.processing(nextOrderInfo, chainConfig!, logger);
           logger.info(`execute ${orderId} processing is finished`);
         } else if (nextOrderInfo.type === "fulfilled") {
           this.orderFulfilledMap.set(orderId, true);
@@ -160,7 +168,7 @@ export class Executor {
     const orderProcessor =
       chainConfig.orderProcessor || this.config.orderProcessor;
 
-    await orderProcessor(
+    await orderProcessor!(
       nextOrderInfo.orderId,
       nextOrderInfo.order!,
       this.config,

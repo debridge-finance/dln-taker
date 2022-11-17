@@ -19,7 +19,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     orderId: string,
     order: OrderData,
     executorConfig: ExecutorConfig,
-    fulfillableChainConfig: ChainConfig,
+    chainConfig: ChainConfig,
     context: OrderProcessorContext
   ) => {
     const logger = context.logger.child({ processor: "strictProcessor" });
@@ -40,7 +40,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
 
     let takeWeb3: Web3;
     if (order.take.chainId !== ChainId.Solana) {
-      takeWeb3 = new Web3(fulfillableChainConfig!.chainRpc);
+      takeWeb3 = new Web3(chainConfig!.chainRpc);
     }
 
     const [giveNativePrice, takeNativePrice] = await Promise.all([
@@ -75,7 +75,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     let fulfillTx;
     if (order.take.chainId === ChainId.Solana) {
       const wallet = Keypair.fromSecretKey(
-        helpers.hexToBuffer(fulfillableChainConfig.takerPrivateKey)
+        helpers.hexToBuffer(chainConfig.takerPrivateKey)
       ).publicKey;
       fulfillTx = await context.client.fulfillOrder<ChainId.Solana>(
         order,
@@ -93,8 +93,8 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
         orderId,
         {
           web3: createWeb3WithPrivateKey(
-            fulfillableChainConfig.chainRpc,
-            fulfillableChainConfig.takerPrivateKey
+            chainConfig.chainRpc,
+            chainConfig.takerPrivateKey
           ),
           fulfillAmount: Number(order.take.amount),
           permit: "0x",
@@ -114,10 +114,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
       );
     }
 
-    const transactionFulfill = await sendTransaction(
-      fulfillableChainConfig,
-      fulfillTx
-    );
+    const transactionFulfill = await sendTransaction(chainConfig, fulfillTx);
     logger.info(`fulfill transaction ${transactionFulfill} is completed`);
 
     let state = await context.client.getTakeOrderStatus(
@@ -142,7 +139,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     let unlockTx;
     if (order.take.chainId === ChainId.Solana) {
       const wallet = Keypair.fromSecretKey(
-        helpers.hexToBuffer(fulfillableChainConfig.takerPrivateKey)
+        helpers.hexToBuffer(chainConfig.takerPrivateKey)
       ).publicKey;
       unlockTx = await context.client.sendUnlockOrder<ChainId.Solana>(
         order,
@@ -170,8 +167,8 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
         executionFeeAmount,
         {
           web3: createWeb3WithPrivateKey(
-            fulfillableChainConfig.chainRpc,
-            fulfillableChainConfig.takerPrivateKey
+            chainConfig.chainRpc,
+            chainConfig.takerPrivateKey
           ),
           ...rewards,
         }
@@ -182,10 +179,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
         )}`
       );
     }
-    const transactionUnlock = await sendTransaction(
-      fulfillableChainConfig,
-      unlockTx
-    );
+    const transactionUnlock = await sendTransaction(chainConfig, unlockTx);
     logger.info(`unlock transaction ${transactionUnlock} is completed`);
   };
 };

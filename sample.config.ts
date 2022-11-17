@@ -6,11 +6,12 @@ import * as processors from "./src/processors";
 const config: ExecutorConfig = {
   orderFeed: `${process.env.WSS}`,
 
-  orderProcessor: processors.strictProcessor([
-    "0x0000000000000000000000000000000000000000",
-  ]),
+  orderValidators: [
+    validators.srcChainDefined(),
+    validators.dstChainDefined(),
 
-  orderValidators: [validators.orderProfitable(4)],
+    validators.orderProfitable(4 /*bps*/),
+  ],
 
   chains: [
     {

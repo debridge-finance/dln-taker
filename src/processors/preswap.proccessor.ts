@@ -22,7 +22,7 @@ export const preswapProcessor = (
     orderId: string,
     order: OrderData,
     executorConfig: ExecutorConfig,
-    fulfillableChainConfig: ChainConfig,
+    chainConfig: ChainConfig,
     context: OrderProcessorContext
   ) => {
     const logger = context.logger.child({ processor: "preswapProcessor" });
@@ -37,7 +37,7 @@ export const preswapProcessor = (
 
     let takeWeb3: Web3;
     if (order.take.chainId !== ChainId.Solana) {
-      takeWeb3 = new Web3(fulfillableChainConfig!.chainRpc);
+      takeWeb3 = new Web3(chainConfig!.chainRpc);
     }
 
     const [giveNativePrice, takeNativePrice] = await Promise.all([
@@ -73,7 +73,7 @@ export const preswapProcessor = (
     let fulfillTx;
     if (order.take.chainId === ChainId.Solana) {
       const wallet = Keypair.fromSecretKey(
-        helpers.hexToBuffer(fulfillableChainConfig.takerPrivateKey)
+        helpers.hexToBuffer(chainConfig.takerPrivateKey)
       ).publicKey;
       fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Solana>(
         order,
@@ -88,8 +88,8 @@ export const preswapProcessor = (
       );
     } else {
       const web3 = createWeb3WithPrivateKey(
-        fulfillableChainConfig.chainRpc,
-        fulfillableChainConfig.takerPrivateKey
+        chainConfig.chainRpc,
+        chainConfig.takerPrivateKey
       );
       fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Ethereum>(
         order,
@@ -118,10 +118,7 @@ export const preswapProcessor = (
       );
     }
 
-    const txFulfill = await sendTransaction(
-      fulfillableChainConfig,
-      fulfillTx.tx
-    );
+    const txFulfill = await sendTransaction(chainConfig, fulfillTx.tx);
     logger.info(`fulfill transaction ${txFulfill} is completed`);
 
     let state = await context.client.getTakeOrderStatus(
@@ -146,7 +143,7 @@ export const preswapProcessor = (
     let unlockTx;
     if (order.take.chainId === ChainId.Solana) {
       const wallet = Keypair.fromSecretKey(
-        helpers.hexToBuffer(fulfillableChainConfig.takerPrivateKey)
+        helpers.hexToBuffer(chainConfig.takerPrivateKey)
       ).publicKey;
       unlockTx = await context.client.sendUnlockOrder<ChainId.Solana>(
         order,
@@ -173,14 +170,14 @@ export const preswapProcessor = (
         executionFeeAmount,
         {
           web3: createWeb3WithPrivateKey(
-            fulfillableChainConfig.chainRpc,
-            fulfillableChainConfig.takerPrivateKey
+            chainConfig.chainRpc,
+            chainConfig.takerPrivateKey
           ),
           ...rewards,
         }
       );
     }
-    const txUnlock = await sendTransaction(fulfillableChainConfig, unlockTx);
+    const txUnlock = await sendTransaction(chainConfig, unlockTx);
     logger.info(`unlock transaction ${txUnlock} is completed`);
   };
 };

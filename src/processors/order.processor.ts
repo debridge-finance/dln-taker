@@ -18,6 +18,6 @@ export type OrderProcessor = (
   orderId: string,
   order: OrderData,
   executorConfig: ExecutorConfig,
-  fulfillableChainConfig: ChainConfig,
+  chainConfig: ChainConfig,
   context: OrderProcessorContext
 ) => Promise<void>;
