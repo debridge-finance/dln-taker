@@ -1,9 +1,8 @@
 import { helpers } from "@debridge-finance/solana-utils";
 import { eventToOrderData, timeDiff, U256 } from "../helpers";
-import { Config, GetNextOrder, NextOrderInfo } from "../interfaces";
+import { GetNextOrder, NextOrderInfo } from "../interfaces";
 import { PmmEvent } from "../pmm_common";
 import client, { Connection as MQConnection } from "amqplib";
-import { ChainId } from "@debridge-finance/pmm-client";
 
 type RabbitMqConfig = {
     RABBIT_URL: string;
@@ -41,14 +40,14 @@ export class RabbitNextOrder extends GetNextOrder {
             switch (decoded.event.oneofKind) {
                 case "createdSrc": {
                     const orderData = eventToOrderData(decoded.event.createdSrc.createdOrder!);
-                    console.log(timeDiff(Number(decoded.transactionMetadata?.trackedByReaderTimestamp!)));
-                    console.log(this.enabledChains, orderData.take.chainId, orderData.give.chainId);
+                    this.logger.debug(timeDiff(Number(decoded.transactionMetadata?.trackedByReaderTimestamp!)));
+                    this.logger.debug(`${this.enabledChains}, ${orderData.take.chainId}, ${orderData.give.chainId}`);
                     if (
                       !this.enabledChains.includes(orderData.take.chainId) ||
                       !this.enabledChains.includes(orderData.give.chainId) ||
                       timeDiff(Number(decoded.transactionMetadata?.trackedByReaderTimestamp!)) > this.eventTimeout
                     ) continue;
-                    console.log(orderData);
+                    this.logger.debug(orderData);
                     return {
                         type: "created",
                         orderId: helpers.bufferToHex(U256.toBytesBE(decoded.event.createdSrc.orderId!)),

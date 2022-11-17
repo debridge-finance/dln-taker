@@ -9,8 +9,6 @@ import {OrderValidator} from "./validators/order.validator";
 type address = string;
 
 
-
-
 /**
  * Represents a chain configuration where orders can be fulfilled.
  */
@@ -73,12 +71,11 @@ export interface ChainConfig {
     /**
      * The private key for the wallet with funds to fulfill orders
      */
-    wallet: string;
+    takerPrivateKey: string;
 
-    /**
-     * Represents a list of validators which filter out orders from the orders feed to be fulfilled
-     */
-    orderValidators?: OrderValidator[];
+    srcValidators?: OrderValidator[];
+
+    dstValidators?: OrderValidator[];
 
     /**
      * Represents an order processor which fulfills orders. You can create your own modular processor
@@ -92,11 +89,13 @@ export interface ChainConfig {
 }
 
 export interface ExecutorConfig {
+    orderValidators?: OrderValidator[];
+
     /**
      * Token price provider
      * default coingecko
      */
-    priceTokenService?: PriceTokenService;
+    tokenPriceService?: PriceTokenService;
 
     /**
      * Swap connector
@@ -104,6 +103,7 @@ export interface ExecutorConfig {
      */
     swapConnector?: SwapConnector;
 
-    orderFeed: GetNextOrder;
-    fulfillableChains: ChainConfig[];
+    orderFeed: string | GetNextOrder;
+
+    chains: ChainConfig[];
 }

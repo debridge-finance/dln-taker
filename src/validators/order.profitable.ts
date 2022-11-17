@@ -16,12 +16,12 @@ export const orderProfitable = (profitabilityBps: number): OrderValidator => {
 
     let giveWeb3;
     if (order.give.chainId !== ChainId.Solana) {
-      giveWeb3 = new Web3(config.fulfillableChains!.find(chainConfig => chainConfig.chain === order.give.chainId)!.chainRpc);
+      giveWeb3 = new Web3(config.chains!.find(chainConfig => chainConfig.chain === order.give.chainId)!.chainRpc);
     }
 
     let takeWeb3;
     if (order.take.chainId !== ChainId.Solana) {
-      takeWeb3 = new Web3(config.fulfillableChains!.find(chainConfig => chainConfig.chain === order.take.chainId)!.chainRpc);
+      takeWeb3 = new Web3(config.chains!.find(chainConfig => chainConfig.chain === order.take.chainId)!.chainRpc);
     }
 
     const giveAddress = helpers.bufferToHex(Buffer.from(order.give.tokenAddress));
@@ -31,8 +31,8 @@ export const orderProfitable = (profitabilityBps: number): OrderValidator => {
     logger.debug(`takeAddress=${takeAddress}`);
 
     const [givePrice, takePrice, giveDecimals, takeDecimals] = await Promise.all([
-      config.priceTokenService!.getPrice(order.give.chainId, giveAddress),
-      config.priceTokenService!.getPrice(order.take.chainId, takeAddress),
+      config.tokenPriceService!.getPrice(order.give.chainId, giveAddress),
+      config.tokenPriceService!.getPrice(order.take.chainId, takeAddress),
       client.getDecimals(order.give.chainId, order.give.tokenAddress, giveWeb3),
       client.getDecimals(order.take.chainId, order.take.tokenAddress, takeWeb3),
     ]);

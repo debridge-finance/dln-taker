@@ -1,12 +1,18 @@
 import {ExecutorConfig} from "./config";
 import {Executor} from "./executor";
 import {helpers} from "@debridge-finance/solana-utils";
-import {Logger} from "pino";
+import pino from "pino";
+import { config } from "dotenv";
+
+config();
 
 export class ExecutorEngine {
   private readonly executors: Executor[];
 
-  constructor(executorConfigs: ExecutorConfig[], private readonly logger: Logger) {
+  constructor(executorConfigs: ExecutorConfig[]) {
+    const logger = pino({
+      level: process.env.LOG_LEVEL || 'info'
+    });
     const orderFulfilledMap = new Map<string, boolean>();
     this.executors = executorConfigs.map(config => {
       return new Executor(config, orderFulfilledMap, logger);

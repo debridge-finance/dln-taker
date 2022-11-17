@@ -1,11 +1,11 @@
 import {ChainConfig, ExecutorConfig} from "./config";
 import {NextOrderInfo} from "./interfaces";
 import {ChainId, Evm, PMMClient, Solana} from "@debridge-finance/pmm-client";
-import logger from "loglevel";
 import {CoingeckoPriceFeed} from "./priceFeeds/coingecko.price.feed";
 import {OneInchConnector} from "./swapConnector/one.inch.connector";
 import {Connection, PublicKey} from "@solana/web3.js";
 import {Logger} from "pino";
+import {WsNextOrder} from "./orderFeeds/ws.order.feed";
 
 export class Executor {
   private isInitialized = false;
@@ -19,7 +19,7 @@ export class Executor {
     if (this.isInitialized) return;
     const clients = {} as any;
     const evmAddresses = {} as any;
-    const chains = await Promise.all(this.config.fulfillableChains.map(async chain => {
+    const chains = await Promise.all(this.config.chains.map(async chain => {
       const chainId = chain.chain;
       if (chainId === ChainId.Solana) {
         this.solanaConnection = new Connection(chain.chainRpc);
@@ -57,15 +57,20 @@ export class Executor {
 
     this.pmmClient = new PMMClient(clients);
 
-    if (!this.config.priceTokenService) {
-      this.config.priceTokenService = new CoingeckoPriceFeed();
+    if (!this.config.tokenPriceService) {
+      this.config.tokenPriceService = new CoingeckoPriceFeed();
     }
 
     if (!this.config.swapConnector) {
       this.config.swapConnector = new OneInchConnector();
     }
 
+    if (typeof this.config.orderFeed === 'string') {
+      this.config.orderFeed = new WsNextOrder(this.config.orderFeed)
+    }
     this.config.orderFeed.setEnabledChains(chains);
+    this.config.orderFeed.setLogger(this.logger);
+    await this.config.orderFeed.init();
 
     this.isInitialized = true;
   }
@@ -74,15 +79,15 @@ export class Executor {
     if (!this.isInitialized) throw new Error('executor is not initialized');
 
     try {
-      const nextOrderInfo = await this.config.orderFeed.getNextOrder();
-      logger.log(`execute nextOrderInfo ${JSON.stringify(nextOrderInfo)}`);
+      const nextOrderInfo = await (this.config.orderFeed as WsNextOrder).getNextOrder();
+      this.logger.info(`execute nextOrderInfo ${JSON.stringify(nextOrderInfo)}`);
 
       if (nextOrderInfo) {
         const orderId = nextOrderInfo.orderId;
         const logger = this.logger.child({ orderId });
         if (nextOrderInfo.type === 'created') {
           logger.info(`execute ${orderId} processing is started`);
-          const fulfillableChainConfig = this.config.fulfillableChains.find(it => nextOrderInfo.order?.take.chainId === it.chain);
+          const fulfillableChainConfig = this.config.chains.find(it => nextOrderInfo.order?.take.chainId === it.chain);
           await this.processing(nextOrderInfo, fulfillableChainConfig!, logger);
           logger.info(`execute ${orderId} processing is finished`);
         } else if(nextOrderInfo.type === 'fulfilled') {
@@ -90,15 +95,25 @@ export class Executor {
         }
       }
     } catch (e) {
-      logger.error(`Error in execution ${e}`);
+      this.logger.error(`Error in execution ${e}`);
     }
   }
 
   private async processing(nextOrderInfo: NextOrderInfo, fulfillableChainConfig: ChainConfig, logger: Logger): Promise<boolean> {
     const order = nextOrderInfo.order!;
 
+    const listOrderValidators = this.config.orderValidators || [];
+    if (fulfillableChainConfig.dstValidators && fulfillableChainConfig.dstValidators.length > 0) {
+      listOrderValidators?.push(...fulfillableChainConfig.dstValidators);
+    }
+
+    const giveChainConfig = this.config.chains.find(chain => chain.chain === order.give.chainId)!;
+    if (giveChainConfig.srcValidators && giveChainConfig.srcValidators.length > 0) {
+      listOrderValidators?.push(...giveChainConfig.srcValidators);
+    }
+
     logger.info('Order validation is started');
-    const orderValidators = await Promise.all(fulfillableChainConfig.orderValidators?.map(validator => {
+    const orderValidators = await Promise.all(listOrderValidators.map(validator => {
       return validator(order, this.config, {
         client: this.pmmClient,
         logger,

@@ -23,7 +23,6 @@ function isVersionedTransaction(arg: unknown): arg is VersionedTransaction {
 }
 
 const sendSolanaTransaction = async (solanaConnection: Connection, keypair: Keypair, data: unknown): Promise<string> => {
-  console.log(data);
   let tx: Transaction | VersionedTransaction;
   if (isTransactionInstruction(data)) {
     tx = new Transaction().add(data)
@@ -64,10 +63,10 @@ const sendEvmTransaction = async (web3: Web3, data: unknown): Promise<string> =>
 export const sendTransaction = async (fulfillableChainConfig: ChainConfig, data: unknown): Promise<string> => {
   if (fulfillableChainConfig.chain === ChainId.Solana) {
     const solanaConnection = new Connection(fulfillableChainConfig.chainRpc);
-    const keyPair = Keypair.fromSecretKey(helpers.hexToBuffer(fulfillableChainConfig.wallet));
+    const keyPair = Keypair.fromSecretKey(helpers.hexToBuffer(fulfillableChainConfig.takerPrivateKey));
     return sendSolanaTransaction(solanaConnection, keyPair, data);
   } else {
-    const web3 = await createWeb3WithPrivateKey(fulfillableChainConfig.chainRpc, fulfillableChainConfig.wallet);
+    const web3 = await createWeb3WithPrivateKey(fulfillableChainConfig.chainRpc, fulfillableChainConfig.takerPrivateKey);
     return sendEvmTransaction(web3, data);
   }
 }

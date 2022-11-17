@@ -1,4 +1,5 @@
 import { OrderData, ChainId } from "@debridge-finance/pmm-client";
+import {Logger} from "pino";
 
 export type ChainConfig = {
 	PMM_SRC: string;
@@ -27,12 +28,19 @@ export type NextOrderInfo = {
 }
 
 export abstract class GetNextOrder {
-	protected enabledChains: ChainId[]
+	protected enabledChains: ChainId[];
+	protected logger: Logger;
+
+	abstract init(): void;
 
 	abstract getNextOrder(): Promise<NextOrderInfo | undefined>;
 
 	setEnabledChains(enabledChains: ChainId[]) {
 		this.enabledChains = enabledChains;
+	}
+
+	setLogger(logger: Logger) {
+		this.logger = logger;
 	}
 }
 

@@ -14,13 +14,13 @@ export const giveAmountUsdEquivalentBetween = (minUSDEquivalent: number, maxUSDE
     const logger = context.logger.child({ validator: 'giveAmountUsdEquivalentBetween' });
     let giveWeb3;
     if (order.give.chainId !== ChainId.Solana) {
-      giveWeb3 = new Web3(config.fulfillableChains!.find(chainConfig => chainConfig.chain === order.give.chainId)!.chainRpc);
+      giveWeb3 = new Web3(config.chains!.find(chainConfig => chainConfig.chain === order.give.chainId)!.chainRpc);
     }
     const giveAddress = helpers.bufferToHex(Buffer.from(order.give.tokenAddress));
     logger.debug(`giveAddress=${giveAddress}`);
 
     const [givePrice, giveDecimals] = await Promise.all([
-      config.priceTokenService!.getPrice(order.give.chainId, giveAddress),
+      config.tokenPriceService!.getPrice(order.give.chainId, giveAddress),
       context.client.getDecimals(order.give.chainId, order.give.tokenAddress, giveWeb3),
     ]);
     logger.debug(`givePrice=${givePrice}`);

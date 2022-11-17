@@ -1,5 +1,5 @@
 import { GetNextOrder, NextOrderInfo } from "../interfaces";
-import { ChainId, Offer, Order, OrderData } from "@debridge-finance/pmm-client";
+import { Offer, Order, OrderData } from "@debridge-finance/pmm-client";
 import { U256 } from "../helpers";
 import { helpers } from "@debridge-finance/solana-utils";
 import WebSocket from 'ws';
@@ -43,6 +43,57 @@ type WsOrderEvent = {
 }
 
 export class WsNextOrder extends GetNextOrder {
+    constructor(private wsUrl: string) {
+        super();
+    }
+
+    async getNextOrder(): Promise<NextOrderInfo | undefined> {
+        while (this.queue.length > 0) {
+            const orderInfo = this.queue.shift()!;
+            if (!this.enabledChains.includes(orderInfo.order.take.chainId) || !(this.enabledChains.includes(orderInfo.order.give.chainId))) continue;
+            switch (orderInfo.state) {
+                case "Created":
+                    return {
+                        order: orderInfo.order,
+                        type: "created",
+                        orderId: orderInfo.orderId,
+                    }
+                case "Fulfilled":
+                    return {
+                        order: orderInfo.order,
+                        type: "fulfilled",
+                        orderId: orderInfo.orderId,
+                        taker: orderInfo.taker
+                    };
+                default:
+                    return {
+                        order: orderInfo.order,
+                        type: "other",
+                        orderId: orderInfo.orderId,
+                    }
+            }
+        }
+    }
+
+    init(): void {
+        this.socket = new WebSocket(this.wsUrl)
+        this.queue = [];
+        this.socket.on("open", () => {
+            this.socket.send(JSON.stringify({ Subcription: {} }))
+        })
+        this.socket.on("message", (event: Buffer) => {
+            const data = JSON.parse(event.toString("utf-8"))
+            this.logger.debug(data);
+            if ('Order' in data) {
+                const parsedEvent = data as WsOrderEvent;
+                this.logger.debug(parsedEvent.Order.order_info);
+                const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
+                const [status, taker] = this.flattenStatus(parsedEvent.Order.order_info);
+                this.queue.push({ order, orderId: parsedEvent.Order.order_info.order_id, state: status, taker });
+            }
+        })
+    }
+
     private socket: WebSocket;
     private queue: { order: OrderData, orderId: string, state: OrderChangeStatus, taker?: string }[];
 
@@ -76,53 +127,5 @@ export class WsNextOrder extends GetNextOrder {
         const status = info.order_info_status
         if (Object.prototype.hasOwnProperty.call(status, "Fulfilled")) return ["Fulfilled", helpers.bufferToHex(Buffer.from((status as FulfilledChangeStatus).Fulfilled.taker))]
         return [status as Exclude<OrderChangeStatusInternal, FulfilledChangeStatus>, undefined];
-    }
-
-    constructor(wsUrl: string) {
-        super();
-        this.socket = new WebSocket(wsUrl)
-        this.queue = [];
-        this.socket.on("open", () => {
-            this.socket.send(JSON.stringify({ Subcription: {} }))
-        })
-        this.socket.on("message", (event: Buffer) => {
-            const data = JSON.parse(event.toString("utf-8"))
-            console.log(data);
-            if ('Order' in data) {
-                const parsedEvent = data as WsOrderEvent;
-                console.log(parsedEvent.Order.order_info);
-                const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
-                const [status, taker] = this.flattenStatus(parsedEvent.Order.order_info);
-                this.queue.push({ order, orderId: parsedEvent.Order.order_info.order_id, state: status, taker });
-            }
-        })
-    }
-
-    async getNextOrder(): Promise<NextOrderInfo | undefined> {
-        while (this.queue.length > 0) {
-            const orderInfo = this.queue.shift()!;
-            if (!this.enabledChains.includes(orderInfo.order.take.chainId) || !(this.enabledChains.includes(orderInfo.order.give.chainId))) continue;
-            switch (orderInfo.state) {
-                case "Created":
-                    return {
-                        order: orderInfo.order,
-                        type: "created",
-                        orderId: orderInfo.orderId,
-                    }
-                case "Fulfilled":
-                    return {
-                        order: orderInfo.order,
-                        type: "fulfilled",
-                        orderId: orderInfo.orderId,
-                        taker: orderInfo.taker
-                    };
-                default:
-                    return {
-                        order: orderInfo.order,
-                        type: "other",
-                        orderId: orderInfo.orderId,
-                    }
-                }
-        }
     }
 }

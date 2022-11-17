@@ -11,7 +11,7 @@ export const disableFulfill = (): OrderValidator => {
   return (order: OrderData, config: ExecutorConfig, context: ValidatorContext): Promise<boolean> => {
     const result = false;
     const logger = context.logger.child({ validator: 'disableFulfill' });
-    context.logger.info(`approve status: ${result}`);
+    logger.info(`approve status: ${result}`);
     return Promise.resolve(result);
   };
 }
