@@ -1,7 +1,8 @@
-import {OrderData} from "@debridge-finance/pmm-client/src/order";
-import {PMMClient} from "@debridge-finance/pmm-client";
-import {ExecutorConfig} from "../config";
-import {Logger} from "pino";
+import { PMMClient } from "@debridge-finance/pmm-client";
+import { OrderData } from "@debridge-finance/pmm-client/src/order";
+import { Logger } from "pino";
+
+import { ExecutorConfig } from "../config";
 
 export interface ValidatorContext {
   logger: Logger;
@@ -13,4 +14,8 @@ export interface ValidatorContext {
  * Returns true if order can be processed, false otherwise.
  *
  */
-export type OrderValidator = (order: OrderData, config: ExecutorConfig, context: ValidatorContext) => Promise<boolean>;
+export type OrderValidator = (
+  order: OrderData,
+  config: ExecutorConfig,
+  context: ValidatorContext
+) => Promise<boolean>;

@@ -1,9 +1,11 @@
-import axios from 'axios';
-import {ChainId, SwapConnector} from "@debridge-finance/pmm-client";
+import { ChainId, SwapConnector } from "@debridge-finance/pmm-client";
+import axios from "axios";
 import logger from "loglevel";
 
 export class OneInchConnector implements SwapConnector {
-  constructor(private readonly apiServerOneInch: string = 'https://nodes.debridge.finance') {}
+  constructor(
+    private readonly apiServerOneInch: string = "https://nodes.debridge.finance"
+  ) {}
 
   async getSwap(request: {
     chainId: ChainId;
@@ -15,15 +17,15 @@ export class OneInchConnector implements SwapConnector {
     slippage: number;
   }): Promise<{ data: string; to: string; value: string }> {
     if (
-      request.fromTokenAddress === '0x0000000000000000000000000000000000000000'
+      request.fromTokenAddress === "0x0000000000000000000000000000000000000000"
     ) {
-      request.fromTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+      request.fromTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
     }
 
     if (
-      request.toTokenAddress === '0x0000000000000000000000000000000000000000'
+      request.toTokenAddress === "0x0000000000000000000000000000000000000000"
     ) {
-      request.toTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+      request.toTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
     }
 
     const query = new URLSearchParams({
@@ -33,7 +35,7 @@ export class OneInchConnector implements SwapConnector {
       fromAddress: request.fromAddress.toString(),
       destReceiver: request.destReceiver.toString(),
       slippage: request.slippage.toString(),
-      disableEstimate: 'true',
+      disableEstimate: "true",
     });
     const url = `${this.apiServerOneInch}/v4.0/${
       request.chainId
@@ -43,7 +45,9 @@ export class OneInchConnector implements SwapConnector {
 
     try {
       const response = await axios.get(url);
-      logger.log(`OneInchConnector getSwap response ${JSON.stringify(response.data)}`);
+      logger.log(
+        `OneInchConnector getSwap response ${JSON.stringify(response.data)}`
+      );
 
       return {
         data: response.data.tx.data,
@@ -63,9 +67,9 @@ export class OneInchConnector implements SwapConnector {
     amount: string;
   }): Promise<string> {
     if (
-      request.fromTokenAddress === '0x0000000000000000000000000000000000000000'
+      request.fromTokenAddress === "0x0000000000000000000000000000000000000000"
     ) {
-      request.fromTokenAddress = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+      request.fromTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
     }
 
     const query = new URLSearchParams({
