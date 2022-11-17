@@ -12,10 +12,11 @@ import { whiteListedMarker } from "./validators/white.listed.marker";
   return this.toString();
 };
 
-
 function main() {
   const config = [
     {
+      orderProcessor: strictProcessor(['0x0000000000000000000000000000000000000000']),
+
       orderValidators: [
         whiteListedMarker([
           `${process.env.BENEFICIARY}`,

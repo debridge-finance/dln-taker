@@ -120,17 +120,14 @@ export class Executor {
 
   private async processing(
     nextOrderInfo: NextOrderInfo,
-    fulfillableChainConfig: ChainConfig,
+    chainConfig: ChainConfig,
     logger: Logger
   ): Promise<boolean> {
     const order = nextOrderInfo.order!;
 
     const listOrderValidators = this.config.orderValidators || [];
-    if (
-      fulfillableChainConfig.dstValidators &&
-      fulfillableChainConfig.dstValidators.length > 0
-    ) {
-      listOrderValidators?.push(...fulfillableChainConfig.dstValidators);
+    if (chainConfig.dstValidators && chainConfig.dstValidators.length > 0) {
+      listOrderValidators?.push(...chainConfig.dstValidators);
     }
 
     const giveChainConfig = this.config.chains.find(
@@ -160,11 +157,14 @@ export class Executor {
     logger.info("Order validation is finished");
 
     logger.info(`OrderProcessor is started`);
-    await fulfillableChainConfig.orderProcessor!(
+    const orderProcessor =
+      chainConfig.orderProcessor || this.config.orderProcessor;
+
+    await orderProcessor(
       nextOrderInfo.orderId,
       nextOrderInfo.order!,
       this.config,
-      fulfillableChainConfig,
+      chainConfig,
       {
         orderFulfilledMap: this.orderFulfilledMap,
         client: this.pmmClient,

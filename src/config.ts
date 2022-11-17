@@ -115,9 +115,8 @@ export interface ExecutorConfig {
 
   /**
    * Defines an order processor that implements the fulfillment strategy
-   * Default: strictProcessor
    */
-  orderProcessor?: OrderProcessor;
+  orderProcessor: OrderProcessor;
 
   chains: ChainConfig[];
 }
