@@ -8,6 +8,7 @@ import BigNumber from "bignumber.js";
 import { WsNextOrder } from "./orderFeeds/ws.order.feed";
 import { CoingeckoPriceFeed } from "./priceFeeds/coingecko.price.feed";
 import { OneInchConnector } from "./connectors/one.inch.connector";
+import {approve} from "./utils/approve";
 
 (BigInt.prototype as any).toJSON = function () {
 	return this.toString();
@@ -259,10 +260,10 @@ async function main() {
 				crossChainForwarderAddress: config[chain].PMM_FORWARDER,
 			} as EvmChainInfo[number];
 			swapConnectors.set(chain, oneInchConnector);
+			await approve(web3, web3.eth.defaultAccount, preswapTokens[chain], config[chain].PMM_FORWARDER!);
 		}
 		beneficiaryMap.set(chain, config[chain].BENEFICIARY);
 		preswapMap.set(chain, preswapTokens[chain]);
-
 	}
 
 	const evmClient = new Evm.PmmEvmClient({ addresses: evmAddresses, enableContractsCache: true });
