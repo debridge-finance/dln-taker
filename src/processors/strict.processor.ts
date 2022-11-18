@@ -25,7 +25,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     const logger = context.logger.child({ processor: "strictProcessor" });
 
     const takeToken = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
-    if (!approvedTokens.includes(takeToken)) {
+    if (!approvedTokens.map(token => token.toLowerCase()).includes(takeToken)) {
       logger.info(`takeToken ${takeToken} is not allowed`);
       return;
     }
@@ -98,6 +98,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
           ),
           fulfillAmount: Number(order.take.amount),
           permit: "0x",
+          unlockAuthority: createWeb3WithPrivateKey(chainConfig.chainRpc, chainConfig.takerPrivateKey).eth.defaultAccount!,
         }
       );
       logger.debug(

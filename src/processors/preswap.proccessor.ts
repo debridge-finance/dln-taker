@@ -103,6 +103,7 @@ export const preswapProcessor = (
           swapConnector: executorConfig.swapConnector!,
           takerAddress: web3.eth.defaultAccount!,
           priceTokenService: executorConfig.tokenPriceService!,
+          unlockAuthority: createWeb3WithPrivateKey(chainConfig.chainRpc, chainConfig.takerPrivateKey).eth.defaultAccount!,
         }
       );
       logger.debug(
