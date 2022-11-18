@@ -42,7 +42,7 @@ cp sample.config.ts executor.config.ts
 Configure networks to listen to, define rules to filter out orders, set the wallets with the liquidity to fulfill orders with (see the next [section](#configuration)), then launch the executor specifying the name of the configuration file:
 
 ```sh
-npm run executor --config executor.config.ts
+npm run executor executor.config.ts
 ```
 
 This will keep the executor up and running, listening for new orders and executing those that satisfy the rules. A detailed execution log would appear in the console.
