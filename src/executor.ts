@@ -4,7 +4,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { Logger } from "pino";
 
 import { ChainConfig, ExecutorConfig } from "./config";
-import { NextOrderInfo } from "./interfaces";
+import {GetNextOrder, NextOrderInfo} from "./interfaces";
 import { WsNextOrder } from "./orderFeeds/ws.order.feed";
 import { CoingeckoPriceFeed } from "./priceFeeds/coingecko.price.feed";
 import { OneInchConnector } from "./swapConnector/one.inch.connector";
@@ -13,6 +13,7 @@ export class Executor {
   private isInitialized = false;
   private solanaConnection: Connection;
   private pmmClient: PMMClient;
+  private orderFeed: GetNextOrder;
 
   constructor(
     private readonly config: ExecutorConfig,
@@ -88,12 +89,14 @@ export class Executor {
       this.config.swapConnector = new OneInchConnector();
     }
 
-    if (typeof this.config.orderFeed === "string") {
-      this.config.orderFeed = new WsNextOrder(this.config.orderFeed);
+    let orderFeed = this.config.orderFeed;
+    if (typeof orderFeed === "string") {
+      orderFeed = new WsNextOrder(orderFeed);
     }
-    this.config.orderFeed.setEnabledChains(chains);
-    this.config.orderFeed.setLogger(this.logger);
-    await this.config.orderFeed.init();
+    orderFeed.setEnabledChains(chains);
+    orderFeed.setLogger(this.logger);
+    await orderFeed.init();
+    this.orderFeed = orderFeed;
 
     this.isInitialized = true;
   }
@@ -103,7 +106,7 @@ export class Executor {
 
     try {
       const nextOrderInfo = await (
-        this.config.orderFeed as WsNextOrder
+        this.orderFeed as WsNextOrder
       ).getNextOrder();
       this.logger.info(
         `execute nextOrderInfo ${JSON.stringify(nextOrderInfo)}`

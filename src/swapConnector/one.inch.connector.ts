@@ -72,6 +72,12 @@ export class OneInchConnector implements SwapConnector {
       request.fromTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
     }
 
+    if (
+      request.toTokenAddress === "0x0000000000000000000000000000000000000000"
+    ) {
+      request.toTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+    }
+
     const query = new URLSearchParams({
       fromTokenAddress: request.fromTokenAddress.toString(),
       toTokenAddress: request.toTokenAddress.toString(),
