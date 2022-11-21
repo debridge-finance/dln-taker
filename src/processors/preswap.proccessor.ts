@@ -3,7 +3,7 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { Keypair } from "@solana/web3.js";
 import Web3 from "web3";
 
-import { ChainConfig, ExecutorConfig } from "../config";
+import { ExecutorConfig } from "../config";
 import { evmNativeTokenAddress, solanaNativeTokenAddress } from "../constant";
 import {
   MarketMakerExecutorError,
@@ -22,9 +22,9 @@ export const preswapProcessor = (
     orderId: string,
     order: OrderData,
     executorConfig: ExecutorConfig,
-    chainConfig: ChainConfig,
     context: OrderProcessorContext
   ) => {
+    const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "preswapProcessor" });
     let giveWeb3: Web3;
     if (order.give.chainId !== ChainId.Solana) {

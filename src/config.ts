@@ -5,8 +5,8 @@ import {
 } from "@debridge-finance/pmm-client";
 
 import { GetNextOrder } from "./interfaces";
-import { OrderProcessor } from "./processors/order.processor";
-import { OrderValidator } from "./validators/order.validator";
+import { OrderProcessor } from "./processors";
+import { OrderValidator } from "./validators";
 
 type address = string;
 
@@ -19,7 +19,7 @@ type Environment = {
   /**
    * Address of the DLN contract responsible for order fulfillment
    */
-  pmmDst?: address;
+  pmmDst: address;
 
   /**
    * Address of the deBridgeGate contract responsible for cross-chain messaging (used by pmmDst)
@@ -31,8 +31,7 @@ type Environment = {
   }
 
   solana?: {
-    solanaDebridge?: string;
-    solanaDebridgeSetting?: string;
+    debridgeSetting?: string;
   }
 }
 

@@ -3,7 +3,7 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { Keypair } from "@solana/web3.js";
 import Web3 from "web3";
 
-import { ChainConfig, ExecutorConfig } from "../config";
+import { ExecutorConfig } from "../config";
 import { evmNativeTokenAddress, solanaNativeTokenAddress } from "../constant";
 import {
   MarketMakerExecutorError,
@@ -19,9 +19,9 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     orderId: string,
     order: OrderData,
     executorConfig: ExecutorConfig,
-    chainConfig: ChainConfig,
     context: OrderProcessorContext
   ) => {
+    const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "strictProcessor" });
 
     const takeToken = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
