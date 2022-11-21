@@ -12,6 +12,8 @@ import {EvmAdapterProvider} from "./providers/evm.provider.adapter";
 import {createWeb3WithPrivateKey} from "./processors/utils/create.web3.with.private.key";
 import {SolanaProviderAdapter} from "./providers/solana.provider.adapter";
 import {helpers} from "@debridge-finance/solana-utils";
+import {OrderValidatorInterface} from "./validators/order.validator.interface";
+import {OrderValidator} from "./validators";
 
 export class Executor {
   private isInitialized = false;
@@ -50,7 +52,7 @@ export class Executor {
             chain.environment?.deBridgeContract!
           );
           const solanaDebridgeSetting = new PublicKey(
-            chain.environment?.deBridgeContract!
+            chain.environment?.solana!.debridgeSetting!
           );
 
           clients[chainId] = new Solana.PmmClient(
@@ -73,6 +75,13 @@ export class Executor {
             crossChainForwarderAddress: chain.environment?.evm?.forwarderContract
           };
         }
+
+        await Promise.all([...(chain.srcValidators || []), ...(chain.dstValidators || [])].filter(validator => {
+          return validator instanceof OrderValidatorInterface;
+        }).map(validator => {
+          return (validator as OrderValidatorInterface).init(chainId)
+        }));
+
         return chainId;
       })
     );
@@ -152,7 +161,7 @@ export class Executor {
     // 3) defined as srcValidators under the giveChain config
 
     // global validators
-    const listOrderValidators = this.config.validators || [];
+    const listOrderValidators: (OrderValidator | OrderValidatorInterface)[] = this.config.validators || [];
 
     // dstValidators@takeChain
     if (chainConfig.dstValidators && chainConfig.dstValidators.length > 0) {
@@ -176,11 +185,19 @@ export class Executor {
     logger.info("Order validation is started");
     const orderValidators = await Promise.all(
       listOrderValidators.map((validator) => {
-        return validator(order, this.config, {
-          client: this.pmmClient,
-          logger,
-          providers: this.providersMap,
-        }) as Promise<boolean>;
+        if (validator instanceof OrderValidatorInterface) {
+          return validator.validate(order, this.config, {
+            client: this.pmmClient,
+            logger,
+            providers: this.providersMap,
+          }) as Promise<boolean>;
+        } else {
+          return validator(order, this.config, {
+            client: this.pmmClient,
+            logger,
+            providers: this.providersMap,
+          }) as Promise<boolean>;
+        }
       }) || []
     );
 
@@ -216,7 +233,7 @@ export class Executor {
   private configureProvidersMap() {
     for (const chain of this.config.chains) {
       let provider: ProviderAdapter;
-      if (chain.chain === ChainId.Solana) {
+      if (chain.chain !== ChainId.Solana) {
         provider = new EvmAdapterProvider(createWeb3WithPrivateKey(chain.chainRpc, chain.takerPrivateKey));
       } else {
         provider = new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(

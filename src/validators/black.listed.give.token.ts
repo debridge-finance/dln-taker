@@ -3,25 +3,35 @@ import { helpers } from "@debridge-finance/solana-utils";
 
 import { ExecutorConfig } from "../config";
 
-import { OrderValidator, ValidatorContext } from "./order.validator";
+import { ValidatorContext } from "./order.validator";
+import {ChainId} from "@debridge-finance/pmm-client";
+import {convertAddressToBuffer} from "../utils/convert.address.to.buffer";
+import {OrderValidatorInterface} from "./order.validator.interface";
 
 /**
  * Checks if the order's locked token is not in the blacklist. This validator is useful to filter off orders that hold undesired and/or illiquid tokens.
  *
  * */
-export const blackListedGiveToken = (addresses: string[]): OrderValidator => {
-  return (
-    order: OrderData,
-    config: ExecutorConfig,
-    context: ValidatorContext
-  ): Promise<boolean> => {
-    const logger = context.logger.child({ validator: "blackListedGiveToken" });
-    const giveToken = helpers.bufferToHex(Buffer.from(order.give.tokenAddress));
-    const result = addresses
-      .map((address) => address.toLowerCase())
-      .includes(giveToken);
+export class BlackListedGiveToken extends OrderValidatorInterface{
 
+  private addressesBuffer: Uint8Array[];
+
+  constructor(private readonly addresses: string[]) {
+    super();
+  }
+
+  init(chainId: ChainId): Promise<void> {
+    super.chainId = chainId;
+    this.addressesBuffer = this.addresses.map((address) => convertAddressToBuffer(chainId, address));
+    return Promise.resolve();
+  }
+
+  validate(order: OrderData, config: ExecutorConfig, context: ValidatorContext): Promise<boolean> {
+    const logger = context.logger.child({ validator: "blackListedGiveToken" });
+    const result = this.addressesBuffer.some(address => buffersAreEqual(order.give.tokenAddress, address))
+
+    const giveToken = !helpers.bufferToHex(Buffer.from(order.give.tokenAddress));
     logger.info(`approve status: ${result}, giveToken ${giveToken}`);
     return Promise.resolve(result);
-  };
-};
+  }
+}

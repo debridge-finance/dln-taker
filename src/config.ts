@@ -7,6 +7,7 @@ import {
 import { GetNextOrder } from "./interfaces";
 import { OrderProcessor } from "./processors";
 import { OrderValidator } from "./validators";
+import { OrderValidatorInterface } from "./validators/order.validator.interface";
 
 type address = string;
 
@@ -76,12 +77,12 @@ export interface ChainConfig {
   /**
    * Represents a list of validators which filter out orders for fulfillment
    */
-  srcValidators?: OrderValidator[];
+  srcValidators?: (OrderValidator | OrderValidatorInterface)[];
 
   /**
    * Represents a list of validators which filter out orders for fulfillment
    */
-  dstValidators?: OrderValidator[];
+  dstValidators?: (OrderValidator | OrderValidatorInterface)[];
 
   /**
    * Defines an order processor that implements the fulfillment strategy

@@ -7,6 +7,7 @@ import Web3 from "web3";
 import { ExecutorConfig } from "../config";
 
 import { OrderValidator, ValidatorContext } from "./order.validator";
+import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
 
 /**
  * Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is the given basis points more than the USD equivalent of the order requested amount.
@@ -20,14 +21,7 @@ export const orderProfitable = (profitabilityBps: number): OrderValidator => {
     const { client } = context;
     const logger = context.logger.child({ validator: "orderProfitable" });
 
-    let giveWeb3;
-    if (order.give.chainId !== ChainId.Solana) {
-      giveWeb3 = new Web3(
-        config.chains!.find(
-          (chainConfig) => chainConfig.chain === order.give.chainId
-        )!.chainRpc
-      );
-    }
+    const giveWeb3 = (context.providers.get(order.give.chainId) as EvmAdapterProvider).connection;
 
     let takeWeb3;
     if (order.take.chainId !== ChainId.Solana) {

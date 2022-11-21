@@ -13,15 +13,16 @@ export class EvmAdapterProvider implements ProviderAdapter {
   async sendTransaction(data: unknown, context: SendTransactionContext) {
     const tx = data as { data: string; to: string; value: number };
     const gasLimit = await this.connection.eth.estimateGas(tx);
-    const gasPrice = await this.connection.eth.getGasPrice();
+    let gasPrice = await this.connection.eth.getGasPrice();
     const result = await this.connection.eth.sendTransaction({
       ...tx,
       from: this.connection.eth.defaultAccount!,
       gasPrice,
       gas: gasLimit,
     });
-    context.logger.info(`[EVM] Sent tx: ${result.transactionHash}`);
+    const transactionHash = result.transactionHash;
+    context.logger.info(`[EVM] Sent tx: ${transactionHash}`);
 
-    return result;
+    return transactionHash;
   }
 }

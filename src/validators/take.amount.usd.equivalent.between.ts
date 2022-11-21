@@ -1,12 +1,11 @@
-import { ChainId } from "@debridge-finance/pmm-client";
 import { OrderData } from "@debridge-finance/pmm-client/src/order";
 import { helpers } from "@debridge-finance/solana-utils";
 import BigNumber from "bignumber.js";
-import Web3 from "web3";
 
 import { ExecutorConfig } from "../config";
 
 import { OrderValidator, ValidatorContext } from "./order.validator";
+import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
 
 /**
  * Checks if the USD equivalent of the order's requested amount (amount that should be supplied to fulfill the order successfully) is in the given range. This validator is useful to filter off uncomfortable volumes, e.g. too low (e.g. less than $10) or too high (e.g., more than $100,000).
@@ -24,14 +23,7 @@ export const takeAmountUsdEquivalentBetween = (
     const logger = context.logger.child({
       validator: "takeAmountUsdEquivalentBetween",
     });
-    let giveWeb3;
-    if (order.take.chainId !== ChainId.Solana) {
-      giveWeb3 = new Web3(
-        config.chains!.find(
-          (chainConfig) => chainConfig.chain === order.take.chainId
-        )!.chainRpc
-      );
-    }
+    let taleWeb3 = (context.providers.get(order.take.chainId) as EvmAdapterProvider).connection;
     const giveAddress = helpers.bufferToHex(
       Buffer.from(order.take.tokenAddress)
     );
@@ -42,7 +34,7 @@ export const takeAmountUsdEquivalentBetween = (
       context.client.getDecimals(
         order.give.chainId,
         order.give.tokenAddress,
-        giveWeb3
+        taleWeb3
       ),
     ]);
     logger.debug(`givePrice=${givePrice}`);

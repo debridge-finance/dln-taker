@@ -12,6 +12,7 @@ import {
 import { OrderProcessor, OrderProcessorContext } from "./order.processor";
 import {SolanaProviderAdapter} from "../providers/solana.provider.adapter";
 import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
+import {convertAddressToBuffer} from "../utils/convert.address.to.buffer";
 
 export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
   return async (
@@ -24,9 +25,9 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "strictProcessor" });
 
-    const takeToken = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
-    if (!approvedTokens.map(token => token.toLowerCase()).includes(takeToken)) {
-      logger.info(`takeToken ${takeToken} is not allowed`);
+    const takeTokenAddressHex = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
+    if (!approvedTokens.map(token => convertAddressToBuffer(chainConfig.chain, token)).some(address => buffersAreEqual(order.take.tokenAddress, address))) {
+      logger.info(`takeToken ${takeTokenAddressHex} is not allowed`);
       return;
     }
     let giveWeb3: Web3;

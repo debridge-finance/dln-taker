@@ -1,9 +1,5 @@
-import { ChainId } from "@debridge-finance/pmm-client";
 import { OrderData } from "@debridge-finance/pmm-client/src/order";
-
 import { ExecutorConfig } from "../config";
-import { createWeb3WithPrivateKey } from "../processors/utils/create.web3.with.private.key";
-
 import { OrderValidator, ValidatorContext } from "./order.validator";
 
 /**
@@ -18,16 +14,8 @@ export const whiteListedTaker = (): OrderValidator => {
     const chainConfig = config.chains.find(
       (chain) => chain.chain === order.take.chainId
     )!;
-    let result = false;
-    if (chainConfig.chain === ChainId.Solana) {
-      // todo
-    } else {
-      const web3 = createWeb3WithPrivateKey(
-        chainConfig.chainRpc,
-        chainConfig.takerPrivateKey
-      );
-      result = web3.eth.defaultAccount === chainConfig.beneficiary;
-    }
+    const taker = context.providers.get(chainConfig.chain)!.address;
+    const result = chainConfig.beneficiary === taker;
     context.logger.info(
       `approve status: ${result}, beneficiary ${chainConfig.beneficiary}`
     );
