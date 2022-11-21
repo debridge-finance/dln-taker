@@ -42,10 +42,10 @@ export class Executor {
           const solanaPmmSrc = new PublicKey(chain.environment?.pmmSrc!);
           const solanaPmmDst = new PublicKey(chain.environment?.pmmDst!);
           const solanaDebridge = new PublicKey(
-            chain.environment?.solana?.solanaDebridge!
+            chain.environment?.deBridgeContract!
           );
           const solanaDebridgeSetting = new PublicKey(
-            chain.environment?.solana?.solanaDebridgeSetting!
+            chain.environment?.deBridgeContract!
           );
 
           clients[chainId] = new Solana.PmmClient(
@@ -193,7 +193,6 @@ export class Executor {
       nextOrderInfo.orderId,
       nextOrderInfo.order!,
       this.config,
-      chainConfig,
       {
         orderFulfilledMap: this.orderFulfilledMap,
         client: this.pmmClient,
