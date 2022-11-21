@@ -1,6 +1,5 @@
 import { ChainId, OrderData, OrderState } from "@debridge-finance/pmm-client";
 import { helpers } from "@debridge-finance/solana-utils";
-import { Keypair } from "@solana/web3.js";
 import Web3 from "web3";
 
 import { ExecutorConfig } from "../config";
@@ -11,8 +10,8 @@ import {
 } from "../error";
 
 import { OrderProcessor, OrderProcessorContext } from "./order.processor";
-import { createWeb3WithPrivateKey } from "./utils/create.web3.with.private.key";
-import { sendTransaction } from "./utils/send.transaction";
+import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
+import {SolanaProviderAdapter} from "../providers/solana.provider.adapter";
 
 export const preswapProcessor = (
   inputToken: string,
@@ -26,6 +25,7 @@ export const preswapProcessor = (
   ) => {
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "preswapProcessor" });
+    const takeProvider = context.providers.get(order.give.chainId);
     let giveWeb3: Web3;
     if (order.give.chainId !== ChainId.Solana) {
       giveWeb3 = new Web3(
@@ -72,9 +72,7 @@ export const preswapProcessor = (
 
     let fulfillTx;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = Keypair.fromSecretKey(
-        helpers.hexToBuffer(chainConfig.takerPrivateKey)
-      ).publicKey;
+      const wallet = (takeProvider as SolanaProviderAdapter).wallet.publicKey;
       fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Solana>(
         order,
         orderId,
@@ -87,23 +85,19 @@ export const preswapProcessor = (
         `fulfillTx is created in solana ${JSON.stringify(fulfillTx)}`
       );
     } else {
-      const web3 = createWeb3WithPrivateKey(
-        chainConfig.chainRpc,
-        chainConfig.takerPrivateKey
-      );
       fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Ethereum>(
         order,
         orderId,
         inputToken as unknown as string,
         {
-          web3,
+          web3: (takeProvider as EvmAdapterProvider).connection,
           fulfillAmount: Number(order.take.amount),
           permit: "0x",
           slippage,
           swapConnector: executorConfig.swapConnector!,
-          takerAddress: web3.eth.defaultAccount!,
+          takerAddress: takeProvider!.address,
           priceTokenService: executorConfig.tokenPriceService!,
-          unlockAuthority: createWeb3WithPrivateKey(chainConfig.chainRpc, chainConfig.takerPrivateKey).eth.defaultAccount!,
+          unlockAuthority: takeProvider!.address,
         }
       );
       logger.debug(
@@ -119,7 +113,7 @@ export const preswapProcessor = (
       );
     }
 
-    const txFulfill = await sendTransaction(chainConfig, fulfillTx.tx);
+    const txFulfill = await takeProvider!.sendTransaction(fulfillTx.tx, { logger });
     logger.info(`fulfill transaction ${txFulfill} is completed`);
 
     let state = await context.client.getTakeOrderStatus(
@@ -143,9 +137,7 @@ export const preswapProcessor = (
 
     let unlockTx;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = Keypair.fromSecretKey(
-        helpers.hexToBuffer(chainConfig.takerPrivateKey)
-      ).publicKey;
+      const wallet = (takeProvider as SolanaProviderAdapter).wallet.publicKey;
       unlockTx = await context.client.sendUnlockOrder<ChainId.Solana>(
         order,
         beneficiary,
@@ -170,15 +162,12 @@ export const preswapProcessor = (
         beneficiary,
         executionFeeAmount,
         {
-          web3: createWeb3WithPrivateKey(
-            chainConfig.chainRpc,
-            chainConfig.takerPrivateKey
-          ),
+          web3: (takeProvider as EvmAdapterProvider).connection,
           ...rewards,
         }
       );
     }
-    const txUnlock = await sendTransaction(chainConfig, unlockTx);
+    const txUnlock = await takeProvider!.sendTransaction(unlockTx, { logger });
     logger.info(`unlock transaction ${txUnlock} is completed`);
   };
 };

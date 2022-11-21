@@ -1,19 +1,24 @@
-import { ChainId, Evm, PMMClient, Solana } from "@debridge-finance/pmm-client";
-import { PmmClient } from "@debridge-finance/pmm-client/src/solana";
-import { Connection, PublicKey } from "@solana/web3.js";
-import { Logger } from "pino";
+import {ChainId, Evm, PMMClient, Solana} from "@debridge-finance/pmm-client";
+import {Connection, Keypair, PublicKey} from "@solana/web3.js";
+import {Logger} from "pino";
 
-import { ChainConfig, ExecutorConfig } from "./config";
+import {ChainConfig, ExecutorConfig} from "./config";
 import {GetNextOrder, NextOrderInfo} from "./interfaces";
-import { WsNextOrder } from "./orderFeeds/ws.order.feed";
-import { CoingeckoPriceFeed } from "./priceFeeds/coingecko.price.feed";
-import { OneInchConnector } from "./swapConnector/one.inch.connector";
+import {WsNextOrder} from "./orderFeeds/ws.order.feed";
+import {CoingeckoPriceFeed} from "./priceFeeds/coingecko.price.feed";
+import {OneInchConnector} from "./swapConnector/one.inch.connector";
+import {ProviderAdapter} from "./providers/provider.adapter";
+import {EvmAdapterProvider} from "./providers/evm.provider.adapter";
+import {createWeb3WithPrivateKey} from "./processors/utils/create.web3.with.private.key";
+import {SolanaProviderAdapter} from "./providers/solana.provider.adapter";
+import {helpers} from "@debridge-finance/solana-utils";
 
 export class Executor {
   private isInitialized = false;
   private solanaConnection: Connection;
   private pmmClient: PMMClient;
   private orderFeed: GetNextOrder;
+  private providersMap = new Map<ChainId, ProviderAdapter>();
 
   constructor(
     private readonly config: ExecutorConfig,
@@ -98,6 +103,8 @@ export class Executor {
     await orderFeed.init();
     this.orderFeed = orderFeed;
 
+    this.configureProvidersMap();
+
     this.isInitialized = true;
   }
 
@@ -172,6 +179,7 @@ export class Executor {
         return validator(order, this.config, {
           client: this.pmmClient,
           logger,
+          providers: this.providersMap,
         }) as Promise<boolean>;
       }) || []
     );
@@ -197,10 +205,25 @@ export class Executor {
         orderFulfilledMap: this.orderFulfilledMap,
         client: this.pmmClient,
         logger,
+        providers: this.providersMap,
       }
     );
     logger.info(`OrderProcessor is finished`);
 
     return true;
+  }
+
+  private configureProvidersMap() {
+    for (const chain of this.config.chains) {
+      let provider: ProviderAdapter;
+      if (chain.chain === ChainId.Solana) {
+        provider = new EvmAdapterProvider(createWeb3WithPrivateKey(chain.chainRpc, chain.takerPrivateKey));
+      } else {
+        provider = new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(
+          helpers.hexToBuffer(chain.takerPrivateKey)
+        ));
+      }
+      this.providersMap.set(chain.chain, provider);
+    }
   }
 }
