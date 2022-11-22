@@ -13,6 +13,7 @@ const broadcast = {
   interval: 2000,
   timeout: 600000,
   k: 1.2,
+  gasLimit: new BigNumber(1000000000),
 }
 
 export class EvmAdapterProvider implements ProviderAdapter {
@@ -53,7 +54,12 @@ export class EvmAdapterProvider implements ProviderAdapter {
         } else {
           const currentGasPrice = new BigNumber(await this.connection.eth.getGasPrice());
           const previousGasPrice = new BigNumber(gasPrice).multipliedBy(broadcast.k);
-          gasPrice = BigNumber.max(currentGasPrice, previousGasPrice).toFixed(0);
+          const maxGasPrice = BigNumber.max(currentGasPrice, previousGasPrice);
+          if (maxGasPrice.lt(broadcast.gasLimit)) {
+            reject('Gas price out of limit');
+          }
+          gasPrice = maxGasPrice.toFixed(0);
+          resultTxExecution = await this.sendTxWithNonce(tx, gasPrice, nonce);
         }
       }, broadcast.interval);
       timeout = setTimeout(() => {
