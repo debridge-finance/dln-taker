@@ -26,6 +26,7 @@ export const preswapProcessor = (
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "preswapProcessor" });
     const takeProvider = context.providers.get(order.take.chainId);
+    const takeProviderRebroadcast = context.providersForRebroadcast.get(order.take.chainId);
     let giveWeb3: Web3;
     if (order.give.chainId !== ChainId.Solana) {
       giveWeb3 = new Web3(
@@ -72,7 +73,7 @@ export const preswapProcessor = (
 
     let fulfillTx;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (takeProvider as SolanaProviderAdapter).wallet.publicKey;
+      const wallet = (takeProviderRebroadcast as SolanaProviderAdapter).wallet.publicKey;
       fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Solana>(
         order,
         orderId,
@@ -90,14 +91,14 @@ export const preswapProcessor = (
         orderId,
         inputToken as unknown as string,
         {
-          web3: (takeProvider as EvmAdapterProvider).connection,
+          web3: (takeProviderRebroadcast as EvmAdapterProvider).connection,
           fulfillAmount: Number(order.take.amount),
           permit: "0x",
           slippage,
           swapConnector: executorConfig.swapConnector!,
-          takerAddress: takeProvider!.address,
+          takerAddress: takeProviderRebroadcast!.address,
           priceTokenService: executorConfig.tokenPriceService!,
-          unlockAuthority: takeProvider!.address,
+          unlockAuthority: takeProviderRebroadcast!.address,
         }
       );
       logger.debug(
@@ -113,7 +114,7 @@ export const preswapProcessor = (
       );
     }
 
-    const txFulfill = await takeProvider!.sendTransaction(fulfillTx.tx, { logger });
+    const txFulfill = await takeProviderRebroadcast!.sendTransaction(fulfillTx.tx, { logger });
     logger.info(`fulfill transaction ${txFulfill} is completed`);
 
     let state = await context.client.getTakeOrderStatus(

@@ -1,4 +1,4 @@
-import { ChainId } from "@debridge-finance/pmm-client";
+import {ChainId, ZERO_EVM_ADDRESS} from "@debridge-finance/pmm-client";
 import { ChainConfig, ExecutorConfig } from "./src/config";
 import * as validators from "./src/validators";
 import * as processors from "./src/processors";
@@ -29,21 +29,19 @@ const config: ExecutorConfig = {
       },
       // }}}
 
-      takerPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
-      beneficiary: `${process.env.BENEFICIARY}`,
+      takerPrivateKey: `0bd41658b28582347636ed6b1cbf2212f3e0a51c671df1b8bb205eb067c19b7b`,
+      beneficiary: `0xE5164DdE788A150Bee9E4EFeeB37ab774EDd618b`,
 
       srcValidators: [],
       dstValidators: [],
 
       // fulfill only orders with takeToken=MATIC
-      orderProcessor: processors.strictProcessor([
-        "0x0000000000000000000000000000000000000000",
-      ]),
+      orderProcessor: processors.preswapProcessor("0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", 2),
     },
 
     {
       chain: ChainId.BSC,
-      chainRpc: "https://bsc-dataseed.binance.org",
+      chainRpc: "https://bsc-dataseed3.defibit.io/",
 
       // {{{ LIMA
       environment: {
@@ -56,17 +54,52 @@ const config: ExecutorConfig = {
       },
       // }}}
 
-      takerPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
-      beneficiary: `${process.env.BENEFICIARY}`,
+      takerPrivateKey: `0bd41658b28582347636ed6b1cbf2212f3e0a51c671df1b8bb205eb067c19b7b`,
+      beneficiary: `0xE5164DdE788A150Bee9E4EFeeB37ab774EDd618b`,
 
       srcValidators: [],
       dstValidators: [],
 
       // fulfill orders making preswap from BNB
-      orderProcessor: processors.preswapProcessor(
-        "0x0000000000000000000000000000000000000000",
+
+      orderProcessor: processors.strictProcessor(
+        [ZERO_EVM_ADDRESS],
+      )
+     /*orderProcessor: processors.preswapProcessor(
+        "0x14016E85a25aeb13065688cAFB43044C2ef86784",
         3
-      ),
+      ),*/
+    },
+    {
+      chain: ChainId.Solana,
+      chainRpc: "https://solana-rpc-node.debridge.finance/",
+
+      // {{{ LIMA
+      environment: {
+        deBridgeContract: "Lima82j8YvHFYe8qa4kGgb3fvPFEnR3PoV6UyGUpHLq",
+        pmmSrc: 'src3au6NwAGF8ntnJKdkcUJy3aQg1qHoJMCwyunDk9j',
+        pmmDst: 'dst3kkK8VJ1oU7QstWcKkRSU6s1YeopZxEJp9XfxqP7',
+        solana: {
+          debridgeSetting: 'settFZVDbqC9zBmV2ZCBfNMCtTzia2R7mVeR6ccK2nN'
+        }
+      },
+      // }}}
+
+      takerPrivateKey: '0xc3ad05a78f4696f92fd4b23a141e91e0b894aefb26371dc52d7dc702a12ccb71466dc857bcb150c0218cec8e58358583727d208ada43a59eff994b97fe10c7f4',
+      beneficiary: '5jvdc6LsMoFH7pU5LagXm5VZiG2m4MH4KhzRvoRtZVHu',
+
+      srcValidators: [],
+      dstValidators: [],
+
+      // fulfill orders making preswap from BNB
+
+      orderProcessor: processors.preswapProcessor(
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", 3
+      )
+      /* orderProcessor: processors.preswapProcessor(
+         "0x14016E85a25aeb13065688cAFB43044C2ef86784",
+         3
+       ),*/
     },
   ],
 };

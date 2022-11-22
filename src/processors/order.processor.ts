@@ -10,6 +10,7 @@ export class OrderProcessorContext {
   orderFulfilledMap: Map<string, boolean>;
   logger: Logger;
   providers: Map<ChainId, ProviderAdapter>;
+  providersForRebroadcast: Map<ChainId, ProviderAdapter>;
 }
 
 /**

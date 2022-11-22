@@ -11,6 +11,15 @@ import { OrderValidatorInterface } from "./validators/order.validator.interface"
 
 type address = string;
 
+export class EvmRebroadcastAdapterOpts {
+  bumpGasPriceMultiplier?: number;
+  pollingInterval?: number;
+  pollingTimeframe?: number;
+  rebroadcastInterval?: number;
+  rebroadcastMaxAttempts?: number;
+  rebroadcastMaxBumpedGasPriceWei?: number;
+}
+
 type Environment = {
   /**
    * Address of the DLN contract responsible for order creation, unlocking and cancellation
@@ -29,6 +38,8 @@ type Environment = {
 
   evm?: {
     forwarderContract?: address;
+    unlockAuthorityPrivateKey?: address;
+    evmRebroadcastAdapterOpts?:EvmRebroadcastAdapterOpts;
   }
 
   solana?: {

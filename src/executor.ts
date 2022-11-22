@@ -14,6 +14,7 @@ import {SolanaProviderAdapter} from "./providers/solana.provider.adapter";
 import {helpers} from "@debridge-finance/solana-utils";
 import {OrderValidatorInterface} from "./validators/order.validator.interface";
 import {OrderValidator} from "./validators";
+import {EvmRebroadcastAdapterProviderAdapter} from "./providers/evm.rebroadcast.adapter.provider.adapter";
 
 export class Executor {
   private isInitialized = false;
@@ -21,6 +22,7 @@ export class Executor {
   private pmmClient: PMMClient;
   private orderFeed: GetNextOrder;
   private providersMap = new Map<ChainId, ProviderAdapter>();
+  private providersForRebroadcastMap = new Map<ChainId, ProviderAdapter>();
 
   constructor(
     private readonly config: ExecutorConfig,
@@ -223,6 +225,7 @@ export class Executor {
         client: this.pmmClient,
         logger,
         providers: this.providersMap,
+        providersForRebroadcast: this.providersForRebroadcastMap,
       }
     );
     logger.info(`OrderProcessor is finished`);
@@ -235,10 +238,12 @@ export class Executor {
       let provider: ProviderAdapter;
       if (chain.chain !== ChainId.Solana) {
         provider = new EvmAdapterProvider(createWeb3WithPrivateKey(chain.chainRpc, chain.takerPrivateKey));
+        this.providersForRebroadcastMap.set(chain.chain, new EvmRebroadcastAdapterProviderAdapter(createWeb3WithPrivateKey(chain.chainRpc, chain.takerPrivateKey), chain.environment?.evm?.evmRebroadcastAdapterOpts));
       } else {
         provider = new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(
           helpers.hexToBuffer(chain.takerPrivateKey)
         ));
+        this.providersForRebroadcastMap.set(chain.chain, provider);
       }
       this.providersMap.set(chain.chain, provider);
     }

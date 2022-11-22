@@ -83,9 +83,12 @@ export class OneInchConnector implements SwapConnector {
       toTokenAddress: request.toTokenAddress.toString(),
       amount: request.amount.toString(),
     });
+
     const url = `${this.apiServerOneInch}/v4.0/${
       request.chainId
     }/quote?${query.toString()}`;
+
+    logger.log(`OneInchConnector getEstimate url ${url}`);
 
     const response = await axios.get(url);
 

@@ -23,6 +23,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     context: OrderProcessorContext
   ) => {
     const takeProvider = context.providers.get(order.take.chainId);
+    const takeProviderRebroadcast = context.providersForRebroadcast.get(order.take.chainId);
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "strictProcessor" });
 
@@ -76,7 +77,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
 
     let fulfillTx;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (takeProvider as SolanaProviderAdapter).wallet.publicKey;
+      const wallet = (takeProviderRebroadcast as SolanaProviderAdapter).wallet.publicKey;
       fulfillTx = await context.client.fulfillOrder<ChainId.Solana>(
         order,
         orderId,
@@ -92,10 +93,10 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
         order,
         orderId,
         {
-          web3: (takeProvider as EvmAdapterProvider).connection,
+          web3: (takeProviderRebroadcast as EvmAdapterProvider).connection,
           fulfillAmount: Number(order.take.amount),
           permit: "0x",
-          unlockAuthority: takeProvider!.address,
+          unlockAuthority: takeProviderRebroadcast!.address,
         }
       );
       logger.debug(
@@ -112,7 +113,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
       );
     }
 
-    const transactionFulfill = await takeProvider!.sendTransaction(fulfillTx, { logger });
+    const transactionFulfill = await takeProviderRebroadcast!.sendTransaction(fulfillTx, { logger });
     logger.info(`fulfill transaction ${transactionFulfill} is completed`);
 
     let state = await context.client.getTakeOrderStatus(
