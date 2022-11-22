@@ -22,7 +22,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     executorConfig: ExecutorConfig,
     context: OrderProcessorContext
   ) => {
-    const takeProvider = context.providers.get(order.give.chainId);
+    const takeProvider = context.providers.get(order.take.chainId);
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "strictProcessor" });
 

@@ -1,8 +1,8 @@
 import {Logger} from "pino";
 
-export type SendTransactionContext = {
-  logger: Logger,
-};
+export class SendTransactionContext {
+  logger: Logger;
+}
 
 export interface ProviderAdapter {
   connection: unknown;

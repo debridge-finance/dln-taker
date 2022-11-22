@@ -25,7 +25,7 @@ export const preswapProcessor = (
   ) => {
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "preswapProcessor" });
-    const takeProvider = context.providers.get(order.give.chainId);
+    const takeProvider = context.providers.get(order.take.chainId);
     let giveWeb3: Web3;
     if (order.give.chainId !== ChainId.Solana) {
       giveWeb3 = new Web3(

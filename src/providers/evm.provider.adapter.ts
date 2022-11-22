@@ -1,5 +1,19 @@
 import Web3 from "web3";
 import {ProviderAdapter, SendTransactionContext} from "./provider.adapter";
+import { clearInterval, clearTimeout } from "timers";
+import BigNumber from "bignumber.js";
+
+class Tx {
+ data: string;
+ to: string;
+ value: number ;
+}
+
+const broadcast = {
+  interval: 2000,
+  timeout: 600000,
+  k: 1.2,
+}
 
 export class EvmAdapterProvider implements ProviderAdapter {
   wallet: never;
@@ -10,19 +24,58 @@ export class EvmAdapterProvider implements ProviderAdapter {
     return this.connection.eth.defaultAccount!;
   }
 
+
   async sendTransaction(data: unknown, context: SendTransactionContext) {
-    const tx = data as { data: string; to: string; value: number };
+    const tx = data as Tx;
+
+    const transactionHash = await new Promise(async (resolve, reject) => {
+      let gasPrice = await this.connection.eth.getGasPrice();
+      const nonce = await this.connection.eth.getTransactionCount (this.connection.eth.defaultAccount!) ;
+
+      let resultTxExecution = await this.sendTxWithNonce(tx, gasPrice, nonce);
+      context.logger.debug(`[EVM] Sent tx: ${resultTxExecution}`);
+
+
+      let interval: NodeJS.Timer;
+      let timeout: NodeJS.Timer;
+      interval = setInterval(async () => {
+
+        const transactionReceiptResult = await this.connection.eth.getTransactionReceipt(resultTxExecution);
+        context.logger.debug(`[EVM] transactionReceiptResult: ${transactionReceiptResult?.status}`);
+        if (transactionReceiptResult?.status === true) {
+          clearInterval(interval);
+          clearTimeout(timeout);
+          resolve(resultTxExecution);
+        } else if (transactionReceiptResult?.status === false) {
+          clearInterval(interval);
+          clearTimeout(timeout);
+          reject('Transaction is failed');
+        } else {
+          const currentGasPrice = new BigNumber(await this.connection.eth.getGasPrice());
+          const previousGasPrice = new BigNumber(gasPrice).multipliedBy(broadcast.k);
+          gasPrice = BigNumber.max(currentGasPrice, previousGasPrice).toFixed(0);
+        }
+      }, broadcast.interval);
+      timeout = setTimeout(() => {
+        reject('Transaction is failed');
+        clearInterval(interval);
+        clearTimeout(timeout);
+      }, broadcast.timeout * 1000);
+    })
+    context.logger.info(`[EVM] Sent final tx: ${transactionHash}`);
+
+    return transactionHash;
+  }
+
+  private async sendTxWithNonce(tx: Tx, gasPrice: string, nonce: number) {
     const gasLimit = await this.connection.eth.estimateGas(tx);
-    let gasPrice = await this.connection.eth.getGasPrice();
-    const result = await this.connection.eth.sendTransaction({
+    let result = await this.connection.eth.sendTransaction({
       ...tx,
       from: this.connection.eth.defaultAccount!,
       gasPrice,
       gas: gasLimit,
+      nonce,
     });
-    const transactionHash = result.transactionHash;
-    context.logger.info(`[EVM] Sent tx: ${transactionHash}`);
-
-    return transactionHash;
+    return result.transactionHash;
   }
 }
