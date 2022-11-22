@@ -4,15 +4,16 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { ExecutorConfig } from "../config";
 
 import { ValidatorContext } from "./order.validator";
-import {OrderValidatorInterface} from "./order.validator.interface";
-import {ChainId} from "@debridge-finance/pmm-client";
-import {convertAddressToBuffer} from "../utils/convert.address.to.buffer";
+import { OrderValidatorInterface } from "./order.validator.interface";
+import { ChainId } from "@debridge-finance/pmm-client";
+import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
+import { buffersAreEqual } from "../utils/buffers.are.equal";
 
 /**
  * Checks if the order's requested token is not in the blacklist. This validator is useful to filter off orders that requested undesired and/or illiquid tokens. *
  *
  * */
-export class BlackListedTakeToken extends OrderValidatorInterface{
+export class BlackListedTakeToken extends OrderValidatorInterface {
 
   private addressesBuffer: Uint8Array[];
 

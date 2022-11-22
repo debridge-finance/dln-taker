@@ -10,9 +10,10 @@ import {
 } from "../error";
 
 import { OrderProcessor, OrderProcessorContext } from "./order.processor";
-import {SolanaProviderAdapter} from "../providers/solana.provider.adapter";
-import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
-import {convertAddressToBuffer} from "../utils/convert.address.to.buffer";
+import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
+import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
+import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
+import { buffersAreEqual } from "../utils/buffers.are.equal";
 
 export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
   return async (
@@ -149,13 +150,13 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
       const rewards =
         order.give.chainId === ChainId.Solana
           ? {
-              reward1: fees.executionFees.rewards[0].toString(),
-              reward2: fees.executionFees.rewards[1].toString(),
-            }
+            reward1: fees.executionFees.rewards[0].toString(),
+            reward2: fees.executionFees.rewards[1].toString(),
+          }
           : {
-              reward1: "0",
-              reward2: "0",
-            };
+            reward1: "0",
+            reward2: "0",
+          };
       unlockTx = await context.client.sendUnlockOrder<ChainId.Polygon>(
         order,
         beneficiary,

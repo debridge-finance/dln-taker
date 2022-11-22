@@ -4,14 +4,15 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { ExecutorConfig } from "../config";
 
 import { ValidatorContext } from "./order.validator";
-import {OrderValidatorInterface} from "./order.validator.interface";
-import {ChainId} from "@debridge-finance/pmm-client";
-import {convertAddressToBuffer} from "../utils/convert.address.to.buffer";
+import { OrderValidatorInterface } from "./order.validator.interface";
+import { ChainId } from "@debridge-finance/pmm-client";
+import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
+import { buffersAreEqual } from "../utils/buffers.are.equal";
 
 /**
  * Checks if the order's requested token is in the whitelist. This validator is useful to target orders that request specific tokens.
  * */
-export class WhiteListedTakeToken extends OrderValidatorInterface{
+export class WhiteListedTakeToken extends OrderValidatorInterface {
 
   private addressesBuffer: Uint8Array[];
 

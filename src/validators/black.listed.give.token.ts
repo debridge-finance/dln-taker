@@ -4,15 +4,16 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { ExecutorConfig } from "../config";
 
 import { ValidatorContext } from "./order.validator";
-import {ChainId} from "@debridge-finance/pmm-client";
-import {convertAddressToBuffer} from "../utils/convert.address.to.buffer";
-import {OrderValidatorInterface} from "./order.validator.interface";
+import { ChainId } from "@debridge-finance/pmm-client";
+import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
+import { buffersAreEqual } from "../utils/buffers.are.equal";
+import { OrderValidatorInterface } from "./order.validator.interface";
 
 /**
  * Checks if the order's locked token is not in the blacklist. This validator is useful to filter off orders that hold undesired and/or illiquid tokens.
  *
  * */
-export class BlackListedGiveToken extends OrderValidatorInterface{
+export class BlackListedGiveToken extends OrderValidatorInterface {
 
   private addressesBuffer: Uint8Array[];
 
