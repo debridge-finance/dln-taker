@@ -38,7 +38,6 @@ type Environment = {
 
   evm?: {
     forwarderContract?: address;
-    unlockAuthorityPrivateKey?: address;
     evmRebroadcastAdapterOpts?:EvmRebroadcastAdapterOpts;
   }
 
@@ -86,6 +85,12 @@ export interface ChainConfig {
   takerPrivateKey: string;
 
   /**
+   * The private key for the wallet who is responsible for sending order unlocks
+   * (must differ from takerPrivateKey)
+   */
+  unlockAuthorityPrivateKey: address;
+
+  /**
    * Represents a list of validators which filter out orders for fulfillment
    */
   srcValidators?: (OrderValidator | OrderValidatorInterface)[];
@@ -105,7 +110,7 @@ export interface ExecutorConfig {
   /**
    * Represents a list of validators which filter out orders for fulfillment
    */
-  validators?: OrderValidator[];
+  validators?: (OrderValidator | OrderValidatorInterface)[];
 
   /**
    * Token price provider

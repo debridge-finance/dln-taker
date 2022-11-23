@@ -36,3 +36,7 @@ export class BlackListedTakeToken extends OrderValidatorInterface {
     return Promise.resolve(result);
   }
 }
+
+export function blacklistedTakeToken(addresses: string[]) {
+  return new BlackListedTakeToken(addresses)
+}

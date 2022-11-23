@@ -1,5 +1,5 @@
-import { BlackListedGiveToken } from "./black.listed.give.token";
-import { BlackListedTakeToken } from "./black.listed.take.token";
+import { blacklistedGiveToken, BlackListedGiveToken } from "./black.listed.give.token";
+import { blacklistedTakeToken, BlackListedTakeToken } from "./black.listed.take.token";
 import { disableFulfill } from "./disable.fulfill";
 import { dstChainDefined } from "./dst.chain.defined";
 import { giveAmountUsdEquivalentBetween } from "./give.amount.usd.equivalent.between";
@@ -7,14 +7,14 @@ import { orderProfitable } from "./order.profitable";
 import { OrderValidator } from "./order.validator";
 import { srcChainDefined } from "./src.chain.defined";
 import { takeAmountUsdEquivalentBetween } from "./take.amount.usd.equivalent.between";
-import { WhiteListedGiveToken } from "./white.listed.give.token";
-import { WhiteListedMarker } from "./white.listed.marker";
-import { WhiteListedTakeToken } from "./white.listed.take.token";
+import { whitelistedGiveToken, WhiteListedGiveToken } from "./white.listed.give.token";
+import { whitelistedMaker, WhiteListedMarker } from "./white.listed.marker";
+import { whitelistedTakeToken, WhiteListedTakeToken } from "./white.listed.take.token";
 import { whiteListedTaker } from "./white.listed.taker";
 
 export {
-  BlackListedGiveToken,
-  BlackListedTakeToken,
+  blacklistedGiveToken,
+  blacklistedTakeToken,
   disableFulfill,
   dstChainDefined,
   giveAmountUsdEquivalentBetween,
@@ -22,8 +22,8 @@ export {
   OrderValidator,
   srcChainDefined,
   takeAmountUsdEquivalentBetween,
-  WhiteListedGiveToken,
-  WhiteListedMarker,
-  WhiteListedTakeToken,
+  whitelistedGiveToken,
+  whitelistedMaker,
+  whitelistedTakeToken,
   whiteListedTaker,
 };

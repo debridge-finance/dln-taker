@@ -35,3 +35,7 @@ export class WhiteListedTakeToken extends OrderValidatorInterface {
     return Promise.resolve(result);
   }
 }
+
+export function whitelistedTakeToken(addresses: string[]) {
+  return new WhiteListedTakeToken(addresses)
+}

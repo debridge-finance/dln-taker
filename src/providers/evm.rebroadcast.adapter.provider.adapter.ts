@@ -25,7 +25,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
     const tx = data as Tx;
     const nonce = await this.connection.eth.getTransactionCount (this.connection.eth.defaultAccount!);
     let gasPrice = await this.connection.eth.getGasPrice();
-    gasPrice = '30722810384';//new BigNumber(gasPrice).multipliedBy(0.4).toFixed(0);
+    // gasPrice = new BigNumber(gasPrice).multipliedBy(0.9).toFixed(0);
 
     if (this.staleTx && this.staleTx.nonce! >= nonce) {
       gasPrice = BigNumber.max(gasPrice, new BigNumber(this.staleTx.gasPrice!).multipliedBy(this.rebroadcast.bumpGasPriceMultiplier!)).toFixed(0);
@@ -105,7 +105,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
     //todo
     //let result = await
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.connection.eth.sendTransaction({
         ...tx,
         from: this.connection.eth.defaultAccount!,

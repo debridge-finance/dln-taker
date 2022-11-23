@@ -114,23 +114,31 @@ export const preswapProcessor = (
       );
     }
 
-    const txFulfill = await takeProviderRebroadcast!.sendTransaction(fulfillTx.tx, { logger });
-    logger.info(`fulfill transaction ${txFulfill} is completed`);
+    try {
+      const txFulfill = await takeProviderRebroadcast!.sendTransaction(fulfillTx.tx, { logger });
+      logger.info(`fulfill transaction ${txFulfill} is completed`);
+    }
+    catch (e) {
+      console.error(e)
+      logger.info(`fulfill transaction failed: ${e}`);
+      return;
+    }
 
     let state = await context.client.getTakeOrderStatus(
       orderId,
       order.take.chainId,
       { web3: takeWeb3! }
     );
-    while (state === null || state.status !== OrderState.Fulfilled) {
-      state = await context.client.getTakeOrderStatus(
-        orderId,
-        order.take.chainId,
-        { web3: takeWeb3! }
-      );
-      logger.debug(`state=${JSON.stringify(state)}`);
-      await helpers.sleep(2000);
-    }
+    console.log('🔴', { state })
+    // while (state === null || state.status !== OrderState.Fulfilled) {
+    //   state = await context.client.getTakeOrderStatus(
+    //     orderId,
+    //     order.take.chainId,
+    //     { web3: takeWeb3! }
+    //   );
+    //   logger.debug(`state=${JSON.stringify(state)}`);
+    //   await helpers.sleep(2000);
+    // }
 
     const beneficiary = executorConfig.chains.find(
       (chain) => chain.chain === order.give.chainId

@@ -36,3 +36,7 @@ export class BlackListedGiveToken extends OrderValidatorInterface {
     return Promise.resolve(result);
   }
 }
+
+export function blacklistedGiveToken(addresses: string[]) {
+  return new BlackListedGiveToken(addresses)
+}

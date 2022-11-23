@@ -35,3 +35,7 @@ export class WhiteListedMarker extends OrderValidatorInterface {
     return Promise.resolve(result);
   }
 }
+
+export function whitelistedMaker(addresses: string[]): OrderValidatorInterface {
+  return new WhiteListedMarker(addresses)
+}

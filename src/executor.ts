@@ -78,9 +78,17 @@ export class Executor {
           };
         }
 
-        await Promise.all([...(chain.srcValidators || []), ...(chain.dstValidators || [])].filter(validator => {
-          return validator instanceof OrderValidatorInterface;
-        }).map(validator => {
+        // append global validators to the list of dstValidators
+        chain.dstValidators = [
+          ...(chain.dstValidators || []),
+          ...(this.config.validators || [])
+        ];
+
+        const validatorsForInit = [
+          ...(chain.srcValidators || []),
+          ...(chain.dstValidators || [])
+        ].filter(validator => validator instanceof OrderValidatorInterface)
+        await Promise.all(validatorsForInit.map(validator => {
           return (validator as OrderValidatorInterface).init(chainId)
         }));
 
@@ -146,6 +154,7 @@ export class Executor {
       }
     } catch (e) {
       this.logger.error(`Error in execution ${e}`);
+      console.log(e)
     }
   }
 
@@ -163,7 +172,7 @@ export class Executor {
     // 3) defined as srcValidators under the giveChain config
 
     // global validators
-    const listOrderValidators: (OrderValidator | OrderValidatorInterface)[] = this.config.validators || [];
+    const listOrderValidators = [];
 
     // dstValidators@takeChain
     if (chainConfig.dstValidators && chainConfig.dstValidators.length > 0) {
@@ -237,7 +246,7 @@ export class Executor {
     for (const chain of this.config.chains) {
       let provider: ProviderAdapter;
       if (chain.chain !== ChainId.Solana) {
-        provider = new EvmAdapterProvider(createWeb3WithPrivateKey(chain.chainRpc, chain.takerPrivateKey));
+        provider = new EvmAdapterProvider(createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey));
         this.providersForRebroadcastMap.set(chain.chain, new EvmRebroadcastAdapterProviderAdapter(createWeb3WithPrivateKey(chain.chainRpc, chain.takerPrivateKey), chain.environment?.evm?.evmRebroadcastAdapterOpts));
       } else {
         provider = new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(
