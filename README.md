@@ -308,11 +308,21 @@ const config: ExecutorConfig = {
             chain: ChainId.BSC,
 
             // explicitly use preswapProcessor for BNB chain
-            orderProcessor: preswapProcessor()
+            orderProcessor: preswapProcessor(BNB_RESERVES_TOKEN_ADDRESS)
         },
     ]
 }
 ```
+
+Each processor accepts one (or multiple) token addresses which are known as *taker reserves* — funds available at the address represented by the `takerPrivateKey` property that are used to fulfill incoming orders. For example, a taker may hold $1mln BUSD on the BNB Chain and $1mln USDC on the Solana chain: by setting these addresses' private keys to respectful `takerPrivateKey` props and providing these tokens' addresses to the order processor, the engine will be able to execute orders using these funds for order fulfillment.
+
+#### Note on EVM approvals
+
+Due to the nature of EVM smart contracts, token transfers are performed via setting respectful allowance on the token contract and then calling the contract whom the allowance has been given to. In our case, before order processors can call DLN contracts to fulfill new orders, the token holder (represented by the `takerPrivateKey` property) must give enough allowance to allow two DLN contracts (`DlnDestination` and `CrosschainForwarder`) to spent reserve tokens on its behalf.
+
+Currently, order processors does not set allowance automatically, so before you start please set infinite allowances for every reserve token to two smart contracts (represented by `environment.pmmDst` and `environment.evm.forwarderContract` configuration properties) per each supported EVM chain.
+
+Next versions of order processor will handle this case implicitly during initialization.
 
 #### `strictProcessor(approvedTokens: string[])` (default)
 
