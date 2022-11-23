@@ -128,16 +128,21 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
       order.take.chainId,
       { web3: takeWeb3! }
     );
+    if (order.take.chainId === ChainId.Solana) {
+      const limit = 10;
+      let iteration = 0;
+      while (state === null || state.status !== OrderState.Fulfilled) {
+        if (iteration === limit) throw new Error("Failed to wait for order fulfillment, retries limit reached")
+        state = await context.client.getTakeOrderStatus(
+          orderId,
+          order.take.chainId
+        );
+        logger.debug(`state=${JSON.stringify(state)}`);
+        await helpers.sleep(2000);
+        iteration += 1;
+      }
+    }
     console.log('🔴', { state })
-    // while (state === null || state.status !== OrderState.Fulfilled) {
-    //   state = await context.client.getTakeOrderStatus(
-    //     orderId,
-    //     order.take.chainId,
-    //     { web3: takeWeb3! }
-    //   );
-    //   logger.debug(`state=${JSON.stringify(state)}`);
-    //   await helpers.sleep(2000);
-    // }
 
     const beneficiary = executorConfig.chains.find(
       (chain) => chain.chain === order.give.chainId

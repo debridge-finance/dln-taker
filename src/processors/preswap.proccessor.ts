@@ -10,8 +10,8 @@ import {
 } from "../error";
 
 import { OrderProcessor, OrderProcessorContext } from "./order.processor";
-import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
-import {SolanaProviderAdapter} from "../providers/solana.provider.adapter";
+import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
+import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
 export const preswapProcessor = (
   inputToken: string,
@@ -129,16 +129,21 @@ export const preswapProcessor = (
       order.take.chainId,
       { web3: takeWeb3! }
     );
+    if (order.take.chainId === ChainId.Solana) {
+      const limit = 10;
+      let iteration = 0;
+      while (state === null || state.status !== OrderState.Fulfilled) {
+        if (iteration === limit) throw new Error("Failed to wait for order fulfillment, retries limit reached")
+        state = await context.client.getTakeOrderStatus(
+          orderId,
+          order.take.chainId
+        );
+        logger.debug(`state=${JSON.stringify(state)}`);
+        await helpers.sleep(2000);
+        iteration += 1;
+      }
+    }
     console.log('🔴', { state })
-    // while (state === null || state.status !== OrderState.Fulfilled) {
-    //   state = await context.client.getTakeOrderStatus(
-    //     orderId,
-    //     order.take.chainId,
-    //     { web3: takeWeb3! }
-    //   );
-    //   logger.debug(`state=${JSON.stringify(state)}`);
-    //   await helpers.sleep(2000);
-    // }
 
     const beneficiary = executorConfig.chains.find(
       (chain) => chain.chain === order.give.chainId
@@ -159,13 +164,13 @@ export const preswapProcessor = (
       const rewards =
         order.give.chainId === ChainId.Solana
           ? {
-              reward1: fees.executionFees.rewards[0].toString(),
-              reward2: fees.executionFees.rewards[1].toString(),
-            }
+            reward1: fees.executionFees.rewards[0].toString(),
+            reward2: fees.executionFees.rewards[1].toString(),
+          }
           : {
-              reward1: "0",
-              reward2: "0",
-            };
+            reward1: "0",
+            reward2: "0",
+          };
       unlockTx = await context.client.sendUnlockOrder<ChainId.Polygon>(
         order,
         beneficiary,
