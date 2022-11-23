@@ -29,7 +29,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
     // {{{ DEBUG
     // For Polygon: you can decrease current gasPrice by 10% to test poller
-    nextGasPrice = new BigNumber(nextGasPrice).multipliedBy(0.9).toFixed(0);
+    // nextGasPrice = new BigNumber(nextGasPrice).multipliedBy(0.9).toFixed(0);
     // }}}
 
     if (this.staleTx && this.staleTx.nonce! >= nonce) {
