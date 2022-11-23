@@ -1,7 +1,20 @@
 {
-  "name": "@debridge-finance/market-maker-executor",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@debridge-finance/dln-executor",
+  "description": "DLN executor is the rule-based daemon service developed to automatically execute orders placed on the deSwap Liquidity Network (DLN) across supported blockchains",
+  "version": "0.2.0",
+  "author": "deBridge",
+  "license": "GPL-3.0-only",
+  "homepage": "https://debridge.finance",
+  "repository": "github:debridge-finance/dln-executor",
+
+  "keywords": [
+    "deBridge",
+    "DLN",
+    "sdk",
+    "solana",
+    "ethereum"
+  ],
+
   "main": "dist/cjs/index.js",
   "scripts": {
     "lint:fix": "prettier --write 'src/**/*.{js,ts}' 'tests/**/*.{js,ts}' sample.config.ts && tslint --fix --config tslint.json --project tsconfig.json",
@@ -11,16 +24,6 @@
     "conv": "mocha -r ts-node/register -b -t 100000 ./tests/conversions.test.ts",
     "executor": "node -r ts-node/register ./src/index.ts"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/debridge-finance/market-maker-executor.git"
-  },
-  "author": "Anton Kuzmenko",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/debridge-finance/market-maker-executor/issues"
-  },
-  "homepage": "https://github.com/debridge-finance/market-maker-executor#readme",
   "devDependencies": {
     "@types/amqplib": "0.8.2",
     "@types/chai": "4.3.3",
@@ -39,8 +42,8 @@
     "tslint-plugin-prettier": "2.3.0"
   },
   "dependencies": {
-    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#5890b5b557a223d29a5116134632ff4dc9b17d3b",
-    "@debridge-finance/solana-utils": "github:debridge-finance/solana-utils#817671ae95ca85c5fe262ed181098dfe6d7d4b59",
+    "@debridge-finance/dln-client": "0.1.4",
+    "@debridge-finance/solana-utils": "1.0.2",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",
     "amqplib": "0.10.3",
