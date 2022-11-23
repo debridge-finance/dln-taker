@@ -16,21 +16,12 @@ export class OneInchConnector implements SwapConnector {
     destReceiver: string;
     slippage: number;
   }): Promise<{ data: string; to: string; value: string }> {
-    if (
-      request.fromTokenAddress === "0x0000000000000000000000000000000000000000"
-    ) {
-      request.fromTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-    }
-
-    if (
-      request.toTokenAddress === "0x0000000000000000000000000000000000000000"
-    ) {
-      request.toTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-    }
+    const fromTokenAddress = this.fixAddress(request.fromTokenAddress);
+    const toTokenAddress = this.fixAddress(request.toTokenAddress);
 
     const query = new URLSearchParams({
-      fromTokenAddress: request.fromTokenAddress.toString(),
-      toTokenAddress: request.toTokenAddress.toString(),
+      fromTokenAddress,
+      toTokenAddress,
       amount: request.amount.toString(),
       fromAddress: request.fromAddress.toString(),
       destReceiver: request.destReceiver.toString(),
@@ -66,21 +57,12 @@ export class OneInchConnector implements SwapConnector {
     toTokenAddress: string;
     amount: string;
   }): Promise<string> {
-    if (
-      request.fromTokenAddress === "0x0000000000000000000000000000000000000000"
-    ) {
-      request.fromTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-    }
-
-    if (
-      request.toTokenAddress === "0x0000000000000000000000000000000000000000"
-    ) {
-      request.toTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-    }
+    const fromTokenAddress = this.fixAddress(request.fromTokenAddress);
+    const toTokenAddress = this.fixAddress(request.toTokenAddress);
 
     const query = new URLSearchParams({
-      fromTokenAddress: request.fromTokenAddress.toString(),
-      toTokenAddress: request.toTokenAddress.toString(),
+      fromTokenAddress,
+      toTokenAddress,
       amount: request.amount.toString(),
     });
 
@@ -93,5 +75,14 @@ export class OneInchConnector implements SwapConnector {
     const response = await axios.get(url);
 
     return response.data.toTokenAmount;
+  }
+
+  private fixAddress(address: string) {
+    if (
+      address === "0x0000000000000000000000000000000000000000"
+    ) {
+      return "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+    }
+    return address;
   }
 }

@@ -4,6 +4,7 @@ import { clearInterval, clearTimeout } from "timers";
 import BigNumber from "bignumber.js";
 import {EvmRebroadcastAdapterOpts} from "../config";
 import {Tx} from "./types/tx";
+import {Logger} from "pino";
 
 export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
   wallet: never;
@@ -38,10 +39,6 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
     } as Tx;
 
     const transactionHash = await new Promise(async (resolve, reject) => {
-
-      let resultTxHash = await this.sendTx(currentTx);//todo catch
-      context.logger.debug(`[EVM] Sent tx: ${resultTxHash}`);
-
       let rebroadcastInterval: NodeJS.Timer;
       let pollingInterval: NodeJS.Timer;
       let timeout: NodeJS.Timer;
@@ -59,60 +56,88 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
         reject(message);
       };
 
-      pollingInterval = setInterval(async () => {
-        let transactionReceiptResult = await this.connection.eth.getTransactionReceipt(resultTxHash);
-        context.logger.debug(`[EVM] polling transactionReceiptResult: ${transactionReceiptResult?.status}`);
-        if (transactionReceiptResult?.status === true) {
-          this.staleTx = undefined;
-          clear();
-          resolve(resultTxHash);
-        } else if (transactionReceiptResult?.status === false) {
-          fail('Transaction is failed');
-        }
-      }, this.rebroadcast.pollingInterval);
+      try {
+        let resultTxHash = await this.sendTx(currentTx, context.logger);
+        context.logger.debug(`[EVM] Sent tx: ${resultTxHash}`);
 
-      let attemptsRebroadcast = 0;//todo add to log
-      rebroadcastInterval = setInterval(async () => {
-        context.logger.debug(`rebroadcasting is started`);
-        if (this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast) {
-          fail('Attempts is expired')
-        }
-        const currentGasPrice = await this.connection.eth.getGasPrice();
-        gasPrice = BigNumber.max(currentGasPrice, new BigNumber(gasPrice).multipliedBy(this.rebroadcast.bumpGasPriceMultiplier!)).toFixed(0);
-        currentTx.gasPrice = gasPrice;
-        if (this.rebroadcast.rebroadcastMaxBumpedGasPriceWei
-          && new BigNumber(gasPrice).lt(this.rebroadcast.rebroadcastMaxBumpedGasPriceWei)) {
-          fail('Gas is higher than rebroadcastMaxBumpedGasPriceWei')
-        }
-        const currentTxSendingResult = await this.sendTx(currentTx);
-        context.logger.debug(`rebroadcasting is finished currentTxSendingResult = ${currentTxSendingResult}`);
-        resultTxHash = currentTxSendingResult;
+        pollingInterval = setInterval(async () => {
+          try {
+            let transactionReceiptResult = await this.connection.eth.getTransactionReceipt(resultTxHash);
+            context.logger.debug(`[EVM] polling transactionReceiptResult: ${transactionReceiptResult?.status}`);
+            if (transactionReceiptResult?.status === true) {
+              this.staleTx = undefined;
+              clear();
+              resolve(resultTxHash);
+            } else if (transactionReceiptResult?.status === false) {
+              fail('Transaction is failed');
+            }
+          } catch (e) {
+            context.logger.error(`Error in polling ${e}`);
+            //todo discuss should we throw here
+          }
+        }, this.rebroadcast.pollingInterval);
 
-        attemptsRebroadcast++;
-      }, this.rebroadcast.rebroadcastInterval);
+        let attemptsRebroadcast = 0;
+        rebroadcastInterval = setInterval(async () => {
+          try {
+            context.logger.debug(`rebroadcasting is started`);
+            if (this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast) {
+              fail('Attempts is expired')
+            }
+            const currentGasPrice = await this.connection.eth.getGasPrice();
+            gasPrice = BigNumber.max(currentGasPrice, new BigNumber(gasPrice).multipliedBy(this.rebroadcast.bumpGasPriceMultiplier!)).toFixed(0);
+            currentTx.gasPrice = gasPrice;
+            if (this.rebroadcast.rebroadcastMaxBumpedGasPriceWei
+              && new BigNumber(gasPrice).lt(this.rebroadcast.rebroadcastMaxBumpedGasPriceWei)) {
+              fail('Gas is higher than rebroadcastMaxBumpedGasPriceWei')
+            }
+            const currentTxSendingResult = await this.sendTx(currentTx, context.logger);
+            context.logger.debug(`rebroadcasting is finished currentTxSendingResult = ${currentTxSendingResult}`);
+            resultTxHash = currentTxSendingResult;
 
-      timeout = setTimeout(() => {
-        fail('Timeout of rebroadcasting');
-      }, this.rebroadcast.pollingTimeframe);
+            attemptsRebroadcast++;
+          } catch (e) {
+            context.logger.error(`Error in rebroadcast sending ${e}`);
+            fail(`Error in rebroadcast sending ${e}`);
+          }
+        }, this.rebroadcast.rebroadcastInterval);
+
+        timeout = setTimeout(() => {
+          fail('Timeout of rebroadcasting');
+        }, this.rebroadcast.pollingTimeframe);
+      } catch (e) {
+        context.logger.error(`Error in rebroadcast ${e}`);
+        fail(`Error in rebroadcast ${e}`);
+      }
+
     })
     context.logger.info(`[EVM] Sent final tx: ${transactionHash}`);
 
     return transactionHash;
   }
 
-  private async sendTx(tx: Tx): Promise<string> {
-    const gasLimit = await this.connection.eth.estimateGas(tx); //todo
+  private async sendTx(tx: Tx, logger: Logger): Promise<string> {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const gasLimit = await this.connection.eth.estimateGas(tx);
+        const newTx = {
+          ...tx,
+          from: this.connection.eth.defaultAccount!,
+          gas: gasLimit,
+        };
+        logger.debug(`sendTx tx ${JSON.stringify(newTx)}`);
 
-    //todo
-    //let result = await
-    return new Promise((resolve, reject) => {
-      this.connection.eth.sendTransaction({
-        ...tx,
-        from: this.connection.eth.defaultAccount!,
-        gas: gasLimit,
-      }).once('transactionHash', (hash: string) =>{
-        resolve(hash);
-      });
+        this.connection.eth.sendTransaction(newTx).once('transactionHash', (hash: string) =>{
+          logger.debug(`sendTx hash ${hash}`);
+          resolve(hash);
+        }).catch(error => {
+          logger.error(error);
+          reject(error);
+        });
+      } catch (error) {
+        logger.error(error);
+        reject(error);
+      }
     });
   }
 

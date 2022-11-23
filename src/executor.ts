@@ -13,7 +13,6 @@ import {createWeb3WithPrivateKey} from "./processors/utils/create.web3.with.priv
 import {SolanaProviderAdapter} from "./providers/solana.provider.adapter";
 import {helpers} from "@debridge-finance/solana-utils";
 import {OrderValidatorInterface} from "./validators/order.validator.interface";
-import {OrderValidator} from "./validators";
 import {EvmRebroadcastAdapterProviderAdapter} from "./providers/evm.rebroadcast.adapter.provider.adapter";
 
 export class Executor {
@@ -21,8 +20,8 @@ export class Executor {
   private solanaConnection: Connection;
   private pmmClient: PMMClient;
   private orderFeed: GetNextOrder;
-  private providersMap = new Map<ChainId, ProviderAdapter>();
-  private providersForRebroadcastMap = new Map<ChainId, ProviderAdapter>();
+  private providersForUnlock = new Map<ChainId, ProviderAdapter>();
+  private providersForFulfill = new Map<ChainId, ProviderAdapter>();
 
   constructor(
     private readonly config: ExecutorConfig,
@@ -200,13 +199,13 @@ export class Executor {
           return validator.validate(order, this.config, {
             client: this.pmmClient,
             logger,
-            providers: this.providersMap,
+            providers: this.providersForUnlock,
           }) as Promise<boolean>;
         } else {
           return validator(order, this.config, {
             client: this.pmmClient,
             logger,
-            providers: this.providersMap,
+            providers: this.providersForUnlock,
           }) as Promise<boolean>;
         }
       }) || []
@@ -233,8 +232,8 @@ export class Executor {
         orderFulfilledMap: this.orderFulfilledMap,
         client: this.pmmClient,
         logger,
-        providers: this.providersMap,
-        providersForRebroadcast: this.providersForRebroadcastMap,
+        providersForUnlock: this.providersForUnlock,
+        providersForFulfill: this.providersForFulfill,
       }
     );
     logger.info(`OrderProcessor is finished`);
@@ -246,15 +245,18 @@ export class Executor {
     for (const chain of this.config.chains) {
       let provider: ProviderAdapter;
       if (chain.chain !== ChainId.Solana) {
-        provider = new EvmAdapterProvider(createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey));
-        this.providersForRebroadcastMap.set(chain.chain, new EvmRebroadcastAdapterProviderAdapter(createWeb3WithPrivateKey(chain.chainRpc, chain.takerPrivateKey), chain.environment?.evm?.evmRebroadcastAdapterOpts));
+        const web3UnlockAuthority = createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey);
+        const web3Fulfill = createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey);
+        this.providersForUnlock.set(chain.chain, new EvmAdapterProvider(web3UnlockAuthority));
+        this.providersForFulfill.set(chain.chain, new EvmRebroadcastAdapterProviderAdapter(web3Fulfill, chain.environment?.evm?.evmRebroadcastAdapterOpts));
       } else {
-        provider = new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(
+        this.providersForFulfill.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(
           helpers.hexToBuffer(chain.takerPrivateKey)
-        ));
-        this.providersForRebroadcastMap.set(chain.chain, provider);
+        )));
+        this.providersForUnlock.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(
+          helpers.hexToBuffer(chain.unlockAuthorityPrivateKey)
+        )));
       }
-      this.providersMap.set(chain.chain, provider);
     }
   }
 }

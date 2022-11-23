@@ -22,8 +22,8 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     executorConfig: ExecutorConfig,
     context: OrderProcessorContext
   ) => {
-    const takeProvider = context.providers.get(order.take.chainId);
-    const takeProviderRebroadcast = context.providersForRebroadcast.get(order.take.chainId);
+    const takeProviderUnlock = context.providersForUnlock.get(order.take.chainId);
+    const takeProviderFulfill = context.providersForFulfill.get(order.take.chainId);
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "strictProcessor" });
 
@@ -77,7 +77,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
 
     let fulfillTx;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (takeProviderRebroadcast as SolanaProviderAdapter).wallet.publicKey;
+      const wallet = (takeProviderFulfill as SolanaProviderAdapter).wallet.publicKey;
       fulfillTx = await context.client.fulfillOrder<ChainId.Solana>(
         order,
         orderId,
@@ -93,10 +93,10 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
         order,
         orderId,
         {
-          web3: (takeProviderRebroadcast as EvmAdapterProvider).connection,
+          web3: (takeProviderFulfill as EvmAdapterProvider).connection,
           fulfillAmount: Number(order.take.amount),
           permit: "0x",
-          unlockAuthority: takeProviderRebroadcast!.address,
+          unlockAuthority: takeProviderUnlock!.address,
         }
       );
       logger.debug(
@@ -114,7 +114,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     }
 
     try {
-      const txFulfill = await takeProviderRebroadcast!.sendTransaction(fulfillTx, { logger });
+      const txFulfill = await takeProviderFulfill!.sendTransaction(fulfillTx, { logger });
       logger.info(`fulfill transaction ${txFulfill} is completed`);
     }
     catch (e) {
@@ -145,7 +145,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
 
     let unlockTx;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (takeProvider as SolanaProviderAdapter).wallet.publicKey;
+      const wallet = (takeProviderUnlock as SolanaProviderAdapter).wallet.publicKey;
       unlockTx = await context.client.sendUnlockOrder<ChainId.Solana>(
         order,
         beneficiary,
@@ -171,7 +171,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
         beneficiary,
         executionFeeAmount,
         {
-          web3: (takeProvider as EvmAdapterProvider).connection,
+          web3: (takeProviderUnlock as EvmAdapterProvider).connection,
           ...rewards,
         }
       );
@@ -181,7 +181,7 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
         )}`
       );
     }
-    const transactionUnlock = await takeProvider!.sendTransaction(unlockTx, { logger });
+    const transactionUnlock = await takeProviderUnlock!.sendTransaction(unlockTx, { logger });
     logger.info(`unlock transaction ${transactionUnlock} is completed`);
   };
 };

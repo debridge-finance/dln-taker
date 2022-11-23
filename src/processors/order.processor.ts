@@ -9,8 +9,8 @@ export class OrderProcessorContext {
   client: PMMClient;
   orderFulfilledMap: Map<string, boolean>;
   logger: Logger;
-  providers: Map<ChainId, ProviderAdapter>;
-  providersForRebroadcast: Map<ChainId, ProviderAdapter>;
+  providersForUnlock: Map<ChainId, ProviderAdapter>;
+  providersForFulfill: Map<ChainId, ProviderAdapter>;
 }
 
 /**
