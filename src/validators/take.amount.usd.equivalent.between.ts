@@ -24,33 +24,33 @@ export const takeAmountUsdEquivalentBetween = (
       validator: "takeAmountUsdEquivalentBetween",
     });
     let taleWeb3 = (context.providers.get(order.take.chainId) as EvmAdapterProvider).connection;
-    const giveAddress = helpers.bufferToHex(
+    const takeAddress = helpers.bufferToHex(
       Buffer.from(order.take.tokenAddress)
     );
-    logger.debug(`giveAddress=${giveAddress}`);
+    logger.debug(`takeAddress=${takeAddress}`);
 
-    const [givePrice, giveDecimals] = await Promise.all([
-      config.tokenPriceService!.getPrice(order.give.chainId, giveAddress),
+    const [takePrice, takeDecimals] = await Promise.all([
+      config.tokenPriceService!.getPrice(order.take.chainId, takeAddress),
       context.client.getDecimals(
-        order.give.chainId,
-        order.give.tokenAddress,
+        order.take.chainId,
+        order.take.tokenAddress,
         taleWeb3
       ),
     ]);
-    logger.debug(`givePrice=${givePrice}`);
-    logger.debug(`giveDecimals=${giveDecimals}`);
+    logger.debug(`takePrice=${takePrice}`);
+    logger.debug(`takeDecimals=${takeDecimals}`);
 
-    const giveUsdAmount = BigNumber(givePrice)
-      .multipliedBy(order.give.amount.toString())
-      .dividedBy(new BigNumber(10).pow(giveDecimals))
+    const takeUsdAmount = BigNumber(takePrice)
+      .multipliedBy(order.take.amount.toString())
+      .dividedBy(new BigNumber(10).pow(takeDecimals))
       .toNumber();
-    logger.debug(`giveUsdAmount=${giveUsdAmount}`);
+    logger.debug(`takeUsdAmount=${takeUsdAmount}`);
 
     const result =
-      minUSDEquivalent <= giveUsdAmount && giveUsdAmount <= maxUSDEquivalent;
+      minUSDEquivalent <= takeUsdAmount && takeUsdAmount <= maxUSDEquivalent;
     logger.debug(`result=${result}`);
     logger.info(
-      `approve status: ${result}, giveUsdAmount: ${giveUsdAmount.toString()}`
+      `approve status: ${result}, takeUsdAmount: ${takeUsdAmount.toString()}`
     );
     return Promise.resolve(result);
   };
