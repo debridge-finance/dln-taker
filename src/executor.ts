@@ -1,19 +1,20 @@
-import {ChainId, Evm, PMMClient, Solana} from "@debridge-finance/pmm-client";
-import {Connection, Keypair, PublicKey} from "@solana/web3.js";
-import {Logger} from "pino";
+import { ChainId, Evm, PMMClient, Solana } from "@debridge-finance/pmm-client";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { Logger } from "pino";
 
-import {ChainConfig, ExecutorConfig} from "./config";
-import {GetNextOrder, NextOrderInfo} from "./interfaces";
-import {WsNextOrder} from "./orderFeeds/ws.order.feed";
-import {CoingeckoPriceFeed} from "./priceFeeds/coingecko.price.feed";
-import {OneInchConnector} from "./swapConnector/one.inch.connector";
-import {ProviderAdapter} from "./providers/provider.adapter";
-import {EvmAdapterProvider} from "./providers/evm.provider.adapter";
-import {createWeb3WithPrivateKey} from "./processors/utils/create.web3.with.private.key";
-import {SolanaProviderAdapter} from "./providers/solana.provider.adapter";
-import {helpers} from "@debridge-finance/solana-utils";
-import {OrderValidatorInterface} from "./validators/order.validator.interface";
-import {EvmRebroadcastAdapterProviderAdapter} from "./providers/evm.rebroadcast.adapter.provider.adapter";
+import { ChainConfig, ExecutorConfig } from "./config";
+import { GetNextOrder, NextOrderInfo } from "./interfaces";
+import { WsNextOrder } from "./orderFeeds/ws.order.feed";
+import { CoingeckoPriceFeed } from "./priceFeeds/coingecko.price.feed";
+import { OneInchConnector } from "./swapConnector/one.inch.connector";
+import { ProviderAdapter } from "./providers/provider.adapter";
+import { EvmAdapterProvider } from "./providers/evm.provider.adapter";
+import { createWeb3WithPrivateKey } from "./processors/utils/create.web3.with.private.key";
+import { SolanaProviderAdapter } from "./providers/solana.provider.adapter";
+import { helpers } from "@debridge-finance/solana-utils";
+import { OrderValidatorInterface } from "./validators/order.validator.interface";
+import { EvmRebroadcastAdapterProviderAdapter } from "./providers/evm.rebroadcast.adapter.provider.adapter";
+import bs58 from "bs58";
 
 export class Executor {
   private isInitialized = false;
@@ -27,7 +28,7 @@ export class Executor {
     private readonly config: ExecutorConfig,
     private readonly orderFulfilledMap: Map<string, boolean>,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async init() {
     if (this.isInitialized) return;
@@ -63,10 +64,8 @@ export class Executor {
             solanaDebridge,
             solanaDebridgeSetting
           );
-          await (clients[chainId] as Solana.PmmClient).initForFulfillPreswap(new PublicKey(chain.beneficiary), [
-            ChainId.BSC,
-            ChainId.Polygon,
-          ]);
+          // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
+          await (clients[chainId] as Solana.PmmClient).initForFulfillPreswap(new PublicKey(chain.beneficiary), []);
         } else {
           // TODO all these addresses are optional, so we need to provide defaults which represent the mainnet setup
           evmAddresses[chainId] = {
@@ -250,12 +249,12 @@ export class Executor {
         this.providersForUnlock.set(chain.chain, new EvmAdapterProvider(web3UnlockAuthority));
         this.providersForFulfill.set(chain.chain, new EvmRebroadcastAdapterProviderAdapter(web3Fulfill, chain.environment?.evm?.evmRebroadcastAdapterOpts));
       } else {
-        this.providersForFulfill.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(
-          helpers.hexToBuffer(chain.takerPrivateKey)
-        )));
-        this.providersForUnlock.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, Keypair.fromSecretKey(
-          helpers.hexToBuffer(chain.unlockAuthorityPrivateKey)
-        )));
+        const decodeKey = (key: string) => Keypair.fromSecretKey(
+          chain.takerPrivateKey.startsWith("0x") ?
+            helpers.hexToBuffer(key) : bs58.decode(key)
+        )
+        this.providersForFulfill.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, decodeKey(chain.takerPrivateKey)));
+        this.providersForUnlock.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, decodeKey(chain.unlockAuthorityPrivateKey)));
       }
     }
   }

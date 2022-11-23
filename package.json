@@ -39,7 +39,7 @@
     "tslint-plugin-prettier": "2.3.0"
   },
   "dependencies": {
-    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#453702a7789aa680c01557f05277963b32dad7fd",
+    "@debridge-finance/pmm-client": "github:debridge-finance/solana-pmm-client#092d03c5e41ca700a63fb13409912a47285ef0c2",
     "@debridge-finance/solana-utils": "github:debridge-finance/solana-utils#817671ae95ca85c5fe262ed181098dfe6d7d4b59",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",
@@ -47,6 +47,7 @@
     "axios": "0.21.4",
     "axios-cache-adapter": "2.7.3",
     "bignumber.js": "9.1.0",
+    "bs58": "^5.0.0",
     "dotenv": "16.0.3",
     "pino": "8.7.0",
     "web3": "1.8.0",

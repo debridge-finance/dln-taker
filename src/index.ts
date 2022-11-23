@@ -1,5 +1,5 @@
 import { ExecutorEngine } from "./executor.engine";
-import {config} from "dotenv";
+import { config } from "dotenv";
 import path from "path";
 
 (BigInt.prototype as any).toJSON = function () {
@@ -29,4 +29,4 @@ async function main() {
 }
 
 main()
-  .catch(e => console.error("Executor failed:", (e as Error).message))
+  .catch(e => console.error("Executor failed:", (e as Error).message, e))
