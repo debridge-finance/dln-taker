@@ -12,14 +12,14 @@ import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
 /**
  * Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is the given basis points more than the USD equivalent of the order requested amount.
  */
-export const orderProfitable = (profitabilityBps: number): OrderValidator => {
+export const giveVsTakeUSDAmountsDifference = (differenceBps: number): OrderValidator => {
   return async (
     order: OrderData,
     config: ExecutorConfig,
     context: ValidatorContext
   ): Promise<boolean> => {
     const { client } = context;
-    const logger = context.logger.child({ validator: "orderProfitable" });
+    const logger = context.logger.child({ validator: "giveVsTakeUSDAmountsDifference" });
 
     const giveWeb3 = (context.providers.get(order.give.chainId) as EvmAdapterProvider).connection;
 
@@ -74,7 +74,7 @@ export const orderProfitable = (profitabilityBps: number): OrderValidator => {
     logger.debug(`takeDecimals=${takeDecimals}`);
 
     const profitability = takeUsdAmount
-      .multipliedBy(profitabilityBps)
+      .multipliedBy(differenceBps)
       .div(100 ** 2);
     logger.debug(`profitability=${profitability}`);
 

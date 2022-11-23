@@ -10,7 +10,7 @@ const config: ExecutorConfig = {
     validators.srcChainDefined(),
     validators.dstChainDefined(),
 
-    validators.orderProfitable(4 /*bps*/),
+    validators.giveVsTakeUSDAmountsDifference(4 /*bps*/),
   ],
 
   chains: [
@@ -30,7 +30,7 @@ const config: ExecutorConfig = {
       // }}}
 
       takerPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.UNLOCK_AUTHORITY_PRIVATE_KEY}`,
       beneficiary: `${process.env.BENEFICIARY}`,
 
       srcValidators: [],
@@ -58,7 +58,7 @@ const config: ExecutorConfig = {
       // }}}
 
       takerPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.UNLOCK_AUTHORITY_PRIVATE_KEY}`,
       beneficiary: `${process.env.BENEFICIARY}`,
 
       srcValidators: [],

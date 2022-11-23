@@ -3,7 +3,7 @@ import { blacklistedTakeToken, BlackListedTakeToken } from "./black.listed.take.
 import { disableFulfill } from "./disable.fulfill";
 import { dstChainDefined } from "./dst.chain.defined";
 import { giveAmountUsdEquivalentBetween } from "./give.amount.usd.equivalent.between";
-import { orderProfitable } from "./order.profitable";
+import { giveVsTakeUSDAmountsDifference } from "./giveVsTakeUSDAmountsDifference";
 import { OrderValidator } from "./order.validator";
 import { srcChainDefined } from "./src.chain.defined";
 import { takeAmountUsdEquivalentBetween } from "./take.amount.usd.equivalent.between";
@@ -18,7 +18,7 @@ export {
   disableFulfill,
   dstChainDefined,
   giveAmountUsdEquivalentBetween,
-  orderProfitable,
+  giveVsTakeUSDAmountsDifference,
   OrderValidator,
   srcChainDefined,
   takeAmountUsdEquivalentBetween,

@@ -15,7 +15,7 @@ import {SolanaProviderAdapter} from "../providers/solana.provider.adapter";
 
 export const preswapProcessor = (
   inputToken: string,
-  slippage: number
+  slippage: number = 3
 ): OrderProcessor => {
   return async (
     orderId: string,

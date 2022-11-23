@@ -162,7 +162,7 @@ const config: ExecutorConfig = {
 ```
 
 
-#### `orderProfitable(profitabilityBps: number)`
+#### `giveVsTakeUSDAmountsDifference(difference: number)`
 
 Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is the given [basis points](https://en.wikipedia.org/wiki/Basis_point) more than the USD equivalent of the order requested amount.
 
@@ -173,7 +173,7 @@ We suggest keeping the profitability of 4 bps:
 ```ts
 validators: [
     // accept orders with 0.04% margin
-    orderIsProfitable(4 /*bps*/),
+    giveVsTakeUSDAmountsDifference(4 /*bps*/),
 ],
 ```
 
@@ -439,7 +439,7 @@ By default, DLN executor prints summary logs to the stdout, indicating the summa
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Received, give 1500000000000000000000 of 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56 on chain=56, take 1485000000 of 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 on chain=137
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator srcChainDefined: approved, chain=56 defined
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator dstChainDefined: approved, chain=137 defined
-[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator orderProfitable: approved, profitability 10bps of required 4bps: give $1500, take $1485
+[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator giveVsTakeUSDAmountsDifference: approved, profitability 10bps of required 4bps: give $1500, take $1485
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator giveAmountUSDEquivalentBetween: approved, give amount ($1500) within range [$10, $100000]
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator takeAmountUSDEquivalentBetween: approved, take amount ($1485) within range [$10, $100000]
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator whitelistedGiveToken: approved, give token 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56 is in the white list
