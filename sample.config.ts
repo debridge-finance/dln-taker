@@ -15,6 +15,37 @@ const config: ExecutorConfig = {
 
   chains: [
     {
+      chain: ChainId.Solana,
+      chainRpc: `${process.env.RPC_SOLANA}`,
+
+      environment: {
+        deBridgeContract: "Lima82j8YvHFYe8qa4kGgb3fvPFEnR3PoV6UyGUpHLq",
+        pmmSrc: "src3au6NwAGF8ntnJKdkcUJy3aQg1qHoJMCwyunDk9j",
+        pmmDst: "dst3kkK8VJ1oU7QstWcKkRSU6s1YeopZxEJp9XfxqP7",
+        solana: {
+          debridgeSetting: "settFZVDbqC9zBmV2ZCBfNMCtTzia2R7mVeR6ccK2nN"
+        }
+      },
+
+      // base58 representation of a private key
+      takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+
+      // base58 representation of a private key
+      unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+
+      // address
+      beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
+
+      srcValidators: [],
+      dstValidators: [],
+
+      // Use "11111111111111111111111111111111" as native SOL address
+      orderProcessor: processors.preswapProcessor(
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+      ),
+    },
+
+    {
       chain: ChainId.Polygon,
       chainRpc: `${process.env.RPC_POLYGON}`,
 
@@ -29,17 +60,18 @@ const config: ExecutorConfig = {
       },
       // }}}
 
-      takerPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-      beneficiary: `${process.env.BENEFICIARY}`,
+      takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+      beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
 
       srcValidators: [],
       dstValidators: [],
 
-      // fulfill only orders with takeToken=MATIC
-      orderProcessor: processors.strictProcessor([
-        "0x0000000000000000000000000000000000000000",
-      ]),
+      // Use "0x0000000000000000000000000000000000000000" as native ETH token
+      // if you hold reserves in ETH
+      orderProcessor: processors.preswapProcessor(
+        "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // USDC
+      ),
     },
 
     {
@@ -57,17 +89,17 @@ const config: ExecutorConfig = {
       },
       // }}}
 
-      takerPrivateKey: `${process.env.TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-      beneficiary: `${process.env.BENEFICIARY}`,
+      takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+      beneficiary: `${process.env.BNB_BENEFICIARY}`,
 
       srcValidators: [],
       dstValidators: [],
 
-      // fulfill orders making preswap from BNB
+      // Use "0x0000000000000000000000000000000000000000" as native ETH token
+      // if you hold reserves in ETH
       orderProcessor: processors.preswapProcessor(
-        "0x0000000000000000000000000000000000000000",
-        3
+        "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", // BUSD
       ),
     },
   ],

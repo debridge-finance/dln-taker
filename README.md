@@ -52,6 +52,29 @@ This will keep the executor up and running, listening for new orders and executi
 
 The config file should represent a Typescript module which exports an Object conforming the [`ExecutorConfig`](src/config.ts) type. This section describes how to configure its properties.
 
+Since it is implied that the executor's config must have access to your private keys in order to sign and broadcast order fulfillment transactions, we kindly advice to put your private keys in the local `.env` file and refer them via the `process.env.*` object. See the example:
+
+```env
+# File: .env
+
+SOLANA_TAKER_PRIVATE_KEY=abc...
+SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY=def...
+```
+
+```ts
+// File: executor.config.ts
+
+{
+    // ...
+
+    // gets the value from the .env file from the corresponding line
+    takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+    unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+
+    // ...
+}
+```
+
 
 ### Orders feed
 
@@ -81,7 +104,7 @@ Validators can be set globally using the `orderValidators` property, which means
 ```ts
 const config: ExecutorConfig = {
     validators: [
-        orderIsProfitable(4 /*bps*/),
+        giveVsTakeUSDAmountsDifference(4 /*bps*/),
         // ...
     ],
 }
@@ -106,7 +129,7 @@ const config: ExecutorConfig = {
             // defines validators for orders coming TO the BNB Chain
             dstValidators: [
                 // fulfill orders on BNB only if the requested amount from $0 to $10,000
-                takeAmountDollarEquiv(0, 10_000),
+                takeAmountUsdEquivalentBetween(0, 10_000),
             ],
         }
     ]

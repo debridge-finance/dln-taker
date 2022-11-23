@@ -29,4 +29,6 @@ async function main() {
 }
 
 main()
-  .catch(e => console.error("Executor failed:", (e as Error).message, e))
+  .catch(e => {
+    console.error(`Executor failed: ${(e as Error).message}`, e.stack);
+  })

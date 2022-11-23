@@ -124,12 +124,12 @@ export const preswapProcessor = (
       return;
     }
 
-    let state = await context.client.getTakeOrderStatus(
-      orderId,
-      order.take.chainId,
-      { web3: takeWeb3! }
-    );
     if (order.take.chainId === ChainId.Solana) {
+      let state = await context.client.getTakeOrderStatus(
+        orderId,
+        order.take.chainId,
+        { web3: takeWeb3! }
+      );
       const limit = 10;
       let iteration = 0;
       while (state === null || state.status !== OrderState.Fulfilled) {
@@ -143,7 +143,6 @@ export const preswapProcessor = (
         iteration += 1;
       }
     }
-    console.log('🔴', { state })
 
     const beneficiary = executorConfig.chains.find(
       (chain) => chain.chain === order.give.chainId
