@@ -26,11 +26,11 @@ Download the source code from Github, picking the specific version:
 git clone --depth 1 --single-branch --branch v0.2.0 git@github.com:debridge-finance/dln-executor.git
 ```
 
-`cd` to the directory and install dependencies:
+`cd` to the directory and install necessary production dependencies:
 
 ```sh
 cd dln-executor
-npm install
+npm install --prod
 ```
 
 Create a configuration file based on the `sample.config.ts`:

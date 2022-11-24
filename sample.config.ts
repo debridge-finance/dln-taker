@@ -28,7 +28,7 @@ const config: ExecutorConfig = {
 
       // base58 representation of a private key
       // For security reasons, put it to the .env file
-      unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
 
       // address
       // For security reasons, put it to the .env file
