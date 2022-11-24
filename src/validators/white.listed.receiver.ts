@@ -11,9 +11,10 @@ import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
 import { buffersAreEqual } from "../utils/buffers.are.equal";
 
 /**
- * Checks if the address who is a receiver the order on the take chain is in the whitelist. This validator is useful to filter out orders placed by the trusted parties.
+ * Checks if the receiver address (who will take funds upon successful order fulfillment) is in the whitelist.
+ * This validator is useful to filter out orders placed by the trusted parties.
  */
-export class WhiteListedReceiver extends OrderValidatorInterface {
+class WhitelistedReceiver extends OrderValidatorInterface {
 
   private addressesBuffer: Uint8Array[];
 
@@ -37,6 +38,6 @@ export class WhiteListedReceiver extends OrderValidatorInterface {
   }
 }
 
-export function whiteListedReceiver(addresses: string[]): OrderValidatorInterface {
-  return new WhiteListedReceiver(addresses)
+export function whitelistedReceiver(addresses: string[]): OrderValidatorInterface {
+  return new WhitelistedReceiver(addresses)
 }
