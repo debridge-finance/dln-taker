@@ -9,26 +9,37 @@ import {
   MarketMakerExecutorErrorType,
 } from "../error";
 
-import { OrderProcessor, OrderProcessorContext } from "./order.processor";
+import {OrderProcessor, OrderProcessorContext, OrderProcessorInitContext} from "./order.processor";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
 import { buffersAreEqual } from "../utils/buffers.are.equal";
 
-export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
-  return async (
-    orderId: string,
-    order: OrderData,
-    executorConfig: ExecutorConfig,
-    context: OrderProcessorContext
-  ) => {
+export class StrictProcessor extends OrderProcessor {
+  private approvedTokensInBuffer: Uint8Array[];
+  constructor(private readonly approvedTokens: string[]) {
+    super();
+  }
+
+  async init(chainId: ChainId, context: OrderProcessorInitContext): Promise<void> {
+    this.chainId = chainId;
+    this.context = context;
+    const chainConfig = context.executorConfig.chains.find(chain => chain.chain === chainId)!;
+    this.approvedTokensInBuffer = this.approvedTokens.map(token => convertAddressToBuffer(chainConfig.chain, token));
+    if (chainId !== ChainId.Solana) {
+      await Promise.all(this.approvedTokens.map(token => this.approveToken(token, chainConfig!.environment!.pmmDst!)));
+    }
+    return Promise.resolve();
+  }
+
+  async process(orderId: string, order: OrderData, executorConfig: ExecutorConfig, context: OrderProcessorContext): Promise<void> {
     const takeProviderUnlock = context.providersForUnlock.get(order.take.chainId);
     const takeProviderFulfill = context.providersForFulfill.get(order.take.chainId);
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "strictProcessor" });
 
     const takeTokenAddressHex = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
-    if (!approvedTokens.map(token => convertAddressToBuffer(chainConfig.chain, token)).some(address => buffersAreEqual(order.take.tokenAddress, address))) {
+    if (!this.approvedTokensInBuffer.some(address => buffersAreEqual(order.take.tokenAddress, address))) {
       logger.info(`takeToken ${takeTokenAddressHex} is not allowed`);
       return;
     }
@@ -187,5 +198,11 @@ export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
     }
     const transactionUnlock = await takeProviderUnlock!.sendTransaction(unlockTx, { logger });
     logger.info(`unlock transaction ${transactionUnlock} is completed`);
-  };
+
+    return Promise.resolve(undefined);
+  }
+}
+
+export const strictProcessor = (approvedTokens: string[]): OrderProcessor => {
+  return new StrictProcessor(approvedTokens);
 };

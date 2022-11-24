@@ -87,8 +87,13 @@ export class Executor {
           ...(chain.dstValidators || [])
         ].filter(validator => validator instanceof OrderValidatorInterface)
         await Promise.all(validatorsForInit.map(validator => {
-          return (validator as OrderValidatorInterface).init(chainId)
+          return (validator as OrderValidatorInterface).init(chainId);
         }));
+
+        await chain.orderProcessor!.init(chain.chain, {
+          executorConfig: this.config,
+          providers: this.providersForFulfill,
+        });
 
         return chainId;
       })
@@ -223,7 +228,7 @@ export class Executor {
     const orderProcessor =
       chainConfig.orderProcessor || this.config.orderProcessor;
 
-    await orderProcessor!(
+    await orderProcessor!.process(
       nextOrderInfo.orderId,
       nextOrderInfo.order!,
       this.config,
@@ -242,7 +247,6 @@ export class Executor {
 
   private configureProvidersMap() {
     for (const chain of this.config.chains) {
-      let provider: ProviderAdapter;
       if (chain.chain !== ChainId.Solana) {
         const web3UnlockAuthority = createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey);
         const web3Fulfill = createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey);

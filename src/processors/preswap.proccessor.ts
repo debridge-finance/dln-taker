@@ -4,25 +4,30 @@ import Web3 from "web3";
 
 import { ExecutorConfig } from "../config";
 import { evmNativeTokenAddress, solanaNativeTokenAddress } from "../constant";
-import {
-  MarketMakerExecutorError,
-  MarketMakerExecutorErrorType,
-} from "../error";
+import { MarketMakerExecutorError, MarketMakerExecutorErrorType } from "../error";
 
-import { OrderProcessor, OrderProcessorContext } from "./order.processor";
+import { OrderProcessor, OrderProcessorContext, OrderProcessorInitContext } from "./order.processor";
 import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
-export const preswapProcessor = (
-  inputToken: string,
-  slippage: number = 3
-): OrderProcessor => {
-  return async (
-    orderId: string,
-    order: OrderData,
-    executorConfig: ExecutorConfig,
-    context: OrderProcessorContext
-  ) => {
+export class PreswapProcessor extends OrderProcessor {
+
+  constructor(private readonly inputToken: string,
+              private readonly slippage: number = 3) {
+    super();
+  }
+
+  async init(chainId: ChainId, context: OrderProcessorInitContext): Promise<void> {
+    this.chainId = chainId;
+    this.context = context;
+    const chainConfig = context.executorConfig.chains.find(chain => chain.chain === chainId);
+    if (chainId !== ChainId.Solana) {
+      await this.approveToken(this.inputToken, chainConfig!.environment!.evm!.forwarderContract!);
+    }
+    return Promise.resolve();
+  }
+
+  async process(orderId: string, order: OrderData, executorConfig: ExecutorConfig, context: OrderProcessorContext): Promise<void> {
     const chainConfig = executorConfig.chains.find(chain => chain.chain === order.take.chainId)!;
     const logger = context.logger.child({ processor: "preswapProcessor" });
     const takeProviderUnlock = context.providersForUnlock.get(order.take.chainId);
@@ -77,7 +82,7 @@ export const preswapProcessor = (
       fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Solana>(
         order,
         orderId,
-        inputToken as unknown as string,
+        this.inputToken,
         {
           taker: wallet,
         }
@@ -89,12 +94,12 @@ export const preswapProcessor = (
       fulfillTx = await context.client.preswapAndFulfillOrder<ChainId.Ethereum>(
         order,
         orderId,
-        inputToken as unknown as string,
+        this.inputToken as string,
         {
           web3: (takeProviderFulfill as EvmAdapterProvider).connection,
           fulfillAmount: Number(order.take.amount),
           permit: "0x",
-          slippage,
+          slippage: this.slippage,
           swapConnector: executorConfig.swapConnector!,
           takerAddress: takeProviderFulfill!.address,
           priceTokenService: executorConfig.tokenPriceService!,
@@ -182,5 +187,13 @@ export const preswapProcessor = (
     }
     const txUnlock = await takeProviderUnlock!.sendTransaction(unlockTx, { logger });
     logger.info(`unlock transaction ${txUnlock} is completed`);
-  };
+  }
+
+}
+
+export const preswapProcessor = (
+  inputToken: string,
+  slippage: number = 3
+): OrderProcessor => {
+  return new PreswapProcessor(inputToken, slippage);
 };
