@@ -2,13 +2,10 @@ import { ChainId } from "@debridge-finance/dln-client";
 import { ExecutorConfig } from "./src/config";
 import * as validators from "./src/validators";
 import * as processors from "./src/processors";
+import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
 
 const config: ExecutorConfig = {
-  //
-  // Mind you must set the WebSocket server address in order to fetch new orders in realtime
-  // For security reasons, put it to the .env file
-  //
-  orderFeed: `${process.env.WSS}`,
+  orderFeed: environment.WSS,
 
   validators: [
     validators.srcChainDefined(),
@@ -21,6 +18,7 @@ const config: ExecutorConfig = {
     {
       chain: ChainId.Solana,
       chainRpc: `${process.env.RPC_SOLANA}`,
+      environment: environment.Solana,
 
       // base58 representation of a private key.
       // For security reasons, put it to the .env file
@@ -46,6 +44,7 @@ const config: ExecutorConfig = {
     {
       chain: ChainId.Polygon,
       chainRpc: `${process.env.RPC_POLYGON}`,
+      environment: environment.Polygon,
 
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
@@ -64,6 +63,7 @@ const config: ExecutorConfig = {
     {
       chain: ChainId.BSC,
       chainRpc: `${process.env.RPC_BNB}`,
+      environment: environment.BNB,
 
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,

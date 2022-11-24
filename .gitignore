@@ -1,4 +1,3 @@
 node_modules
 .env
 executor.config.ts
-prerelease-sample.config.ts

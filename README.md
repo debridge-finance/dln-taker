@@ -39,7 +39,7 @@ Create a configuration file based on the `sample.config.ts`:
 cp sample.config.ts executor.config.ts
 ```
 
-> 🔴 Currently, DLN is running on the mainnet prerelease environment. You should have received a copy of sample configuration file with overridden defaults. If not, please ask for `prerelease-sample.config.ts` file.
+> 🔴 Currently, DLN is running on the mainnet prerelease environment codenamed "LIMA", consisting of custom set of smart contracts being deployed on Solana, Polygon and BNB chains. Thus, the `sample.config.ts` file which uses the `CURRENT_ENVIRONMENT` macro is actually referring to `PRERELEASE_ENVIRONMENT_CODENAME_LIMA`, where all custom (non-production) smart contract addresses as well as the websocket server address are defined. See [predefined environment configurations](./src/environments.ts) for details.
 
 Configure networks to listen to, define rules to filter out orders, set the wallets with the liquidity to fulfill orders with (see the next [section](#configuration)), then launch the executor specifying the name of the configuration file:
 
@@ -54,7 +54,13 @@ This will keep the executor up and running, listening for new orders and executi
 
 The config file should represent a Typescript module which exports an Object conforming the [`ExecutorConfig`](src/config.ts) type. This section describes how to configure its properties.
 
-Since it is implied that the executor's config must have access to your private keys in order to sign and broadcast order fulfillment transactions, we kindly advice to put your private keys in the local `.env` file and refer them via the `process.env.*` object. See the example:
+Since it is implied that the executor's config must have access to your private keys in order to sign and broadcast order fulfillment transactions, we kindly advice to put your private keys in the local `.env` file and refer them via the `process.env.*` object. For clarity, DLN executor is shipped with `sample.env` file which can be used as a foundation for your custom privacy-focused configuration strategy. First, copy the sample file:
+
+```sh
+cp sample.env .env
+```
+
+Then put sensitive values to the variables defined in this file, effectively reusing them in the configuration file. See the example:
 
 ```env
 # File: .env
@@ -79,7 +85,7 @@ BNB_BENEFICIARY=
 
     takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
     unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-    beneficiary: `${process.env.BNB_BENEFICIARY}`,ITY_PRIVATE_KEY}`,
+    beneficiary: `${process.env.BNB_BENEFICIARY}`,
 
     // ...
 }
@@ -93,8 +99,8 @@ The executor engine must have the source of new orders that are being placed on 
 ```ts
 const config: ExecutorConfig = {
     // use the custom ws address provided by deBridge.
-    // Could be the IOrderFeed implementation as well
-    orderFeed: "ws://127.0.0.1/ws",
+    // Could be a URL to WSS or the IOrderFeed implementation as well
+    orderFeed: environment.WSS,
 }
 ```
 
