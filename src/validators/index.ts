@@ -9,8 +9,8 @@ import { srcChainDefined } from "./src.chain.defined";
 import { takeAmountUsdEquivalentBetween } from "./take.amount.usd.equivalent.between";
 import { whitelistedGiveToken, WhiteListedGiveToken } from "./white.listed.give.token";
 import { whitelistedMaker, WhiteListedMarker } from "./white.listed.marker";
+import { whitelistedReceiver } from "./white.listed.receiver";
 import { whitelistedTakeToken, WhiteListedTakeToken } from "./white.listed.take.token";
-import { whiteListedTaker } from "./white.listed.taker";
 
 export {
   blacklistedGiveToken,
@@ -25,5 +25,5 @@ export {
   whitelistedGiveToken,
   whitelistedMaker,
   whitelistedTakeToken,
-  whiteListedTaker,
+  whitelistedReceiver,
 };

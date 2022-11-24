@@ -20,17 +20,17 @@ const config: ExecutorConfig = {
       chainRpc: `${process.env.RPC_SOLANA}`,
       environment: environment.Solana,
 
-      // base58 representation of a private key.
-      // For security reasons, put it to the .env file
-      takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-
-      // base58 representation of a private key
-      // For security reasons, put it to the .env file
-      unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-
       // address
       // For security reasons, put it to the .env file
       beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
+
+      // Warn! base58 representation of a private key.
+      // Warn! For security reasons, put it to the .env file
+      takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+
+      // Warn! base58 representation of a private key.
+      // Warn! For security reasons, put it to the .env file
+      unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
 
       srcValidators: [],
       dstValidators: [],
@@ -46,9 +46,9 @@ const config: ExecutorConfig = {
       chainRpc: `${process.env.RPC_POLYGON}`,
       environment: environment.Polygon,
 
+      beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-      beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
 
       srcValidators: [],
       dstValidators: [],

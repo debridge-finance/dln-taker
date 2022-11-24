@@ -23,7 +23,7 @@ This package is intended to automate the process of order execution: it listens 
 Download the source code from Github, picking the specific version:
 
 ```sh
-git clone --depth 1 --single-branch --branch v0.2.0 git@github.com:debridge-finance/dln-executor.git
+git clone --depth 1 --single-branch --branch v0.2.1 git@github.com:debridge-finance/dln-executor.git
 ```
 
 `cd` to the directory and install necessary production dependencies:
@@ -39,7 +39,7 @@ Create a configuration file based on the `sample.config.ts`:
 cp sample.config.ts executor.config.ts
 ```
 
-> 🔴 Currently, DLN is running on the mainnet prerelease environment codenamed "LIMA", consisting of custom set of smart contracts being deployed on Solana, Polygon and BNB chains. Thus, the `sample.config.ts` file which uses the `CURRENT_ENVIRONMENT` macro is actually referring to `PRERELEASE_ENVIRONMENT_CODENAME_LIMA`, where all custom (non-production) smart contract addresses as well as the websocket server address are defined. See [predefined environment configurations](./src/environments.ts) for details.
+> 🔴 Currently, DLN is running on a fully operational mainnet pre-release environment codenamed "LIMA", consisting of custom set of smart contracts being deployed on the mainnet Solana, mainnet Polygon and mainnet BNB chains. Thus, the `sample.config.ts` file which uses the `CURRENT_ENVIRONMENT` macro is actually referring to `PRERELEASE_ENVIRONMENT_CODENAME_LIMA`, where all custom (non-production) smart contract addresses as well as the websocket server address are defined. See [predefined environment configurations](./src/environments.ts) for details.
 
 Configure networks to listen to, define rules to filter out orders, set the wallets with the liquidity to fulfill orders with (see the next [section](#configuration)), then launch the executor specifying the name of the configuration file:
 
@@ -48,6 +48,54 @@ npm run executor executor.config.ts
 ```
 
 This will keep the executor up and running, listening for new orders and executing those that satisfy the rules. A detailed execution log would appear in the console.
+
+## Testing automated fulfillment
+
+### Ensure you are using the proper environment
+
+Currently, we’ve set up a fully operational pre-release environment codenamed “LIMA”, which consists of:
+- deployed pre-release smart contracts on several mainnet chains (Solana, Polygon and BNB),
+- an event broker to feed executor through the websocket connection with the information about new orders being placed on the DLN,
+- an [order placement app](https://lima.debridge.io/pmm),
+- an [order explorer](https://lima-explorer.debridge.io/orders) with order execution shortcuts.
+
+At the time of writing this is the only environment where orders can be placed and executed, thus the `sample.config.ts` file which uses the `CURRENT_ENVIRONMENT` macro is actually referring to `PRERELEASE_ENVIRONMENT_CODENAME_LIMA`, where all custom (non-production) smart contract addresses as well as the websocket server address are defined. See [predefined environment configurations](./src/environments.ts) for details. This means no additional configuration is needed, however you can set an explicit reference to `PRERELEASE_ENVIRONMENT_CODENAME_LIMA` environment to prevent accidental switching to the production environment.
+
+### Restricting orders from fulfillment
+
+To prevent dln-executor from fulfilling third party orders but yours during testing, you can configure it to filter off unwanted orders by adding trusted address to the whitelist of receivers using the [`whitelistedReceiver`](#whitelistedreceiveraddresses-address) validator:
+
+```ts
+dstValidators: [
+    // only fulfill orders which transfer funds to the given receiver address
+    validators.whitelistedReceiver(['0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'])
+],
+```
+
+This will make `dln-executor` to fulfill orders with `receiver` property set you the given address.
+
+### Placing new orders
+
+You can use the [order placement app](https://lima.debridge.io/pmm) to place new orders. If you decided to use the `whitelistedReceiver` validator then don't forget to set the `receiver` property of an order with the trusted address.
+
+## Preparing funds
+
+For every EVM chain you would like to support (currently: only BNB and Polygon):
+- Register the reserves-keeping address (its private key must be set as a `takerPrivateKey` in the configuration file) and load it with small amount of reserve tokens to be used for fulfillment (e.g., 100 USDC) and a small amount of native blockchain currency (e.g., 0.1 ETH) to pay gas for fulfillment transactions. `dln-executor` will attempt to atomically swap minimum necessary amount of reserve token with the requested token using the best market route picked by 1inch router during order fulfillment
+- Register the unlock authority address (its private key must be set as an `unlockAuthorityPrivateKey` in the configuration file) and load it with a small amount of native blockchain currency (e.g. 0.1 ETH) to pay gas for order unlocking transactions
+- Register the beneficiary address (its public key (address) must be as a `beneficiary`). This address will be used to retrieve funds unblocked from the orders you successfully fulfill. Orders created through our API would have only stablecoins locked as we are going to swap arbitrary input tokens to select stable coins.
+- Set up allowances by approving two contracts (`DlnDestination` and `CrosschainForwarder`) to spend reserve tokens on behalf of the reserves-keeping address. This is a temporary requirement, as the next version of dln-executor will perform this operation automatically. The addresses of these contracts within the LIMA environment are:
+    - Polygon
+        - `0xceD226Cbc7B4473c7578E3b392427d09448f24Ae`
+        - `0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd`
+    - BNB
+        - `0xceD226Cbc7B4473c7578E3b392427d09448f24Ae`
+        - `0xce1705632Ced3A1d18Ed2b87ECe5B74526f59b8A`
+
+For Solana chain:
+- Register the reserves-keeping address (its private key must be set as a `takerPrivateKey` in the configuration file) and load it with small amount of reserve tokens to be used for fulfillment (e.g., 100 USDC) and a small amount of native blockchain currency (e.g., 1 SOL) to pay gas for fulfillment transactions. `dln-executor` will attempt to atomically swap minimum necessary amount of reserve token with the requested token using the best market route picked by Jupiter router during order fulfillment
+- Register the beneficiary address (its public key (address) must be as a `beneficiary`). This address will be used to retrieve funds unblocked from the orders you successfully fulfill. Orders created through our API would have only stablecoins locked as we are going to swap arbitrary input tokens to select stable coins.
+
 
 
 ## Configuration
@@ -120,7 +168,7 @@ Validators can be set globally using the `orderValidators` property, which means
 ```ts
 const config: ExecutorConfig = {
     validators: [
-        giveVsTakeUSDAmountsDifference(4 /*bps*/),
+        validators.giveVsTakeUSDAmountsDifference(4 /*bps*/),
         // ...
     ],
 }
@@ -137,7 +185,7 @@ const config: ExecutorConfig = {
             // defines validators for orders coming FROM the BNB Chain
             srcValidators: [
                 // if the order is coming from BNB chain, accept it only if BUSD is the giveToken
-                whitelistedGiveToken([
+                validators.whitelistedGiveToken([
                     '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56'
                 ]),
             ],
@@ -145,7 +193,7 @@ const config: ExecutorConfig = {
             // defines validators for orders coming TO the BNB Chain
             dstValidators: [
                 // fulfill orders on BNB only if the requested amount from $0 to $10,000
-                takeAmountUsdEquivalentBetween(0, 10_000),
+                validators.takeAmountUsdEquivalentBetween(0, 10_000),
             ],
         }
     ]
@@ -200,8 +248,7 @@ const config: ExecutorConfig = {
 }
 ```
 
-
-#### `giveVsTakeUSDAmountsDifference(difference: number)`
+#### `giveVsTakeUSDAmountsDifference(differenceBps: number)`
 
 Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is the given [basis points](https://en.wikipedia.org/wiki/Basis_point) more than the USD equivalent of the order requested amount.
 
@@ -223,7 +270,7 @@ Checks if the USD equivalent of the order's unlock amount (amount given by the m
 ```ts
 validators: [
     // accept orders with unlock amounts >$10 and <$100K
-    giveAmountUSDEquivalentBetween(10, 100_000),
+    validators.giveAmountUSDEquivalentBetween(10, 100_000),
 ],
 ```
 
@@ -234,7 +281,7 @@ Checks if the USD equivalent of the order's requested amount (amount that should
 ```ts
 validators: [
     // accept orders with unlock amounts >$10 and <$100K
-    takeAmountUSDEquivalentBetween(10, 100_000),
+    validators.takeAmountUSDEquivalentBetween(10, 100_000),
 ],
 ```
 
@@ -242,9 +289,16 @@ validators: [
 
 Checks if the address who placed the order on the source chain is in the whitelist. This validator is useful to filter out orders placed by the trusted parties.
 
-#### `whitelistedTaker(addresses: string[])`
+#### `whitelistedReceiver(addresses: address[])`
 
-Checks if the order explicitly restricts fulfillment with the specific address which is in the given whitelist. This validator is useful to target OTC-like orders routed through DLN.
+Checks if the receiver address set in the order is in the given whitelist. This validator is useful to filter out orders placed by the trusted parties.
+
+```ts
+dstValidators: [
+    // only fulfill orders which transfer funds to the given receiver address
+    validators.whitelistedReceiver(['0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'])
+],
+```
 
 #### `whitelistedGiveToken(addresses: string[])`
 
@@ -258,7 +312,7 @@ const config: ExecutorConfig = {
 
             srcValidators: [
                 // if the order is coming from Ethereum chain, accept ETH and USDT only
-                whitelistedGiveToken([
+                validators.whitelistedGiveToken([
                     '0x0000000000000000000000000000000000000000',
                     '0xdAC17F958D2ee523a2206206994597C13D831ec7'
                 ]),
@@ -287,7 +341,7 @@ Developing custom validator requires a basic knowledge of Javascript and prefera
 ```ts
 export function receiverKnown(knownReceiverAddress): OrderValidator {
   return async (order: OrderData, pmmClient: PMMClient, config: ExecutorConfig) => {
-    return order.receiver === knownReceiverAddress;
+    return buffersAreEqual(order.receiver, convertAddressToBuffer(chainId, knownReceiverAddress));
   }
 }
 ```
@@ -296,7 +350,7 @@ Then such validator can be used in the configuration:
 
 ```ts
 validators: [
-    receiverKnown("0x123...890")
+    receiverKnown("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
 ],
 ```
 
@@ -324,7 +378,7 @@ const config: ExecutorConfig = {
             chain: ChainId.BSC,
 
             // explicitly use preswapProcessor for BNB chain
-            orderProcessor: preswapProcessor(BNB_RESERVES_TOKEN_ADDRESS)
+            orderProcessor: processors.preswapProcessor(BNB_RESERVES_TOKEN_ADDRESS)
         },
     ]
 }
@@ -347,7 +401,7 @@ A very basic processor attempts to fulfill orders that request tokens presented 
 This processor accepts the list of reserve tokens you are willing to use for order fulfillment. For example, the following configuration will execute orders which request either ETH or USDT:
 
 ```ts
-orderProcessor: strictProcessor([
+orderProcessor: processors.strictProcessor([
     '0x0000000000000000000000000000000000000000', // ETH
     '0xdAC17F958D2ee523a2206206994597C13D831ec7' // USDT
 ]),
@@ -367,7 +421,7 @@ For example, the taker's `wallet` holds $100,000 USDC. Given the order which req
 This processor accepts a token address you are willing to use for order fulfillment. For example, the following configuration will execute orders using USDT as a reserve address, swapping it to the requested token when necessary:
 
 ```ts
-orderProcessor: preswapProcessor('0xdAC17F958D2ee523a2206206994597C13D831ec7'), // USDT
+orderProcessor: processors.preswapProcessor('0xdAC17F958D2ee523a2206206994597C13D831ec7'), // USDT
 ```
 
 This processor will set an infinite allowance to the DLN smart contract on first launch to speed up fulfillments.
@@ -412,32 +466,19 @@ chains: [
 
 #### Chain related configuration
 
-A configuration engine preserves a list of defaults representing the mainnet deployments of the DLN smart contracts per each chain. For example, it is well known that the address of the core `deBridgeGate` contract across supported EVM chains is `0x43dE2d77BF8027e25dBD179B491e8d64f38398aA`. However, if you are running the executor against non-production environment, you might have received the list of applicable addresses that must override these defaults.
+A configuration engine preserves a list of defaults representing the mainnet deployments of the DLN smart contracts per each chain. See [predefined environment configurations](./src/environments.ts) for details.
 
-```ts
-chains: [
-    {
-        chain: ChainId.Solana,
-        chainRpc: "https://api.mainnet-beta.solana.com/",
-
-        // { this should not be presented in the real world config: mainnet addresses are defined in the internals
-            pmmSrc: "srcTG7YiZkebpJJaCQEuqBznRYqrfcj8a917EcMnNUk",
-            pmmDst: "dstFoo3xGxv23giLZBuyo9rRwXHdDMeySj7XXMj1Rqn",
-            deBridge: "F1nSne66G8qCrTVBa1wgDrRFHMGj8pZUZiqgxUrVtaAQ",
-            deBridgeSettings: "14bkTTDfycEShjiurAv1yGupxvsQcWevReLNnpzZgaMh",
-        // }
-
-    },
-]
-```
+At the time of writing, DLN is running on a fully operational mainnet pre-release environment codenamed "LIMA", consisting of custom set of smart contracts being deployed on the mainnet Solana, mainnet Polygon and mainnet BNB chains. This is the only environment where orders can be placed and executed, thus the `sample.config.ts` file which uses the `CURRENT_ENVIRONMENT` macro is actually referring to `PRERELEASE_ENVIRONMENT_CODENAME_LIMA`, where all custom (non-production) smart contract addresses as well as the websocket server address are defined. This means no additional configuration is needed unless your config still refers the `CURRENT_ENVIRONMENT`, however you can set an explicit reference to `PRERELEASE_ENVIRONMENT_CODENAME_LIMA` environment to prevent accidental switching to the production environment.
 
 #### Taker related configuration
 
-> **Caution!** Properties from this section define sensitive data used by the DLN executor to operate funds.
+> **Caution!** Properties from this section define sensitive data used by the DLN executor to operate reserve funds. Since it is implied that the executor's config must have access to your private keys in order to sign and broadcast order fulfillment transactions, we kindly advice to put your private keys in the local `.env` file and refer them via the `process.env.*` object. For clarity, DLN executor is shipped with `sample.env` file which can be used as a foundation for your custom privacy-focused configuration strategy.
 
-The `beneficiary` property defines taker controlled address where the orders (fulfilled on the other chains) would unlock the funds to.
+The `beneficiary` property defines taker controlled address where the orders-locked funds (fulfilled on the other chains) would be unlocked to.
 
-The `wallet` property defines the private key for the wallet with the funds to fulfill orders. The DLN executor will sign transactions on behalf of this wallet, effectively setting approval, transferring funds, performing swaps and fulfillments.
+The `takerPrivateKey` property defines the private key with the reserve funds available to fulfill orders. The DLN executor will sign transactions on behalf of this address, effectively setting approval, transferring funds, performing swaps and fulfillments.
+
+The `unlockAuthorityPrivateKey` property defines the private key to unlock successfully fulfilled orders. The DLN executor will sign transactions on behalf of this address, effectively unlocking the orders.
 
 ```ts
 const config: ExecutorConfig = {
@@ -449,9 +490,15 @@ const config: ExecutorConfig = {
             // unlocked funds will be sent to this Solana address
             beneficiary: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
 
-            // if the order is created on another chain (e.g. Ethereum), DLN executor would attempt to
-            // fulfill such order on behalf of this wallet
-            wallet: "abc123...",
+            // if the order is created on another chain (e.g. Ethereum), DLN executor would attempt to fulfill
+            // this order on behalf of this address
+            // Warn! base58 representation of a private key.
+            // Warn! For security reasons, put it to the .env file
+            takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+
+            // Warn! base58 representation of a private key.
+            // Warn! For security reasons, put it to the .env file
+            unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
         },
 
         {
@@ -461,9 +508,17 @@ const config: ExecutorConfig = {
             // unlocked funds will be sent to this Ethereum address
             beneficiary: "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
 
-            // if the order is created on another chain (e.g. Solana), DLN executor would attempt to
-            // fulfill such order on behalf of this wallet
-            wallet: "abc123...",
+            // if the order is created on another chain (e.g. Solana), DLN executor would attempt to fulfill
+            // this order on behalf of this address
+            // Warn! base64 representation of a private key.
+            // Warn! For security reasons, put it to the .env file
+            takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
+
+            // if the order is created on another chain (e.g. Solana), DLN executor would unlock it
+            // after successful fulfillment on behalf of this address
+            // Warn! base64 representation of a private key.
+            // Warn! For security reasons, put it to the .env file
+            unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
         },
     ]
 }

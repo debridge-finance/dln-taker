@@ -11,9 +11,10 @@ import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
 import { buffersAreEqual } from "../utils/buffers.are.equal";
 
 /**
- * Checks if the address who placed the order on the source chain is in the whitelist. This validator is useful to filter out orders placed by the trusted parties.
+ * Checks if the receiver address (who will take funds upon successful order fulfillment) is in the whitelist.
+ * This validator is useful to filter out orders placed by the trusted parties.
  */
-export class WhiteListedMarker extends OrderValidatorInterface {
+class WhitelistedReceiver extends OrderValidatorInterface {
 
   private addressesBuffer: Uint8Array[];
 
@@ -28,15 +29,15 @@ export class WhiteListedMarker extends OrderValidatorInterface {
   }
 
   validate(order: OrderData, config: ExecutorConfig, context: ValidatorContext): Promise<boolean> {
-    const logger = context.logger.child({ validator: "WhiteListedMarker" });
-    const result = this.addressesBuffer.some(address => buffersAreEqual(order.maker, address))
+    const logger = context.logger.child({ validator: "WhiteListedReceiver" });
+    const result = this.addressesBuffer.some(address => buffersAreEqual(order.receiver, address))
 
-    const maker = helpers.bufferToHex(Buffer.from(order.maker));
-    logger.info(`approve status: ${result}, maker ${maker}`);
+    const receiver = helpers.bufferToHex(Buffer.from(order.receiver));
+    logger.info(`approve status: ${result}, receiver ${receiver}`);
     return Promise.resolve(result);
   }
 }
 
-export function whitelistedMaker(addresses: string[]): OrderValidatorInterface {
-  return new WhiteListedMarker(addresses)
+export function whitelistedReceiver(addresses: string[]): OrderValidatorInterface {
+  return new WhitelistedReceiver(addresses)
 }
