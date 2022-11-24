@@ -23,7 +23,7 @@ This package is intended to automate the process of order execution: it listens 
 Download the source code from Github, picking the specific version:
 
 ```sh
-git clone --depth 1 --single-branch --branch v0.2.0 git@github.com:debridge-finance/dln-executor.git
+git clone --depth 1 --single-branch --branch v0.2.1 git@github.com:debridge-finance/dln-executor.git
 ```
 
 `cd` to the directory and install necessary production dependencies:
