@@ -1,4 +1,4 @@
-import { ChainId, SwapConnector } from "@debridge-finance/pmm-client";
+import { ChainId, SwapConnector } from "@debridge-finance/dln-client";
 import axios from "axios";
 import logger from "loglevel";
 

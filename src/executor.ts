@@ -1,4 +1,4 @@
-import { ChainId, Evm, PMMClient, Solana } from "@debridge-finance/pmm-client";
+import { ChainId, Evm, PMMClient, Solana } from "@debridge-finance/dln-client";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { Logger } from "pino";
 

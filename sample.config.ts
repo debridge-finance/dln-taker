@@ -1,4 +1,4 @@
-import { ChainId } from "@debridge-finance/pmm-client";
+import { ChainId } from "@debridge-finance/dln-client";
 import { ChainConfig, ExecutorConfig } from "./src/config";
 import * as validators from "./src/validators";
 import * as processors from "./src/processors";

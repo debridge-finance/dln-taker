@@ -5,7 +5,7 @@ import {
   PriceTokenService,
   ZERO_EVM_ADDRESS,
   ZERO_SOLANA_ADDRESS,
-} from "@debridge-finance/pmm-client";
+} from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import { PublicKey } from "@solana/web3.js";
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";

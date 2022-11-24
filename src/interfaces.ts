@@ -1,4 +1,4 @@
-import { ChainId, OrderData } from "@debridge-finance/pmm-client";
+import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
 export type ChainConfig = {

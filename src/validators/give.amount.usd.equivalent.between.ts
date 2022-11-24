@@ -1,4 +1,5 @@
-import { OrderData } from "@debridge-finance/pmm-client/src/order";
+import { ChainId, OrderData } from "@debridge-finance/dln-client";
+
 import { helpers } from "@debridge-finance/solana-utils";
 import BigNumber from "bignumber.js";
 

@@ -1,5 +1,5 @@
-import {ChainId, PMMClient} from "@debridge-finance/pmm-client";
-import { OrderData } from "@debridge-finance/pmm-client/src/order";
+import { ChainId, OrderData, PMMClient } from "@debridge-finance/dln-client";
+
 import { Logger } from "pino";
 
 import { ExecutorConfig } from "../config";

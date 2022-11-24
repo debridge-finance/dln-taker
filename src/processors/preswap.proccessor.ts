@@ -1,4 +1,4 @@
-import { ChainId, OrderData, OrderState } from "@debridge-finance/pmm-client";
+import { ChainId, OrderData, OrderState } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import Web3 from "web3";
 

@@ -2,7 +2,7 @@ import {
   ChainId,
   PriceTokenService,
   SwapConnector,
-} from "@debridge-finance/pmm-client";
+} from "@debridge-finance/dln-client";
 
 import { GetNextOrder } from "./interfaces";
 import { OrderProcessor } from "./processors";

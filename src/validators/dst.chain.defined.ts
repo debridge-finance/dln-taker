@@ -1,4 +1,4 @@
-import { OrderData } from "@debridge-finance/pmm-client/src/order";
+import { ChainId, OrderData } from "@debridge-finance/dln-client";
 
 import { ExecutorConfig } from "../config";
 

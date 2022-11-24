@@ -1,4 +1,4 @@
-import { Offer, Order, OrderData } from "@debridge-finance/pmm-client";
+import { Offer, Order, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import WebSocket from "ws";
 

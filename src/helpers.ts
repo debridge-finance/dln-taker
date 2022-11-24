@@ -1,4 +1,4 @@
-import { ChainId, OrderData } from "@debridge-finance/pmm-client";
+import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 
 import { Order } from "./pmm_common";

@@ -1,10 +1,9 @@
-import { OrderData } from "@debridge-finance/pmm-client/src/order";
+import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 
 import { ExecutorConfig } from "../config";
 
 import { ValidatorContext } from "./order.validator";
-import { ChainId } from "@debridge-finance/pmm-client";
 import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
 import { buffersAreEqual } from "../utils/buffers.are.equal";
 import { OrderValidatorInterface } from "./order.validator.interface";
