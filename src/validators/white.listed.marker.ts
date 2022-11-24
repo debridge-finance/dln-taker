@@ -32,7 +32,7 @@ export class WhiteListedMarker extends OrderValidatorInterface {
     const result = this.addressesBuffer.some(address => buffersAreEqual(order.maker, address))
 
     const maker = helpers.bufferToHex(Buffer.from(order.maker));
-    logger.info(`approve status: ${result}, giveToken ${maker}`);
+    logger.info(`approve status: ${result}, maker ${maker}`);
     return Promise.resolve(result);
   }
 }
