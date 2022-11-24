@@ -1,14 +1,10 @@
 import { ChainId, OrderData } from "@debridge-finance/dln-client";
-
-import { helpers } from "@debridge-finance/solana-utils";
-
 import { ExecutorConfig } from "../config";
-
 import { ValidatorContext } from "./order.validator";
 import { OrderValidatorInterface } from "./order.validator.interface";
-
 import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
 import { buffersAreEqual } from "../utils/buffers.are.equal";
+import { convertBufferToAddress } from "../utils/convert.buffer.to.address";
 
 /**
  * Checks if the address who placed the order on the source chain is in the whitelist. This validator is useful to filter out orders placed by the trusted parties.
@@ -31,7 +27,7 @@ export class WhiteListedGiveToken extends OrderValidatorInterface {
     const logger = context.logger.child({ validator: "WhiteListedGiveToken" });
     const result = this.addressesBuffer.some(address => buffersAreEqual(order.give.tokenAddress, address))
 
-    const giveToken = helpers.bufferToHex(Buffer.from(order.give.tokenAddress));
+    const giveToken = convertBufferToAddress(this.chainId, order.give.tokenAddress);
     logger.info(`approve status: ${result}, giveToken ${giveToken}`);
     return Promise.resolve(result);
   }

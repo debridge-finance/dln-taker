@@ -1,14 +1,10 @@
 import { ChainId, OrderData } from "@debridge-finance/dln-client";
-
-import { helpers } from "@debridge-finance/solana-utils";
-
 import { ExecutorConfig } from "../config";
-
 import { ValidatorContext } from "./order.validator";
 import { OrderValidatorInterface } from "./order.validator.interface";
-
 import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
 import { buffersAreEqual } from "../utils/buffers.are.equal";
+import {convertBufferToAddress} from "../utils/convert.buffer.to.address";
 
 /**
  * Checks if the order's requested token is in the whitelist. This validator is useful to target orders that request specific tokens.
@@ -31,7 +27,7 @@ export class WhiteListedTakeToken extends OrderValidatorInterface {
     const logger = context.logger.child({ validator: "WhiteListedTakeToken" });
     const result = this.addressesBuffer.some(address => buffersAreEqual(order.take.tokenAddress, address))
 
-    const takeToken = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
+    const takeToken = convertBufferToAddress(this.chainId, order.take.tokenAddress);
     logger.info(`approve status: ${result}, takeToken ${takeToken}`);
     return Promise.resolve(result);
   }

@@ -1,4 +1,4 @@
-import { ChainId, OrderData } from "@debridge-finance/dln-client";
+import { OrderData } from "@debridge-finance/dln-client";
 
 import { helpers } from "@debridge-finance/solana-utils";
 import BigNumber from "bignumber.js";
@@ -6,7 +6,7 @@ import BigNumber from "bignumber.js";
 import { ExecutorConfig } from "../config";
 
 import { OrderValidator, ValidatorContext } from "./order.validator";
-import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
+import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 
 /**
  * Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is in the given range. This validator is useful to filter off uncomfortable volumes, e.g. too low (e.g. less than $10) or too high (e.g., more than $100,000).

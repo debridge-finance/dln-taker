@@ -1,12 +1,11 @@
-import { ChainId, OrderData } from "@debridge-finance/dln-client";
+import { OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import BigNumber from "bignumber.js";
-import Web3 from "web3";
 
 import { ExecutorConfig } from "../config";
 
 import { OrderValidator, ValidatorContext } from "./order.validator";
-import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
+import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 
 /**
  * Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is the given basis points more than the USD equivalent of the order requested amount.
@@ -21,15 +20,7 @@ export const giveVsTakeUSDAmountsDifference = (differenceBps: number): OrderVali
     const logger = context.logger.child({ validator: "giveVsTakeUSDAmountsDifference" });
 
     const giveWeb3 = (context.providers.get(order.give.chainId) as EvmAdapterProvider).connection;
-
-    let takeWeb3;
-    if (order.take.chainId !== ChainId.Solana) {
-      takeWeb3 = new Web3(
-        config.chains!.find(
-          (chainConfig) => chainConfig.chain === order.take.chainId
-        )!.chainRpc
-      );
-    }
+    const takeWeb3 = (context.providers.get(order.take.chainId) as EvmAdapterProvider).connection;
 
     const giveAddress = helpers.bufferToHex(
       Buffer.from(order.give.tokenAddress)
