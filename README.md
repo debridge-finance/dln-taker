@@ -23,13 +23,13 @@ This package is intended to automate the process of order execution: it listens 
 Download the source code from Github, picking the specific version:
 
 ```sh
-git clone --depth 1 --single-branch --branch v0.2.0 git@github.com:debridge-finance/market-maker-executor.git
+git clone --depth 1 --single-branch --branch v0.2.0 git@github.com:debridge-finance/dln-executor.git
 ```
 
 `cd` to the directory and install dependencies:
 
 ```sh
-cd market-maker-executor
+cd dln-executor
 npm install
 ```
 
@@ -38,6 +38,8 @@ Create a configuration file based on the `sample.config.ts`:
 ```sh
 cp sample.config.ts executor.config.ts
 ```
+
+> 🔴 Currently, DLN is running on the mainnet prerelease environment. You should have received a copy of sample configuration file with overridden defaults. If not, please ask for `prerelease-sample.config.ts` file.
 
 Configure networks to listen to, define rules to filter out orders, set the wallets with the liquidity to fulfill orders with (see the next [section](#configuration)), then launch the executor specifying the name of the configuration file:
 
@@ -58,7 +60,10 @@ Since it is implied that the executor's config must have access to your private 
 # File: .env
 
 SOLANA_TAKER_PRIVATE_KEY=abc...
-SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY=def...
+
+BNB_TAKER_PRIVATE_KEY=
+BNB_UNLOCK_AUTHORITY_PRIVATE_KEY=
+BNB_BENEFICIARY=
 ```
 
 ```ts
@@ -69,7 +74,12 @@ SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY=def...
 
     // gets the value from the .env file from the corresponding line
     takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-    unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+
+    // ...
+
+    takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
+    unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+    beneficiary: `${process.env.BNB_BENEFICIARY}`,ITY_PRIVATE_KEY}`,
 
     // ...
 }

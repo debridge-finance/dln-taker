@@ -1,9 +1,13 @@
 import { ChainId } from "@debridge-finance/dln-client";
-import { ChainConfig, ExecutorConfig } from "./src/config";
+import { ExecutorConfig } from "./src/config";
 import * as validators from "./src/validators";
 import * as processors from "./src/processors";
 
 const config: ExecutorConfig = {
+  //
+  // Mind you must set the WebSocket server address in order to fetch new orders in realtime
+  // For security reasons, put it to the .env file
+  //
   orderFeed: `${process.env.WSS}`,
 
   validators: [
@@ -18,22 +22,16 @@ const config: ExecutorConfig = {
       chain: ChainId.Solana,
       chainRpc: `${process.env.RPC_SOLANA}`,
 
-      environment: {
-        deBridgeContract: "Lima82j8YvHFYe8qa4kGgb3fvPFEnR3PoV6UyGUpHLq",
-        pmmSrc: "src3au6NwAGF8ntnJKdkcUJy3aQg1qHoJMCwyunDk9j",
-        pmmDst: "dst3kkK8VJ1oU7QstWcKkRSU6s1YeopZxEJp9XfxqP7",
-        solana: {
-          debridgeSetting: "settFZVDbqC9zBmV2ZCBfNMCtTzia2R7mVeR6ccK2nN"
-        }
-      },
-
-      // base58 representation of a private key
+      // base58 representation of a private key.
+      // For security reasons, put it to the .env file
       takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
 
       // base58 representation of a private key
+      // For security reasons, put it to the .env file
       unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
 
       // address
+      // For security reasons, put it to the .env file
       beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
 
       srcValidators: [],
@@ -48,17 +46,6 @@ const config: ExecutorConfig = {
     {
       chain: ChainId.Polygon,
       chainRpc: `${process.env.RPC_POLYGON}`,
-
-      // {{{ LIMA
-      environment: {
-        deBridgeContract: "0xa9a617e8BE4efb0aC315691D2b4dbEC94f5Bb27b",
-        pmmSrc: "0x81BD33D37941F5912C9FB74c8F00FB8d2CaCa327",
-        pmmDst: "0xceD226Cbc7B4473c7578E3b392427d09448f24Ae",
-        evm: {
-          forwarderContract: '0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd'
-        }
-      },
-      // }}}
 
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
@@ -76,18 +63,7 @@ const config: ExecutorConfig = {
 
     {
       chain: ChainId.BSC,
-      chainRpc: "https://bsc-dataseed.binance.org",
-
-      // {{{ LIMA
-      environment: {
-        deBridgeContract: "0xa9a617e8BE4efb0aC315691D2b4dbEC94f5Bb27b",
-        pmmSrc: "0x81BD33D37941F5912C9FB74c8F00FB8d2CaCa327",
-        pmmDst: "0xceD226Cbc7B4473c7578E3b392427d09448f24Ae",
-        evm: {
-          forwarderContract: '0xce1705632Ced3A1d18Ed2b87ECe5B74526f59b8A'
-        }
-      },
-      // }}}
+      chainRpc: `${process.env.RPC_BNB}`,
 
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,

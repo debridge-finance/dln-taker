@@ -108,13 +108,14 @@ export interface ChainConfig {
   beneficiary: address;
 
   /**
-   * The private key for the wallet with funds to fulfill orders
+   * The private key for the wallet with funds to fulfill orders. Must have enough reserves and native currency
+   * to fulfill orders
    */
   takerPrivateKey: string;
 
   /**
-   * The private key for the wallet who is responsible for sending order unlocks
-   * (must differ from takerPrivateKey)
+   * The private key for the wallet who is responsible for sending order unlocks (must differ from takerPrivateKey).
+   * Must have enough ether to unlock orders
    */
   unlockAuthorityPrivateKey: address;
 
