@@ -1,7 +1,9 @@
 import Web3 from "web3";
 import IERC20 from "./ierc20.json";
-import { ZERO_EVM_ADDRESS } from "@debridge-finance/dln-client";
+import { ChainId, ZERO_EVM_ADDRESS } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
+import { EvmAdapterProvider } from "../../providers/evm.provider.adapter";
+import { OrderProcessorInitContext } from "../order.processor";
 
 const APPROVE_VALUE = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
 
@@ -58,3 +60,17 @@ export const isApproved = async (
   return approvedCount.gt(0);
 };
 
+export const approveToken = async (chainId: ChainId, tokenAddress: string, contractAddress: string, context: OrderProcessorInitContext): Promise<void> => {
+  if (chainId === ChainId.Solana) return Promise.resolve();
+  const { connection } = context.providers.get(chainId) as EvmAdapterProvider;
+  const tokenIsApproved = await isApproved(connection, tokenAddress, contractAddress);
+  if (!tokenIsApproved) {
+    context.logger.debug(`Token ${tokenAddress} approving is started`);
+    await approve(connection, tokenAddress, contractAddress);
+    context.logger.debug(`Token ${tokenAddress} approving is finished`);
+  } else {
+    context.logger.debug(`Token ${tokenAddress} is approved`);
+  }
+
+  return Promise.resolve();
+}

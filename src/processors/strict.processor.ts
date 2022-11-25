@@ -14,6 +14,7 @@ import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 import { convertAddressToBuffer } from "../utils/convert.address.to.buffer";
 import { buffersAreEqual } from "../utils/buffers.are.equal";
+import { approveToken } from "./utils/approve";
 
 export class StrictProcessor extends OrderProcessor {
   private approvedTokensInBuffer: Uint8Array[];
@@ -27,7 +28,9 @@ export class StrictProcessor extends OrderProcessor {
     const chainConfig = context.executorConfig.chains.find(chain => chain.chain === chainId)!;
     this.approvedTokensInBuffer = this.approvedTokens.map(token => convertAddressToBuffer(chainConfig.chain, token));
     if (chainId !== ChainId.Solana) {
-      await Promise.all(this.approvedTokens.map(token => this.approveToken(token, chainConfig!.environment!.pmmDst!)));
+      for (const token of this.approvedTokens) {
+        await approveToken(chainId, token, chainConfig!.environment!.pmmDst!, context)
+      }
     }
     return Promise.resolve();
   }

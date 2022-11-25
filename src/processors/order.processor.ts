@@ -2,8 +2,6 @@ import { Logger } from "pino";
 
 import { ExecutorConfig } from "../config";
 import { ProviderAdapter } from "../providers/provider.adapter";
-import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
-import { approve, isApproved } from "./utils/approve";
 import { ChainId, OrderData, PMMClient } from "@debridge-finance/dln-client";
 
 export class OrderProcessorContext {
@@ -35,19 +33,4 @@ export abstract class OrderProcessor {
     executorConfig: ExecutorConfig,
     context: OrderProcessorContext
   ): Promise<void>;
-
-  protected async approveToken(tokenAddress: string, contractAddress: string): Promise<void> {
-    if (this.chainId === ChainId.Solana) return Promise.resolve();
-    const { connection } = this.context.providers.get(this.chainId) as EvmAdapterProvider;
-    const tokenIsApproved = await isApproved(connection, tokenAddress, contractAddress);
-    if (!tokenIsApproved) {
-      this.context.logger.debug(`Token ${tokenAddress} approving is started`);
-      await approve(connection, tokenAddress, contractAddress);
-      this.context.logger.debug(`Token ${tokenAddress} approving is finished`);
-    } else {
-      this.context.logger.debug(`Token ${tokenAddress} is approved`);
-    }
-
-    return Promise.resolve();
-  }
 }

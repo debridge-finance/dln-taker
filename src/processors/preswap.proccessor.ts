@@ -9,6 +9,7 @@ import { MarketMakerExecutorError, MarketMakerExecutorErrorType } from "../error
 import { OrderProcessor, OrderProcessorContext, OrderProcessorInitContext } from "./order.processor";
 import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
+import { approveToken } from "./utils/approve";
 
 export class PreswapProcessor extends OrderProcessor {
 
@@ -22,7 +23,7 @@ export class PreswapProcessor extends OrderProcessor {
     this.context = context;
     const chainConfig = context.executorConfig.chains.find(chain => chain.chain === chainId);
     if (chainId !== ChainId.Solana) {
-      await this.approveToken(this.inputToken, chainConfig!.environment!.evm!.forwarderContract!);
+      await approveToken(chainId, this.inputToken, chainConfig!.environment!.evm!.forwarderContract!, context);
     }
     return Promise.resolve();
   }
