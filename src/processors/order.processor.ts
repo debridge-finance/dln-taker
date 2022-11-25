@@ -17,6 +17,7 @@ export class OrderProcessorContext {
 export class OrderProcessorInitContext {
   providers: Map<ChainId, ProviderAdapter>;
   executorConfig: ExecutorConfig;
+  logger: Logger;
 }
 
 /**
@@ -40,7 +41,11 @@ export abstract class OrderProcessor {
     const { connection } = this.context.providers.get(this.chainId) as EvmAdapterProvider;
     const tokenIsApproved = await isApproved(connection, tokenAddress, contractAddress);
     if (!tokenIsApproved) {
+      this.context.logger.debug(`Token ${tokenAddress} approving is started`);
       await approve(connection, tokenAddress, contractAddress);
+      this.context.logger.debug(`Token ${tokenAddress} approving is finished`);
+    } else {
+      this.context.logger.debug(`Token ${tokenAddress} is approved`);
     }
 
     return Promise.resolve();

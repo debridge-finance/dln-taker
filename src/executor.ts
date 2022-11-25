@@ -32,6 +32,8 @@ export class Executor {
 
   async init() {
     if (this.isInitialized) return;
+    this.configureProvidersMap();
+
     const clients: { [key in ChainId]: Solana.PmmClient | Evm.PmmEvmClient } = {} as any;
     const evmAddresses: { [key in ChainId]: any } = {} as any;
     const chains = await Promise.all(
@@ -93,6 +95,7 @@ export class Executor {
         await chain.orderProcessor!.init(chain.chain, {
           executorConfig: this.config,
           providers: this.providersForFulfill,
+          logger: this.logger,
         });
 
         return chainId;
@@ -124,8 +127,6 @@ export class Executor {
     orderFeed.setLogger(this.logger);
     await orderFeed.init();
     this.orderFeed = orderFeed;
-
-    this.configureProvidersMap();
 
     this.isInitialized = true;
   }
