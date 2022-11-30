@@ -14,7 +14,7 @@ export class EvmAdapterProvider implements ProviderAdapter {
     const tx = data as { data: string; to: string; value: number };
     const gasLimit = await this.connection.eth.estimateGas(tx);
     let gasPrice = await this.connection.eth.getGasPrice();
-    const transactionHash = new Promise((resolve, reject) => {
+    const transactionHash = await new Promise((resolve, reject) => {
       this.connection.eth.sendTransaction({
         ...tx,
         from: this.connection.eth.defaultAccount!,
