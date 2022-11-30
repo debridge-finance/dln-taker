@@ -199,12 +199,14 @@ export class Executor {
             client: this.pmmClient,
             logger,
             providers: this.providersForUnlock,
+            orderId: nextOrderInfo.orderId,
           }) as Promise<boolean>;
         } else {
           return validator(order, this.config, {
             client: this.pmmClient,
             logger,
             providers: this.providersForUnlock,
+            orderId: nextOrderInfo.orderId,
           }) as Promise<boolean>;
         }
       }) || []

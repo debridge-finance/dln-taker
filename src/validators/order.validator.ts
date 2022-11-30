@@ -9,6 +9,7 @@ export interface ValidatorContext {
   logger: Logger;
   client: PMMClient;
   providers: Map<ChainId, ProviderAdapter>;
+  orderId: string;
 }
 
 /**
