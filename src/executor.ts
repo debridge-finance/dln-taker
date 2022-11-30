@@ -94,7 +94,8 @@ export class Executor {
 
         await chain.orderProcessor!.init(chain.chain, {
           executorConfig: this.config,
-          providers: this.providersForFulfill,
+          providersForFulfill: this.providersForFulfill,
+          providersForUnlock: this.providersForUnlock,
           logger: this.logger,
         });
 

@@ -62,7 +62,7 @@ export const isApproved = async (
 
 export const approveToken = async (chainId: ChainId, tokenAddress: string, contractAddress: string, context: OrderProcessorInitContext): Promise<void> => {
   if (chainId === ChainId.Solana) return Promise.resolve();
-  const { connection } = context.providers.get(chainId) as EvmAdapterProvider;
+  const { connection } = context.providersForFulfill.get(chainId) as EvmAdapterProvider;
   const tokenIsApproved = await isApproved(connection, tokenAddress, contractAddress);
   if (!tokenIsApproved) {
     context.logger.debug(`Token ${tokenAddress} approving is started`);
