@@ -29,7 +29,7 @@ export class WhiteListedTakeToken extends OrderValidatorInterface {
 
   validate(order: OrderData, config: ExecutorConfig, context: ValidatorContext): Promise<boolean> {
     const logger = context.logger.child({ validator: "WhiteListedTakeToken" });
-    const result = this.addressesBuffer.some(address => buffersAreEqual(order.take.tokenAddress, address))
+    const result = this.addressesBuffer.some(address => buffersAreEqual(order.take.tokenAddress, address));
 
     const takeToken = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
     logger.info(`approve status: ${result}, takeToken ${takeToken}`);

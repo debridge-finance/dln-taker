@@ -29,7 +29,7 @@ export class WhiteListedGiveToken extends OrderValidatorInterface {
 
   validate(order: OrderData, config: ExecutorConfig, context: ValidatorContext): Promise<boolean> {
     const logger = context.logger.child({ validator: "WhiteListedGiveToken" });
-    const result = this.addressesBuffer.some(address => buffersAreEqual(order.give.tokenAddress, address))
+    const result = this.addressesBuffer.some(address => buffersAreEqual(order.give.tokenAddress, address));
 
     const giveToken = helpers.bufferToHex(Buffer.from(order.give.tokenAddress));
     logger.info(`approve status: ${result}, giveToken ${giveToken}`);

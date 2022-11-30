@@ -30,7 +30,7 @@ class WhitelistedReceiver extends OrderValidatorInterface {
 
   validate(order: OrderData, config: ExecutorConfig, context: ValidatorContext): Promise<boolean> {
     const logger = context.logger.child({ validator: "WhiteListedReceiver" });
-    const result = this.addressesBuffer.some(address => buffersAreEqual(order.receiver, address))
+    const result = this.addressesBuffer.some(address => buffersAreEqual(order.receiver, address));
 
     const receiver = helpers.bufferToHex(Buffer.from(order.receiver));
     logger.info(`approve status: ${result}, receiver ${receiver}`);

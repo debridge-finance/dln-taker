@@ -29,7 +29,7 @@ export class WhiteListedMarker extends OrderValidatorInterface {
 
   validate(order: OrderData, config: ExecutorConfig, context: ValidatorContext): Promise<boolean> {
     const logger = context.logger.child({ validator: "WhiteListedMarker" });
-    const result = this.addressesBuffer.some(address => buffersAreEqual(order.maker, address))
+    const result = this.addressesBuffer.some(address => buffersAreEqual(order.maker, address));
 
     const maker = helpers.bufferToHex(Buffer.from(order.maker));
     logger.info(`approve status: ${result}, maker ${maker}`);
