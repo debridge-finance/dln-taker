@@ -3,7 +3,7 @@ import { blacklistedTakeToken } from "./black.listed.take.token";
 import { disableFulfill } from "./disable.fulfill";
 import { dstChainDefined } from "./dst.chain.defined";
 import { giveAmountUsdEquivalentBetween } from "./give.amount.usd.equivalent.between";
-import { giveStatusOrder } from "./give.status.order";
+import { giveOrderState } from "./giveOrderState";
 import { giveVsTakeUSDAmountsDifference } from "./giveVsTakeUSDAmountsDifference";
 import { OrderValidator } from "./order.validator";
 import { srcChainDefined } from "./src.chain.defined";
@@ -27,5 +27,5 @@ export {
   whitelistedMaker,
   whitelistedTakeToken,
   whitelistedReceiver,
-  giveStatusOrder,
+  giveOrderState,
 };

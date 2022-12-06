@@ -10,6 +10,7 @@ const config: ExecutorConfig = {
   validators: [
     validators.srcChainDefined(),
     validators.dstChainDefined(),
+    validators.giveOrderState(),
 
     validators.giveVsTakeUSDAmountsDifference(4 /*bps*/),
   ],
