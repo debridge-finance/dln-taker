@@ -1,4 +1,5 @@
 import {
+  calculateExpectedTakeAmount,
   calculateRecommendedTakeAmount,
   ChainId, optimisticSlippageBps,
   OrderData,
@@ -64,7 +65,7 @@ export class PreswapProcessor extends OrderProcessor {
     const giveWeb3 = context.providersForFulfill.get(order.give.chainId)!.connection as Web3;
     this.giveWeb3 = giveWeb3;
 
-    const { takeAmount: expectedTakeAmount } = await calculateRecommendedTakeAmount(order, {
+    const { takeAmount: expectedTakeAmount } = await calculateExpectedTakeAmount(order, {
       client: context.client,
       giveConnection: this.giveWeb3,
       takeConnection: this.takeWeb3,
