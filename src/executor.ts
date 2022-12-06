@@ -24,6 +24,8 @@ export class Executor {
   private providersForUnlock = new Map<ChainId, ProviderAdapter>();
   private providersForFulfill = new Map<ChainId, ProviderAdapter>();
 
+  private readonly url1Inch = 'https://nodes.debridge.finance';
+
   constructor(
     private readonly config: ExecutorConfig,
     private readonly orderFulfilledMap: Map<string, boolean>,
@@ -117,7 +119,7 @@ export class Executor {
     }
 
     if (!this.config.swapConnector) {
-      this.config.swapConnector = new OneInchConnector();
+      this.config.swapConnector = new OneInchConnector(this.url1Inch, clients[ChainId.Solana] as Solana.PmmClient);
     }
 
     let orderFeed = this.config.orderFeed;

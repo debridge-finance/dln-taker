@@ -1,5 +1,4 @@
 import { OrderProcessor } from "./order.processor";
-import { preswapProcessor } from "./preswap.proccessor";
-import { strictProcessor } from "./strict.processor";
+import { processor } from "./processor";
 
-export { OrderProcessor, preswapProcessor, strictProcessor };
+export { OrderProcessor, processor };

@@ -1,9 +1,10 @@
 import {
-  ChainId,
+  calculateRecommendedTakeAmount,
+  ChainId, optimisticSlippageBps,
   OrderData,
   PMMClient,
   PriceTokenService,
-  SwapConnector
+  SwapConnector, tokenAddressToString, TokensBucket
 } from "@debridge-finance/dln-client";
 import Web3 from "web3";
 
@@ -15,6 +16,7 @@ import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { approveToken } from "./utils/approve";
 import {Logger} from "pino";
 import {ProviderAdapter} from "../providers/provider.adapter";
+import BigNumber from "bignumber.js";
 
 export class PreswapProcessor extends OrderProcessor {
 
@@ -23,8 +25,13 @@ export class PreswapProcessor extends OrderProcessor {
   private takeProviderUnlock?: ProviderAdapter;
   private takeProviderFulfill?: ProviderAdapter;
 
-  constructor(private readonly inputToken: string,
-              private readonly slippage: number = 3) {
+  private giveWeb3: Web3;
+
+  private reservedToken: Uint8Array;
+
+  private bucketToken: TokensBucket;
+
+  constructor(private readonly minProfitabilityBps: number,) {
     super();
   }
 
@@ -32,9 +39,11 @@ export class PreswapProcessor extends OrderProcessor {
     this.chainId = chainId;
     this.context = context;
     const chainConfig = context.executorConfig.chains.find(chain => chain.chain === chainId);
+    const token = tokenAddressToString(this.chainId, chainConfig!.bucket.findFirstToken(this.chainId)!);
     if (chainId !== ChainId.Solana) {
-      await approveToken(chainId, this.inputToken, chainConfig!.environment!.evm!.forwarderContract!, context);
+      await approveToken(chainId, token, chainConfig!.environment!.evm!.forwarderContract!, context);
     }
+    this.reservedToken = chainConfig!.bucket.findFirstToken(this.chainId)!;
 
     this.swapConnector = context.executorConfig.swapConnector;
     this.priceTokenService = context.executorConfig.tokenPriceService;
@@ -48,14 +57,35 @@ export class PreswapProcessor extends OrderProcessor {
   async process(orderId: string, order: OrderData, executorConfig: ExecutorConfig, context: OrderProcessorContext): Promise<void> {
     const logger = context.logger.child({ processor: "preswapProcessor" });
 
+    if (!this.bucketToken.isOneOf(order.give.chainId, order.give.tokenAddress)) {
+      return ;//todo
+    }
+
     const giveWeb3 = context.providersForFulfill.get(order.give.chainId)!.connection as Web3;
+    this.giveWeb3 = giveWeb3;
+
+    const { takeAmount: expectedTakeAmount } = await calculateRecommendedTakeAmount(order, {
+      client: context.client,
+      giveConnection: this.giveWeb3,
+      takeConnection: this.takeWeb3,
+      priceTokenService: this.priceTokenService!,
+      buckets: [this.bucketToken],
+      swapConnector: this.swapConnector!,
+    }, true);
+
+    const takeAmount = new BigNumber(order.take.amount.toString());
+    const profit = new BigNumber(expectedTakeAmount).minus(takeAmount);
+    const minProfitAmount = takeAmount.multipliedBy(this.minProfitabilityBps).div(10_000);
+    if (profit.lt(minProfitAmount)) {
+      return ;//todo
+    }
 
     const fees = await this.getFee(order, executorConfig.tokenPriceService!, context.client, giveWeb3, logger);
     const executionFeeAmount = await context.client.getAmountToSend(order.take.chainId, order.give.chainId, fees.executionFees.total, this.takeWeb3!);
     logger.debug(`executionFeeAmount=${JSON.stringify(executionFeeAmount)}`);
 
     //fulfill order
-    const fulfillTx= await this.createOrderFullfillTx(orderId, order, context.client, logger);
+    const fulfillTx = await this.createOrderFullfillTx(orderId, order, expectedTakeAmount, context.client, logger);
     if (context.orderFulfilledMap.has(orderId)) {
       context.orderFulfilledMap.delete(orderId);
       logger.error(`transaction is fulfilled`);
@@ -75,12 +105,12 @@ export class PreswapProcessor extends OrderProcessor {
 
     const beneficiary = executorConfig.chains.find((chain) => chain.chain === order.give.chainId)!.beneficiary;
 
-    const unlockTx = await this.createOrderUnlockTx(order, beneficiary, executionFeeAmount, fees, context.client, logger);
+    const unlockTx = await this.createOrderUnlockTx(orderId, order, beneficiary, executionFeeAmount, fees, context.client, logger);
     const txUnlock = await this.takeProviderUnlock!.sendTransaction(unlockTx, { logger });
     logger.info(`unlock transaction ${txUnlock} is completed`);
   }
 
-  private async createOrderUnlockTx(order: OrderData, beneficiary: string, executionFeeAmount: bigint, fees: any, client: PMMClient, logger: Logger) { //todo fix any
+  private async createOrderUnlockTx(orderId: string, order: OrderData, beneficiary: string, executionFeeAmount: bigint, fees: any, client: PMMClient, logger: Logger) { //todo fix any
     let unlockTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
       const wallet = (this.takeProviderUnlock as SolanaProviderAdapter).wallet.publicKey;
@@ -105,6 +135,7 @@ export class PreswapProcessor extends OrderProcessor {
     }
     const unlockTx = await client.sendUnlockOrder<ChainId.Solana>(
       order,
+      orderId,
       beneficiary,
       executionFeeAmount,
       unlockTxPayload
@@ -114,7 +145,7 @@ export class PreswapProcessor extends OrderProcessor {
     return unlockTx;
   }
 
-  private async createOrderFullfillTx(orderId: string, order: OrderData, client: PMMClient, logger: Logger) {
+  private async createOrderFullfillTx(orderId: string, order: OrderData, reservedAmount: string, client: PMMClient, logger: Logger) {
     let fullFillTxPayload;
     if (order.take.chainId === ChainId.Solana) {
       const wallet = (this.takeProviderFulfill as SolanaProviderAdapter).wallet.publicKey;
@@ -122,27 +153,25 @@ export class PreswapProcessor extends OrderProcessor {
         taker: wallet,
       };
     } else {
+
       fullFillTxPayload = {
         web3: this.takeWeb3,
-        fulfillAmount: Number(order.take.amount),
         permit: "0x",
-        slippage: this.slippage,
+        slippage: optimisticSlippageBps() / 10_000,
         swapConnector: this.swapConnector!,
         takerAddress: this.takeProviderFulfill!.address,
         priceTokenService: this.priceTokenService!,
         unlockAuthority: this.takeProviderUnlock!.address,
+        reservedAmount
       };
     }
-    const fulfillTx = await client.preswapAndFulfillOrder(order, orderId, this.inputToken, fullFillTxPayload);
+    const fulfillTx = await client.preswapAndFulfillOrder(order, orderId, this.reservedToken, fullFillTxPayload);
     logger.debug(`fulfillTx is created in ${order.take.chainId} ${JSON.stringify(fulfillTx)}`);
 
     return fulfillTx;
   }
 }
 
-export const preswapProcessor = (
-  inputToken: string,
-  slippage: number = 3
-): OrderProcessor => {
-  return new PreswapProcessor(inputToken, slippage);
+export const processor = (minProfitabilityBps: number): OrderProcessor => {
+  return new PreswapProcessor(minProfitabilityBps);
 };

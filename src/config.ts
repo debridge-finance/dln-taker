@@ -2,6 +2,7 @@ import {
   ChainId,
   PriceTokenService,
   SwapConnector,
+  TokensBucket,
 } from "@debridge-finance/dln-client";
 
 import { GetNextOrder } from "./interfaces";
@@ -133,6 +134,8 @@ export interface ChainConfig {
    * Defines an order processor that implements the fulfillment strategy
    */
   orderProcessor?: OrderProcessor;
+
+  bucket: TokensBucket;
 }
 
 export interface ExecutorConfig {

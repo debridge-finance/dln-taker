@@ -1,88 +1,111 @@
-import { ChainId, SwapConnector } from "@debridge-finance/dln-client";
-import axios from "axios";
-import logger from "loglevel";
+import axios from 'axios';
+import {
+  ChainId,
+  Solana,
+  SwapConnector,
+  tokenAddressToString,
+} from '@debridge-finance/dln-client';
+import { PublicKey } from '@solana/web3.js';
 
 export class OneInchConnector implements SwapConnector {
   constructor(
-    private readonly apiServerOneInch: string = "https://nodes.debridge.finance"
+    private readonly apiServerOneInch: string,
+    private readonly solanaClient: Solana.PmmClient,
   ) {}
 
   async getSwap(request: {
     chainId: ChainId;
-    fromTokenAddress: string;
-    toTokenAddress: string;
+    fromTokenAddress: Uint8Array;
+    toTokenAddress: Uint8Array;
     amount: string;
-    fromAddress: string;
-    destReceiver: string;
+    fromAddress: Uint8Array;
+    destReceiver: Uint8Array;
     slippage: number;
   }): Promise<{ data: string; to: string; value: string }> {
-    const fromTokenAddress = this.fixAddress(request.fromTokenAddress);
-    const toTokenAddress = this.fixAddress(request.toTokenAddress);
+    if (request.chainId === ChainId.Solana) {
+      throw new Error('Not implemented');
+    }
+    const fromTokenAddress = this.fix1inchNativeAddress(
+      request.chainId,
+      request.fromTokenAddress,
+    );
+    const toTokenAddress = this.fix1inchNativeAddress(
+      request.chainId,
+      request.toTokenAddress,
+    );
 
     const query = new URLSearchParams({
       fromTokenAddress,
       toTokenAddress,
       amount: request.amount.toString(),
-      fromAddress: request.fromAddress.toString(),
-      destReceiver: request.destReceiver.toString(),
+      fromAddress: tokenAddressToString(request.chainId, request.fromAddress),
+      destReceiver: tokenAddressToString(request.chainId, request.destReceiver),
       slippage: request.slippage.toString(),
-      disableEstimate: "true",
+      disableEstimate: 'true',
     });
     const url = `${this.apiServerOneInch}/v4.0/${
       request.chainId
     }/swap?${query.toString()}`;
 
-    logger.log(`OneInchConnector getSwap url ${url}`);
+    console.log(url);
 
-    try {
-      const response = await axios.get(url);
-      logger.log(
-        `OneInchConnector getSwap response ${JSON.stringify(response.data)}`
-      );
+    const response = await axios.get(url);
 
-      return {
-        data: response.data.tx.data,
-        to: response.data.tx.to,
-        value: response.data.tx.value,
-      };
-    } catch (e) {
-      logger.log(`OneInchConnector getSwap error ${e}`);
-      throw e;
+    return {
+      data: response.data.tx.data,
+      to: response.data.tx.to,
+      value: response.data.tx.value,
+    };
+  }
+
+  private fix1inchNativeAddress(chainId: ChainId, token: Uint8Array) {
+    let address = tokenAddressToString(chainId, token);
+    if (address === '0x0000000000000000000000000000000000000000') {
+      address = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
     }
+    return address;
   }
 
   async getEstimate(request: {
     chainId: ChainId;
-    fromTokenAddress: string;
-    toTokenAddress: string;
+    fromTokenAddress: Uint8Array;
+    toTokenAddress: Uint8Array;
     amount: string;
+    slippage?: number;
   }): Promise<string> {
-    const fromTokenAddress = this.fixAddress(request.fromTokenAddress);
-    const toTokenAddress = this.fixAddress(request.toTokenAddress);
+    if (request.chainId === ChainId.Solana) {
+      const stableCoinMint = new PublicKey(request.toTokenAddress);
+      const router = await this.solanaClient.jupiter!.findExactInRoutes(
+        new PublicKey(request.fromTokenAddress),
+        stableCoinMint,
+        BigInt(request.amount),
+        request.slippage! * 100,
+      );
+      return router!.outAmount.toString();
+    }
+
+    const fromTokenAddress = this.fix1inchNativeAddress(
+      request.chainId,
+      request.fromTokenAddress,
+    );
+    const toTokenAddress = this.fix1inchNativeAddress(
+      request.chainId,
+      request.toTokenAddress,
+    );
 
     const query = new URLSearchParams({
       fromTokenAddress,
       toTokenAddress,
       amount: request.amount.toString(),
     });
-
     const url = `${this.apiServerOneInch}/v4.0/${
       request.chainId
     }/quote?${query.toString()}`;
 
-    logger.log(`OneInchConnector getEstimate url ${url}`);
+    console.log(url);
 
     const response = await axios.get(url);
 
     return response.data.toTokenAmount;
-  }
-
-  private fixAddress(address: string) {
-    if (
-      address === "0x0000000000000000000000000000000000000000"
-    ) {
-      return "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-    }
-    return address;
   }
 }
