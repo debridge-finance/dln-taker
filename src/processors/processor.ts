@@ -65,7 +65,7 @@ export class PreswapProcessor extends OrderProcessor {
     const giveWeb3 = context.providersForFulfill.get(order.give.chainId)!.connection as Web3;
     this.giveWeb3 = giveWeb3;
 
-    const { takeAmount: expectedTakeAmount } = await calculateExpectedTakeAmount(order, {
+    const { takeAmount: expectedTakeAmount, reserveAmountDst } = await calculateExpectedTakeAmount(order,  this.minProfitabilityBps,{
       client: context.client,
       giveConnection: this.giveWeb3,
       takeConnection: this.takeWeb3,
@@ -74,10 +74,7 @@ export class PreswapProcessor extends OrderProcessor {
       swapConnector: this.swapConnector!,
     }, true);
 
-    const takeAmount = new BigNumber(order.take.amount.toString());
-    const profit = new BigNumber(expectedTakeAmount).minus(takeAmount);
-    const minProfitAmount = takeAmount.multipliedBy(this.minProfitabilityBps).div(10_000);
-    if (profit.lt(minProfitAmount)) {
+    if (new BigNumber(expectedTakeAmount).lt(order.take.amount.toString())) {
       return ;//todo
     }
 
@@ -86,7 +83,7 @@ export class PreswapProcessor extends OrderProcessor {
     logger.debug(`executionFeeAmount=${JSON.stringify(executionFeeAmount)}`);
 
     //fulfill order
-    const fulfillTx = await this.createOrderFullfillTx(orderId, order, expectedTakeAmount, context.client, logger);
+    const fulfillTx = await this.createOrderFullfillTx(orderId, order, reserveAmountDst, context.client, logger);
     if (context.orderFulfilledMap.has(orderId)) {
       context.orderFulfilledMap.delete(orderId);
       logger.error(`transaction is fulfilled`);
