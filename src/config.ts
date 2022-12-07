@@ -134,8 +134,6 @@ export interface ChainConfig {
    * Defines an order processor that implements the fulfillment strategy
    */
   orderProcessor?: OrderProcessor;
-
-  bucket: TokensBucket;
 }
 
 export interface ExecutorConfig {
@@ -167,4 +165,6 @@ export interface ExecutorConfig {
   orderProcessor?: OrderProcessor;
 
   chains: ChainConfig[];
+
+  bucket: TokensBucket;
 }

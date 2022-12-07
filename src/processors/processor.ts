@@ -40,11 +40,11 @@ export class PreswapProcessor extends OrderProcessor {
     this.chainId = chainId;
     this.context = context;
     const chainConfig = context.executorConfig.chains.find(chain => chain.chain === chainId);
-    const token = tokenAddressToString(this.chainId, chainConfig!.bucket.findFirstToken(this.chainId)!);
+    const token = tokenAddressToString(this.chainId, context.executorConfig!.bucket.findFirstToken(this.chainId)!);
     if (chainId !== ChainId.Solana) {
       await approveToken(chainId, token, chainConfig!.environment!.evm!.forwarderContract!, context);
     }
-    this.reservedToken = chainConfig!.bucket.findFirstToken(this.chainId)!;
+    this.reservedToken = context.executorConfig!.bucket.findFirstToken(this.chainId)!;
 
     this.swapConnector = context.executorConfig.swapConnector;
     this.priceTokenService = context.executorConfig.tokenPriceService;
