@@ -1,4 +1,4 @@
-import { ChainId } from "@debridge-finance/dln-client";
+import { ChainId, TokensBucket } from "@debridge-finance/dln-client";
 import { ExecutorConfig } from "./src/config";
 import * as validators from "./src/validators";
 import * as processors from "./src/processors";
@@ -10,8 +10,18 @@ const config: ExecutorConfig = {
   validators: [
     validators.srcChainDefined(),
     validators.dstChainDefined(),
+  ],
 
-    validators.giveVsTakeUSDAmountsDifference(4 /*bps*/),
+  buckets: [
+    new TokensBucket({
+      [ChainId.Avalanche]: ['0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E'],
+      [ChainId.Arbitrum]: ['0xff970a61a04b1ca14834a43f5de4533ebddb5cc8'],
+      [ChainId.BSC]: ['0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d'],
+      [ChainId.Fantom]: ['0x04068da6c83afcfa0e13ba15a6696662335d5b75'],
+      [ChainId.Ethereum]: ['0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'],
+      [ChainId.Polygon]: ['0x2791bca1f2de4661ed88a30c99a7a9449aa84174'],
+      [ChainId.Solana]: ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
+    })
   ],
 
   chains: [
@@ -35,10 +45,7 @@ const config: ExecutorConfig = {
       srcValidators: [],
       dstValidators: [],
 
-      // Use "11111111111111111111111111111111" as native SOL address
-      orderProcessor: processors.preswapProcessor(
-        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-      ),
+      orderProcessor: processors.processor(4),
     },
 
     {
@@ -53,11 +60,7 @@ const config: ExecutorConfig = {
       srcValidators: [],
       dstValidators: [],
 
-      // Use "0x0000000000000000000000000000000000000000" as native ETH token
-      // if you hold reserves in ETH
-      orderProcessor: processors.preswapProcessor(
-        "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // USDC
-      ),
+      orderProcessor: processors.processor(4),
     },
 
     {
@@ -72,11 +75,7 @@ const config: ExecutorConfig = {
       srcValidators: [],
       dstValidators: [],
 
-      // Use "0x0000000000000000000000000000000000000000" as native ETH token
-      // if you hold reserves in ETH
-      orderProcessor: processors.preswapProcessor(
-        "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", // BUSD
-      ),
+      orderProcessor: processors.processor(4),
     },
   ],
 };

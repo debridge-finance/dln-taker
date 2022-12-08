@@ -30,7 +30,7 @@ export const giveAmountUsdEquivalentBetween = (
     logger.debug(`giveAddress=${giveAddress}`);
 
     const [givePrice, giveDecimals] = await Promise.all([
-      config.tokenPriceService!.getPrice(order.give.chainId, giveAddress),
+      config.tokenPriceService!.getPrice(order.give.chainId, order.give.tokenAddress),
       context.client.getDecimals(
         order.give.chainId,
         order.give.tokenAddress,

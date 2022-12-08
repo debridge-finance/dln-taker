@@ -165,5 +165,5 @@ export interface ExecutorConfig {
 
   chains: ChainConfig[];
 
-  bucket: TokensBucket;
+  buckets: TokensBucket[];
 }

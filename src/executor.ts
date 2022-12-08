@@ -96,13 +96,6 @@ export class Executor {
           return (validator as OrderValidatorInterface).init(chainId);
         }));
 
-        await chain.orderProcessor!.init(chain.chain, {
-          executorConfig: this.config,
-          providersForFulfill: this.providersForFulfill,
-          providersForUnlock: this.providersForUnlock,
-          logger: this.logger,
-        });
-
         return chainId;
       })
     );
@@ -132,6 +125,18 @@ export class Executor {
     orderFeed.setLogger(this.logger);
     await orderFeed.init();
     this.orderFeed = orderFeed;
+
+    // init processors finally
+    await Promise.all(
+      this.config.chains.map(async (chain) => {
+        return chain.orderProcessor!.init(chain.chain, {
+          executorConfig: this.config,
+          providersForFulfill: this.providersForFulfill,
+          providersForUnlock: this.providersForUnlock,
+          logger: this.logger,
+        });
+      })
+    )
 
     this.isInitialized = true;
   }

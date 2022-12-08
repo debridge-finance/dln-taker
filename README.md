@@ -168,7 +168,7 @@ Validators can be set globally using the `orderValidators` property, which means
 ```ts
 const config: ExecutorConfig = {
     validators: [
-        validators.giveVsTakeUSDAmountsDifference(4 /*bps*/),
+        validators.takeAmountUsdEquivalentBetween(0, 10_000),
         // ...
     ],
 }
@@ -246,21 +246,6 @@ const config: ExecutorConfig = {
         },
     ]
 }
-```
-
-#### `giveVsTakeUSDAmountsDifference(differenceBps: number)`
-
-Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is the given [basis points](https://en.wikipedia.org/wiki/Basis_point) more than the USD equivalent of the order requested amount.
-
-For example, assume a user places an order giving 1 ETH (≈$1500) and requesting 4.95 BNB (≈$1485). Such order has profitability of 5 bps (0.05%), so it will be approved by the validator setting of `profitabilityBps`=4 and won't be approved by the validator setting of `profitabilityBps`=6.
-
-We suggest keeping the profitability of 4 bps:
-
-```ts
-validators: [
-    // accept orders with 0.04% margin
-    giveVsTakeUSDAmountsDifference(4 /*bps*/),
-],
 ```
 
 #### `giveAmountUSDEquivalentBetween(minUSDEquivalent: number, maxUSDEquivalent: number)`
@@ -378,53 +363,11 @@ const config: ExecutorConfig = {
             chain: ChainId.BSC,
 
             // explicitly use preswapProcessor for BNB chain
-            orderProcessor: processors.preswapProcessor(BNB_RESERVES_TOKEN_ADDRESS)
+            orderProcessor: processors.processor(4 /*bps*/)
         },
     ]
 }
 ```
-
-Each processor accepts one (or multiple) token addresses which are known as *taker reserves* — funds available at the address represented by the `takerPrivateKey` property that are used to fulfill incoming orders. For example, a taker may hold $1mln BUSD on the BNB Chain and $1mln USDC on the Solana chain: by setting these addresses' private keys to respectful `takerPrivateKey` props and providing these tokens' addresses to the order processor, the engine will be able to execute orders using these funds for order fulfillment.
-
-#### Note on EVM approvals
-
-Due to the nature of EVM smart contracts, token transfers are performed via setting respectful allowance on the token contract and then calling the contract whom the allowance has been given to. In our case, before order processors can call DLN contracts to fulfill new orders, the token holder (represented by the `takerPrivateKey` property) must give enough allowance to allow two DLN contracts (`DlnDestination` and `CrosschainForwarder`) to spent reserve tokens on its behalf.
-
-Currently, order processors does not set allowance automatically, so before you start please set infinite allowances for every reserve token to two smart contracts (represented by `environment.pmmDst` and `environment.evm.forwarderContract` configuration properties) per each supported EVM chain.
-
-Next versions of order processor will handle this case implicitly during initialization.
-
-#### `strictProcessor(approvedTokens: string[])` (default)
-
-A very basic processor attempts to fulfill orders that request tokens presented on the taker's `wallet`. For example, if the taker's `wallet` have only ETH and USDT on the given chain, this processor will attempt to fulfill only those orders that request ETH and USDT, skipping orders that request other tokens (say, USDC).
-
-This processor accepts the list of reserve tokens you are willing to use for order fulfillment. For example, the following configuration will execute orders which request either ETH or USDT:
-
-```ts
-orderProcessor: processors.strictProcessor([
-    '0x0000000000000000000000000000000000000000', // ETH
-    '0xdAC17F958D2ee523a2206206994597C13D831ec7' // USDT
-]),
-```
-
-This processor will set an infinite allowance to the DLN smart contract on first launch to speed up fulfillments.
-
-#### `preswapProcessor(approvedToken: string)`
-
-This processor attempts to fulfill orders making an atomic swap of the minimum necessary amount of tokens being held on the taker's wallet (we call it *taker's reserve token*) to receive the amount of tokens requested by the order and attempt to fulfill the order in a single transaction.
-
-For example, the taker's `wallet` holds $100,000 USDC. Given the order which requests 1 ETH, the `preswapProcessor()` will craft a transaction which does the following atomically:
-1. swaps 1500 USDC to retrieve at least 1 ETH (excess remained will be refunded to the taker's `wallet`)
-2. fulfills the wallet supplying 1 ETH to cover the requested amount
-3. in case swap of fulfill fails, the whole transaction gets reverted.
-
-This processor accepts a token address you are willing to use for order fulfillment. For example, the following configuration will execute orders using USDT as a reserve address, swapping it to the requested token when necessary:
-
-```ts
-orderProcessor: processors.preswapProcessor('0xdAC17F958D2ee523a2206206994597C13D831ec7'), // USDT
-```
-
-This processor will set an infinite allowance to the DLN smart contract on first launch to speed up fulfillments.
 
 ### Supported chains
 
@@ -543,7 +486,6 @@ By default, DLN executor prints summary logs to the stdout, indicating the summa
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Received, give 1500000000000000000000 of 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56 on chain=56, take 1485000000 of 0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174 on chain=137
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator srcChainDefined: approved, chain=56 defined
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator dstChainDefined: approved, chain=137 defined
-[Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator giveVsTakeUSDAmountsDifference: approved, profitability 10bps of required 4bps: give $1500, take $1485
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator giveAmountUSDEquivalentBetween: approved, give amount ($1500) within range [$10, $100000]
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator takeAmountUSDEquivalentBetween: approved, take amount ($1485) within range [$10, $100000]
 [Order 4d51b661-a05f-49d5-a2ea-699222deefbd] Validator whitelistedGiveToken: approved, give token 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56 is in the white list
