@@ -57,7 +57,7 @@ export class SwapConnectorImpl implements SwapConnector {
           BigInt(request.amount),
           slippage * 100,
         )
-      )!.inAmount.toString();
+      )!.outAmount.toString();
     } else {
       return this.oneInchConnector.getEstimate(request);
     }
