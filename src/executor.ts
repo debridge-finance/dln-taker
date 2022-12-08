@@ -15,6 +15,8 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { OrderValidatorInterface } from "./validators/order.validator.interface";
 import { EvmRebroadcastAdapterProviderAdapter } from "./providers/evm.rebroadcast.adapter.provider.adapter";
 import bs58 from "bs58";
+import { SwapConnectorImpl } from "./swapConnector/swap.connector.impl";
+import { JupiterWrapper } from "./swapConnector/jupiter.wrapper";
 
 export class Executor {
   private isInitialized = false;
@@ -119,7 +121,7 @@ export class Executor {
     }
 
     if (!this.config.swapConnector) {
-      this.config.swapConnector = new OneInchConnector(this.url1Inch, clients[ChainId.Solana] as Solana.PmmClient);
+      this.config.swapConnector = new SwapConnectorImpl(new OneInchConnector(this.url1Inch), new JupiterWrapper());
     }
 
     let orderFeed = this.config.orderFeed;

@@ -1,30 +1,18 @@
 import axios from 'axios';
-import {
-  ChainId,
-  Solana,
-  SwapConnector,
-  tokenAddressToString,
-} from '@debridge-finance/dln-client';
-import { PublicKey } from '@solana/web3.js';
+import { ChainId, tokenAddressToString } from '@debridge-finance/dln-client';
 
-export class OneInchConnector implements SwapConnector {
-  constructor(
-    private readonly apiServerOneInch: string,
-    private readonly solanaClient: Solana.PmmClient,
-  ) {}
+export class OneInchConnector {
+  constructor(private readonly apiServerOneInch: string) {}
 
   async getSwap(request: {
     chainId: ChainId;
     fromTokenAddress: Uint8Array;
     toTokenAddress: Uint8Array;
     amount: string;
-    fromAddress: Uint8Array;
-    destReceiver: Uint8Array;
-    slippage: number;
+    fromAddress: Uint8Array | undefined;
+    destReceiver: Uint8Array | undefined;
+    slippageBps: number;
   }): Promise<{ data: string; to: string; value: string }> {
-    if (request.chainId === ChainId.Solana) {
-      throw new Error('Not implemented');
-    }
     const fromTokenAddress = this.fix1inchNativeAddress(
       request.chainId,
       request.fromTokenAddress,
@@ -38,9 +26,9 @@ export class OneInchConnector implements SwapConnector {
       fromTokenAddress,
       toTokenAddress,
       amount: request.amount.toString(),
-      fromAddress: tokenAddressToString(request.chainId, request.fromAddress),
-      destReceiver: tokenAddressToString(request.chainId, request.destReceiver),
-      slippage: request.slippage.toString(),
+      fromAddress: tokenAddressToString(request.chainId, request.fromAddress!),
+      destReceiver: tokenAddressToString(request.chainId, request.destReceiver!),
+      slippage: (request.slippageBps / 10_000).toString(),
       disableEstimate: 'true',
     });
     const url = `${this.apiServerOneInch}/v4.0/${
@@ -71,19 +59,7 @@ export class OneInchConnector implements SwapConnector {
     fromTokenAddress: Uint8Array;
     toTokenAddress: Uint8Array;
     amount: string;
-    slippage?: number;
   }): Promise<string> {
-    if (request.chainId === ChainId.Solana) {
-      const stableCoinMint = new PublicKey(request.toTokenAddress);
-      const router = await this.solanaClient.jupiter!.findExactInRoutes(
-        new PublicKey(request.fromTokenAddress),
-        stableCoinMint,
-        BigInt(request.amount),
-        request.slippage! * 100,
-      );
-      return router!.outAmount.toString();
-    }
-
     const fromTokenAddress = this.fix1inchNativeAddress(
       request.chainId,
       request.fromTokenAddress,

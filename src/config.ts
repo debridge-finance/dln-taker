@@ -150,7 +150,6 @@ export interface ExecutorConfig {
 
   /**
    * Swap connector
-   * Default: OneInchConnector
    */
   swapConnector?: SwapConnector;
 

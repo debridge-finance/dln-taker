@@ -1,6 +1,5 @@
 import {
   calculateExpectedTakeAmount,
-  calculateRecommendedTakeAmount,
   ChainId, optimisticSlippageBps,
   OrderData,
   PMMClient,
@@ -65,10 +64,7 @@ export class PreswapProcessor extends OrderProcessor {
     const giveWeb3 = context.providersForFulfill.get(order.give.chainId)!.connection as Web3;
     this.giveWeb3 = giveWeb3;
 
-    const {
-      requiredReserveDstAmount,
-      isProfitable,
-    } = await calculateExpectedTakeAmount(order, optimisticSlippageBps(), this.minProfitabilityBps,{
+    const { profitableTakeAmount, requiredReserveDstAmount } = await calculateExpectedTakeAmount(order,  this.minProfitabilityBps,optimisticSlippageBps(),{
       client: context.client,
       giveConnection: this.giveWeb3,
       takeConnection: this.takeWeb3,
@@ -77,9 +73,8 @@ export class PreswapProcessor extends OrderProcessor {
       swapConnector: this.swapConnector!,
     });
 
-    if (!isProfitable) {
-      logger.info('order is not profitable, skipping');
-      return;//todo
+    if (new BigNumber(profitableTakeAmount).lt(order.take.amount.toString())) {
+      return ;//todo
     }
 
     const fees = await this.getFee(order, executorConfig.tokenPriceService!, context.client, giveWeb3, logger);
@@ -148,7 +143,7 @@ export class PreswapProcessor extends OrderProcessor {
   }
 
   private async createOrderFullfillTx(orderId: string, order: OrderData, reservedAmount: string, client: PMMClient, logger: Logger) {
-    let fullFillTxPayload;
+    let fullFillTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
       const wallet = (this.takeProviderFulfill as SolanaProviderAdapter).wallet.publicKey;
       fullFillTxPayload = {
@@ -159,14 +154,13 @@ export class PreswapProcessor extends OrderProcessor {
       fullFillTxPayload = {
         web3: this.takeWeb3,
         permit: "0x",
-        slippage: optimisticSlippageBps() / 10_000,
-        swapConnector: this.swapConnector!,
         takerAddress: this.takeProviderFulfill!.address,
-        priceTokenService: this.priceTokenService!,
         unlockAuthority: this.takeProviderUnlock!.address,
-        reservedAmount
       };
     }
+    fullFillTxPayload.swapConnector = this.swapConnector!;
+    fullFillTxPayload.reservedAmount = reservedAmount;
+    fullFillTxPayload.slippageBps = optimisticSlippageBps();
     const fulfillTx = await client.preswapAndFulfillOrder(order, orderId, this.reservedToken, fullFillTxPayload);
     logger.debug(`fulfillTx is created in ${order.take.chainId} ${JSON.stringify(fulfillTx)}`);
 
