@@ -65,17 +65,21 @@ export class PreswapProcessor extends OrderProcessor {
     const giveWeb3 = context.providersForFulfill.get(order.give.chainId)!.connection as Web3;
     this.giveWeb3 = giveWeb3;
 
-    const { takeAmount: expectedTakeAmount, reserveAmountDst } = await calculateExpectedTakeAmount(order,  this.minProfitabilityBps,{
+    const {
+      requiredReserveDstAmount,
+      isProfitable,
+    } = await calculateExpectedTakeAmount(order, optimisticSlippageBps(), this.minProfitabilityBps,{
       client: context.client,
       giveConnection: this.giveWeb3,
       takeConnection: this.takeWeb3,
       priceTokenService: this.priceTokenService!,
       buckets: [this.bucketToken],
       swapConnector: this.swapConnector!,
-    }, true);
+    });
 
-    if (new BigNumber(expectedTakeAmount).lt(order.take.amount.toString())) {
-      return ;//todo
+    if (!isProfitable) {
+      logger.info('order is not profitable, skipping');
+      return;//todo
     }
 
     const fees = await this.getFee(order, executorConfig.tokenPriceService!, context.client, giveWeb3, logger);
@@ -83,7 +87,7 @@ export class PreswapProcessor extends OrderProcessor {
     logger.debug(`executionFeeAmount=${JSON.stringify(executionFeeAmount)}`);
 
     //fulfill order
-    const fulfillTx = await this.createOrderFullfillTx(orderId, order, reserveAmountDst, context.client, logger);
+    const fulfillTx = await this.createOrderFullfillTx(orderId, order, requiredReserveDstAmount, context.client, logger);
     if (context.orderFulfilledMap.has(orderId)) {
       context.orderFulfilledMap.delete(orderId);
       logger.error(`transaction is fulfilled`);
