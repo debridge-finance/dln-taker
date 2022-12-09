@@ -44,7 +44,10 @@ export class PreswapProcessor extends OrderProcessor {
         })
       })
 
-      await Promise.all(tokens.map(token => approveToken(chainId, token, chainConfig!.environment!.evm!.forwarderContract!, context)))
+      await Promise.all([
+        ...tokens.map(token => approveToken(chainId, token, chainConfig!.environment!.evm!.forwarderContract!, context)),
+        ...tokens.map(token => approveToken(chainId, token, chainConfig!.environment!.pmmDst, context)),
+      ])
     }
 
     this.swapConnector = context.executorConfig.swapConnector;
