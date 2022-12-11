@@ -17,6 +17,7 @@ import { approveToken } from "./utils/approve";
 import {Logger} from "pino";
 import {ProviderAdapter} from "../providers/provider.adapter";
 import BigNumber from "bignumber.js";
+import {createClientLogger} from "../logger";
 
 export class PreswapProcessor extends OrderProcessor {
 
@@ -61,6 +62,7 @@ export class PreswapProcessor extends OrderProcessor {
 
   async process(orderId: string, order: OrderData, executorConfig: ExecutorConfig, context: OrderProcessorContext): Promise<void> {
     const logger = context.logger.child({ processor: "preswapProcessor" });
+    const clientLogger = createClientLogger(logger);
 
     const bucket = executorConfig.buckets.find((bucket) =>
       bucket.findFirstToken(order.give.chainId) !== undefined &&
@@ -85,6 +87,7 @@ export class PreswapProcessor extends OrderProcessor {
       priceTokenService: this.priceTokenService!,
       buckets: executorConfig.buckets,
       swapConnector: this.swapConnector!,
+      logger: clientLogger,
     });
 
     if (!isProfitable) {
@@ -145,6 +148,8 @@ export class PreswapProcessor extends OrderProcessor {
         ...rewards,
       };
     }
+    unlockTxPayload.loggerInstance = createClientLogger(logger);
+
     const unlockTx = await client.sendUnlockOrder<ChainId.Solana>(
       order,
       orderId,
@@ -176,6 +181,7 @@ export class PreswapProcessor extends OrderProcessor {
     fullFillTxPayload.swapConnector = this.swapConnector!;
     fullFillTxPayload.reservedAmount = reservedAmount;
     fullFillTxPayload.slippageBps = optimisticSlippageBps();
+    fullFillTxPayload.loggerInstance = createClientLogger(logger);
     const fulfillTx = await client.preswapAndFulfillOrder(order, orderId, reserveDstToken, fullFillTxPayload);
     logger.debug(`fulfillTx is created in ${order.take.chainId} ${JSON.stringify(fulfillTx)}`);
 

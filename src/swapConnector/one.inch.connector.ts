@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ChainId, tokenAddressToString } from '@debridge-finance/dln-client';
+import {ChainId, Logger, tokenAddressToString} from '@debridge-finance/dln-client';
 
 export class OneInchConnector {
   constructor(private readonly apiServerOneInch: string) {}
@@ -12,7 +12,7 @@ export class OneInchConnector {
     fromAddress: Uint8Array | undefined;
     destReceiver: Uint8Array | undefined;
     slippageBps: number;
-  }): Promise<{ data: string; to: string; value: string }> {
+  }, context?: { logger: Logger }): Promise<{ data: string; to: string; value: string }> {
     const fromTokenAddress = this.fix1inchNativeAddress(
       request.chainId,
       request.fromTokenAddress,
@@ -35,7 +35,7 @@ export class OneInchConnector {
       request.chainId
     }/swap?${query.toString()}`;
 
-    console.log(url);
+    context?.logger?.log(url);
 
     const response = await axios.get(url);
 
@@ -59,7 +59,7 @@ export class OneInchConnector {
     fromTokenAddress: Uint8Array;
     toTokenAddress: Uint8Array;
     amount: string;
-  }): Promise<string> {
+  }, context?: { logger: Logger }): Promise<string> {
     const fromTokenAddress = this.fix1inchNativeAddress(
       request.chainId,
       request.fromTokenAddress,
@@ -78,7 +78,7 @@ export class OneInchConnector {
       request.chainId
     }/quote?${query.toString()}`;
 
-    console.log(url);
+    context?.logger?.log(url);
 
     const response = await axios.get(url);
 

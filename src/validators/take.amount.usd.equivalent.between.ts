@@ -7,6 +7,7 @@ import { ExecutorConfig } from "../config";
 
 import { OrderValidator, ValidatorContext } from "./order.validator";
 import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
+import {createClientLogger} from "../logger";
 
 /**
  * Checks if the USD equivalent of the order's requested amount (amount that should be supplied to fulfill the order successfully) is in the given range. This validator is useful to filter off uncomfortable volumes, e.g. too low (e.g. less than $10) or too high (e.g., more than $100,000).
@@ -24,6 +25,7 @@ export const takeAmountUsdEquivalentBetween = (
     const logger = context.logger.child({
       validator: "takeAmountUsdEquivalentBetween",
     });
+    const clientLogger = createClientLogger(logger);
     let taleWeb3 = (context.providers.get(order.take.chainId) as EvmAdapterProvider).connection;
     const takeAddress = helpers.bufferToHex(
       Buffer.from(order.take.tokenAddress)
@@ -31,7 +33,7 @@ export const takeAmountUsdEquivalentBetween = (
     logger.debug(`takeAddress=${takeAddress}`);
 
     const [takePrice, takeDecimals] = await Promise.all([
-      config.tokenPriceService!.getPrice(order.take.chainId, order.take.tokenAddress),
+      config.tokenPriceService!.getPrice(order.take.chainId, order.take.tokenAddress, { logger: clientLogger }),
       context.client.getDecimals(
         order.take.chainId,
         order.take.tokenAddress,

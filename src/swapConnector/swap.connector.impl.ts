@@ -1,4 +1,4 @@
-import {ChainId, SwapConnector, SwapResponse } from '@debridge-finance/dln-client';
+import {ChainId, Logger, SwapConnector, SwapResponse} from '@debridge-finance/dln-client';
 import { PublicKey } from '@solana/web3.js';
 import { JupiterWrapper } from './jupiter.wrapper';
 import { OneInchConnector } from './one.inch.connector';
@@ -21,7 +21,7 @@ export class SwapConnectorImpl implements SwapConnector {
     fromAddress: Uint8Array | undefined;
     destReceiver: Uint8Array | undefined;
     slippageBps: number;
-  }): Promise<SwapResponse<Chain>> {
+  }, context?: { logger: Logger }): Promise<SwapResponse<Chain>> {
     let result: any
     if (request.chainId === ChainId.Solana) {
       const slippage = 1;
@@ -36,7 +36,7 @@ export class SwapConnectorImpl implements SwapConnector {
         route,
       } as SwapResponse<ChainId.Solana>;
     } else {
-      result = await this.oneInchConnector.getSwap(request);
+      result = await this.oneInchConnector.getSwap(request, context);
     }
     return result;
   }
@@ -46,7 +46,7 @@ export class SwapConnectorImpl implements SwapConnector {
     fromTokenAddress: Uint8Array;
     toTokenAddress: Uint8Array;
     amount: string;
-  }): Promise<string> {
+  }, context?: { logger: Logger }): Promise<string> {
     if (request.chainId === ChainId.Solana) {
       const slippage = 1;
       const stableCoinMint = new PublicKey(request.toTokenAddress);
@@ -59,7 +59,7 @@ export class SwapConnectorImpl implements SwapConnector {
         )
       )!.outAmount.toString();
     } else {
-      return this.oneInchConnector.getEstimate(request);
+      return this.oneInchConnector.getEstimate(request, context);
     }
   }
 }

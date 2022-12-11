@@ -3,6 +3,7 @@ import {
   ChainId,
   ClientError,
   ClientErrorType,
+  Logger,
   PriceTokenService,
   tokenAddressToString,
 } from '@debridge-finance/dln-client';
@@ -30,9 +31,9 @@ export class CoingeckoPriceFeed extends PriceTokenService {
     }
   }
 
-  async getPrice(chainId: ChainId, token?: Uint8Array | null): Promise<number> {
+  async getPrice(chainId: ChainId, token: Uint8Array | null, context?: { logger: Logger }): Promise<number> {
     if (!token) {
-      return this.getGasPrice(chainId);
+      return this.getGasPrice(chainId, context);
     }
     const coinGeckoChainId = this.getCoinGeckoChainId(chainId);
     const tokenAddress = tokenAddressToString(chainId, token);
@@ -51,24 +52,24 @@ export class CoingeckoPriceFeed extends PriceTokenService {
       this.endpointTokenPrice +
       coinGeckoChainId +
       `?contract_addresses=${tokenAddress}&vs_currencies=${this.currency}`;
-    console.log(`CoinGeckoPriceTokenService url ${url}`);
+    context?.logger?.verbose(`CoinGeckoPriceTokenService url ${url}`);
     const response = await axios.get(url + this.api_key);
-    console.log(
+    context?.logger?.verbose(
       `CoinGeckoPriceTokenService response ${JSON.stringify(response.data)}`,
     );
 
     return response.data[tokenAddress][this.currency];
   }
 
-  private async getGasPrice(chainId: ChainId): Promise<number> {
+  private async getGasPrice(chainId: ChainId, context?: { logger: Logger }): Promise<number> {
     const getNativeCoinName = this.getNativeCoinName(chainId);
     const url =
       this.domain +
       this.endpointGasPrice +
       `?ids=${getNativeCoinName}&vs_currencies=${this.currency}`;
-    console.log(`CoinGeckoPriceTokenService url ${url}`);
+    context?.logger?.verbose(`CoinGeckoPriceTokenService url ${url}`);
     const response = await axios.get(url + this.api_key);
-    console.log(`CoinGeckoPriceTokenService response ${response.data}`);
+    context?.logger?.verbose(`CoinGeckoPriceTokenService response ${response.data}`);
 
     return response.data[getNativeCoinName][this.currency];
   }

@@ -7,6 +7,7 @@ import { ExecutorConfig } from "../config";
 
 import { OrderValidator, ValidatorContext } from "./order.validator";
 import {EvmAdapterProvider} from "../providers/evm.provider.adapter";
+import {createClientLogger} from "../logger";
 
 /**
  * Checks if the USD equivalent of the order's unlock amount (amount given by the maker upon order creation, deducted by the fees) is in the given range. This validator is useful to filter off uncomfortable volumes, e.g. too low (e.g. less than $10) or too high (e.g., more than $100,000).
@@ -23,6 +24,7 @@ export const giveAmountUsdEquivalentBetween = (
     const logger = context.logger.child({
       validator: "giveAmountUsdEquivalentBetween",
     });
+    const clientLogger = createClientLogger(logger);
     const giveWeb3 = (context.providers.get(order.give.chainId) as EvmAdapterProvider).connection;
     const giveAddress = helpers.bufferToHex(
       Buffer.from(order.give.tokenAddress)
@@ -30,7 +32,7 @@ export const giveAmountUsdEquivalentBetween = (
     logger.debug(`giveAddress=${giveAddress}`);
 
     const [givePrice, giveDecimals] = await Promise.all([
-      config.tokenPriceService!.getPrice(order.give.chainId, order.give.tokenAddress),
+      config.tokenPriceService!.getPrice(order.give.chainId, order.give.tokenAddress, { logger: clientLogger }),
       context.client.getDecimals(
         order.give.chainId,
         order.give.tokenAddress,
