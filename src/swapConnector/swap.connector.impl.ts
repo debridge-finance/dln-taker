@@ -21,7 +21,7 @@ export class SwapConnectorImpl implements SwapConnector {
     fromAddress: Uint8Array | undefined;
     destReceiver: Uint8Array | undefined;
     slippageBps: number;
-  }, context?: { logger: Logger }): Promise<SwapResponse<Chain>> {
+  }, context: { logger: Logger }): Promise<SwapResponse<Chain>> {
     let result: any
     if (request.chainId === ChainId.Solana) {
       const slippage = 1;
@@ -46,7 +46,7 @@ export class SwapConnectorImpl implements SwapConnector {
     fromTokenAddress: Uint8Array;
     toTokenAddress: Uint8Array;
     amount: string;
-  }, context?: { logger: Logger }): Promise<string> {
+  }, context: { logger: Logger }): Promise<string> {
     if (request.chainId === ChainId.Solana) {
       const slippage = 1;
       const stableCoinMint = new PublicKey(request.toTokenAddress);

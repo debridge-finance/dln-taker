@@ -12,7 +12,7 @@ export class OneInchConnector {
     fromAddress: Uint8Array | undefined;
     destReceiver: Uint8Array | undefined;
     slippageBps: number;
-  }, context?: { logger: Logger }): Promise<{ data: string; to: string; value: string }> {
+  }, context: { logger: Logger }): Promise<{ data: string; to: string; value: string }> {
     const fromTokenAddress = this.fix1inchNativeAddress(
       request.chainId,
       request.fromTokenAddress,
@@ -59,7 +59,7 @@ export class OneInchConnector {
     fromTokenAddress: Uint8Array;
     toTokenAddress: Uint8Array;
     amount: string;
-  }, context?: { logger: Logger }): Promise<string> {
+  }, context: { logger: Logger }): Promise<string> {
     const fromTokenAddress = this.fix1inchNativeAddress(
       request.chainId,
       request.fromTokenAddress,

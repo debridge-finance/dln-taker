@@ -5,6 +5,7 @@ import { ProviderAdapter } from "../providers/provider.adapter";
 import { ChainId, OrderData, OrderState, PMMClient, PriceTokenService } from "@debridge-finance/dln-client";
 import Web3 from "web3";
 import { helpers } from "@debridge-finance/solana-utils";
+import {createClientLogger} from "../logger";
 
 export class OrderProcessorContext {
   client: PMMClient;
@@ -65,9 +66,10 @@ export abstract class OrderProcessor {
   }
 
   protected async getFee(order: OrderData, tokenPriceService: PriceTokenService, client: PMMClient, giveWeb3: Web3, logger: Logger) {
+    const clientLogger = createClientLogger(logger);
     const [giveNativePrice, takeNativePrice] = await Promise.all([
-      tokenPriceService!.getPrice(order.give.chainId, null),
-      tokenPriceService!.getPrice(order.take.chainId, null),
+      tokenPriceService!.getPrice(order.give.chainId, null, { logger: clientLogger }),
+      tokenPriceService!.getPrice(order.take.chainId, null, { logger: clientLogger }),
     ]);
     const fees = await client.getTakerFlowCost(
       order,
