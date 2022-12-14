@@ -2,27 +2,28 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { config } from "dotenv";
 import pino from "pino";
 
-import { ExecutorConfig } from "./config";
+import { ExecutorLaunchConfig } from "./config";
 import { Executor } from "./executor";
 
 config();
 
 export class ExecutorEngine {
-  private readonly executors: Executor[];
+  private executors: Executor[];
+  private orderFulfilledMap = new Map<string, boolean>();
 
-  constructor(executorConfigs: ExecutorConfig[]) {
-    const logger = pino({
-      level: process.env.LOG_LEVEL || "info",
-    });
-    const orderFulfilledMap = new Map<string, boolean>();
-    this.executors = executorConfigs.map((config) => {
-      return new Executor(config, orderFulfilledMap, logger);
-    });
+  constructor(private executorConfigs: ExecutorLaunchConfig[]) {
   }
 
   async init() {
-    return Promise.all(
-      this.executors.map(async (executor) => executor.init())
+    const logger = pino({
+      level: process.env.LOG_LEVEL || "info",
+    });
+    this.executors = await Promise.all(
+      this.executorConfigs.map(async (config) => {
+        const executor = new Executor(logger, this.orderFulfilledMap)
+        await executor.init(config)
+        return executor
+      })
     );
   }
 

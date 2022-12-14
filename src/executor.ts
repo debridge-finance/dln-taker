@@ -1,8 +1,8 @@
-import { ChainId, Evm, PMMClient, Solana } from "@debridge-finance/dln-client";
+import { ChainId, Evm, PMMClient, PriceTokenService, Solana, SwapConnector, TokensBucket } from "@debridge-finance/dln-client";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { Logger } from "pino";
 
-import { ChainConfig, ExecutorConfig } from "./config";
+import { ChainDefinition, ExecutorLaunchConfig } from "./config";
 import { GetNextOrder, NextOrderInfo } from "./interfaces";
 import { WsNextOrder } from "./orderFeeds/ws.order.feed";
 import { CoingeckoPriceFeed } from "@debridge-finance/dln-client";
@@ -12,60 +12,81 @@ import { EvmAdapterProvider } from "./providers/evm.provider.adapter";
 import { createWeb3WithPrivateKey } from "./processors/utils/create.web3.with.private.key";
 import { SolanaProviderAdapter } from "./providers/solana.provider.adapter";
 import { helpers } from "@debridge-finance/solana-utils";
-import { OrderValidatorInterface } from "./validators/order.validator.interface";
 import { EvmRebroadcastAdapterProviderAdapter } from "./providers/evm.rebroadcast.adapter.provider.adapter";
 import bs58 from "bs58";
 import { SwapConnectorImpl } from "@debridge-finance/dln-client";
 import { JupiterWrapper } from "@debridge-finance/dln-client";
+import * as processors from "./processors";
+import { OrderValidator } from "./validators";
 
-export class Executor {
+export type InitializingChain = {
+  chain: ChainId;
+  chainRpc: string;
+  unlockProvider: ProviderAdapter;
+  fulfullProvider: ProviderAdapter;
+  client: Solana.PmmClient | Evm.PmmEvmClient;
+}
+
+export type SupportedChainConfig = {
+  chain: ChainId;
+  chainRpc: string;
+  srcValidators: OrderValidator[];
+  dstValidators: OrderValidator[];
+  orderProcessor: processors.OrderProcessor;
+  unlockProvider: ProviderAdapter;
+  fulfullProvider: ProviderAdapter;
+  beneficiary: string;
+  client: Solana.PmmClient | Evm.PmmEvmClient;
+}
+
+export interface ExecutorConf {
+  readonly tokenPriceService: PriceTokenService;
+  readonly swapConnector: SwapConnector;
+  readonly orderFeed: GetNextOrder;
+  readonly chains: { [key in ChainId]?: SupportedChainConfig };
+  readonly buckets: TokensBucket[];
+  readonly client: PMMClient;
+}
+
+export class Executor implements ExecutorConf {
+  tokenPriceService: PriceTokenService;
+  swapConnector: SwapConnector;
+  orderFeed: GetNextOrder;
+  chains: { [key in ChainId]?: SupportedChainConfig } = {};
+  buckets: TokensBucket[] = [];
+  client: PMMClient;
+
   private isInitialized = false;
-  private solanaConnection: Connection;
   private pmmClient: PMMClient;
-  private orderFeed: GetNextOrder;
-  private providersForUnlock = new Map<ChainId, ProviderAdapter>();
-  private providersForFulfill = new Map<ChainId, ProviderAdapter>();
-
   private readonly url1Inch = 'https://nodes.debridge.finance';
 
   constructor(
-    private readonly config: ExecutorConfig,
+    private readonly logger: Logger,
     private readonly orderFulfilledMap: Map<string, boolean>,
-    private readonly logger: Logger
   ) { }
 
-  async init() {
+  async init(config: ExecutorLaunchConfig) {
     if (this.isInitialized) return;
 
+    this.tokenPriceService = config.tokenPriceService || new CoingeckoPriceFeed();
 
-    if (!this.config.tokenPriceService) {
-      this.config.tokenPriceService = new CoingeckoPriceFeed();
-    }
-
-    if (this.config.swapConnector) {
+    if (config.swapConnector) {
       throw new Error("Custom swapConnector not implemented");
     }
-
     const oneInchConnector = new OneInchConnector(this.url1Inch);
     const jupiterConnector = new JupiterWrapper();
-    this.config.swapConnector = new SwapConnectorImpl(oneInchConnector, jupiterConnector);
+    this.swapConnector = new SwapConnectorImpl(oneInchConnector, jupiterConnector);
 
-    const clients: { [key in ChainId]: Solana.PmmClient | Evm.PmmEvmClient } = {} as any;
-    const evmAddresses: { [key in ChainId]: any } = {} as any;
-    const chains = await Promise.all(
-      this.config.chains.map(async (chain) => {
-        const chainId = chain.chain;
+    this.buckets = config.buckets;
 
-        // console.log(chainId, chain.orderProcessor, this.config.orderProcessor)
-        if (!chain.orderProcessor && !this.config.orderProcessor) {
-          throw new Error(
-            `OrderProcessor is specified neither globally (config.orderProcessor) nor for chain ${ChainId[chainId]} (config.chains.<bsc>.orderProcessor)`
-          );
-        }
+    const clients: { [key in number]: any } = {}
+    await Promise.all(
+      config.chains.map(async (chain) => {
+        this.logger.info(`initializing ${ChainId[chain.chain]}...`)
 
-        if (chainId === ChainId.Solana) {
-          this.solanaConnection = new Connection(chain.chainRpc);
-
+        let client, unlockProvider, fulfullProvider;
+        if (chain.chain === ChainId.Solana) {
+          const solanaConnection = new Connection(chain.chainRpc);
           const solanaPmmSrc = new PublicKey(chain.environment?.pmmSrc!);
           const solanaPmmDst = new PublicKey(chain.environment?.pmmDst!);
           const solanaDebridge = new PublicKey(
@@ -75,74 +96,105 @@ export class Executor {
             chain.environment?.solana!.debridgeSetting!
           );
 
-          clients[chainId] = new Solana.PmmClient(
-            this.solanaConnection,
+          const decodeKey = (key: string) => Keypair.fromSecretKey(
+            chain.takerPrivateKey.startsWith("0x") ?
+              helpers.hexToBuffer(key) : bs58.decode(key)
+          );
+          fulfullProvider = new SolanaProviderAdapter(solanaConnection, decodeKey(chain.takerPrivateKey))
+          unlockProvider = new SolanaProviderAdapter(solanaConnection, decodeKey(chain.unlockAuthorityPrivateKey))
+
+          client = new Solana.PmmClient(
+            solanaConnection,
             solanaPmmSrc,
             solanaPmmDst,
             solanaDebridge,
             solanaDebridgeSetting
           );
           // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
-          await (clients[chainId] as Solana.PmmClient).initForFulfillPreswap(new PublicKey(chain.beneficiary), [], jupiterConnector);
-        } else {
-          // TODO all these addresses are optional, so we need to provide defaults which represent the mainnet setup
-          evmAddresses[chainId] = {
-            pmmSourceAddress: chain.environment?.pmmSrc,
-            pmmDestinationAddress: chain.environment?.pmmDst,
-            deBridgeGateAddress: chain.environment?.deBridgeContract,
-            crossChainForwarderAddress: chain.environment?.evm?.forwarderContract
-          };
+          await client.initForFulfillPreswap(new PublicKey(chain.beneficiary), [], jupiterConnector);
+        }
+        else {
+          const web3UnlockAuthority = createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey);
+          unlockProvider = new EvmAdapterProvider(web3UnlockAuthority);
+
+          const web3Fulfill = createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey);
+          fulfullProvider= new EvmRebroadcastAdapterProviderAdapter(web3Fulfill, chain.environment?.evm?.evmRebroadcastAdapterOpts);
+
+          client = new Evm.PmmEvmClient({
+            enableContractsCache: true,
+            addresses: {
+              [chain.chain]: {
+                pmmSourceAddress: chain.environment?.pmmSrc,
+                pmmDestinationAddress: chain.environment?.pmmDst,
+                deBridgeGateAddress: chain.environment?.deBridgeContract,
+                crossChainForwarderAddress: chain.environment?.evm?.forwarderContract
+              }
+            },
+          });
         }
 
+        const processorInitializer = chain.orderProcessor || config.orderProcessor || processors.processor(4)
+        const initializingChain = {
+          chain: chain.chain,
+          chainRpc: chain.chainRpc,
+          unlockProvider,
+          fulfullProvider,
+          client,
+        };
+        const orderProcessor = await processorInitializer(chain.chain, {
+          chain: initializingChain,
+          buckets: config.buckets,
+          logger: this.logger,
+        });
+
         // append global validators to the list of dstValidators
-        chain.dstValidators = [
-          ...(chain.dstValidators || []),
-          ...(this.config.validators || [])
-        ];
+        const dstValidators = await Promise.all(
+          [
+            ...(chain.dstValidators || []),
+            ...(config.validators || [])
+          ].map(validator => validator(chain.chain, {
+            chain: initializingChain,
+            logger: this.logger
+          }))
+        );
 
-        const validatorsForInit = [
-          ...(chain.srcValidators || []),
-          ...(chain.dstValidators || [])
-        ].filter(validator => validator instanceof OrderValidatorInterface)
-        await Promise.all(validatorsForInit.map(validator => {
-          return (validator as OrderValidatorInterface).init(chainId);
-        }));
+        const srcValidators = await Promise.all(
+          (chain.srcValidators || []).map(initializer => initializer(
+            chain.chain, {
+              chain: initializingChain,
+              logger: this.logger
+            }
+          ))
+        );
 
-        return chainId;
+        this.chains[chain.chain] = {
+          chain: chain.chain,
+          chainRpc: chain.chainRpc,
+          srcValidators,
+          dstValidators,
+          orderProcessor,
+          unlockProvider,
+          fulfullProvider,
+          client,
+          beneficiary: chain.beneficiary
+        }
+
+        clients[chain.chain] = client;
+
       })
     );
 
-    Object.keys(evmAddresses).forEach((chainId) => {
-      clients[chainId as any as ChainId] = new Evm.PmmEvmClient({
-        enableContractsCache: true,
-        addresses: evmAddresses,
-      });
-    });
+    this.client = this.pmmClient = new PMMClient(clients);
 
-    this.pmmClient = new PMMClient(clients);
-
-    let orderFeed = this.config.orderFeed;
+    let orderFeed = config.orderFeed;
     if (typeof orderFeed === "string") {
       orderFeed = new WsNextOrder(orderFeed);
     }
-    orderFeed.setEnabledChains(chains);
+    orderFeed.setEnabledChains(Object.values(this.chains).map(chain => chain.chain));
     orderFeed.setLogger(this.logger);
     await orderFeed.init();
     this.orderFeed = orderFeed;
 
-    // init processors finally
-    this.configureProvidersMap();
-
-    await Promise.all(
-      this.config.chains.map(async (chain) => {
-        return chain.orderProcessor!.init(chain.chain, {
-          executorConfig: this.config,
-          providersForFulfill: this.providersForFulfill,
-          providersForUnlock: this.providersForUnlock,
-          logger: this.logger,
-        });
-      })
-    )
 
     this.isInitialized = true;
   }
@@ -163,13 +215,8 @@ export class Executor {
         const logger = this.logger.child({ orderId });
         if (nextOrderInfo.type === "created") {
           logger.info(`execute ${orderId} processing is started`);
-          const chainConfig = this.config.chains.find(
-            (it) => nextOrderInfo.order?.take.chainId === it.chain
-          );
-          await this.processing(nextOrderInfo, chainConfig!, logger);
+          await this.processing(nextOrderInfo, logger);
           logger.info(`execute ${orderId} processing is finished`);
-        } else if (nextOrderInfo.type === "fulfilled") {
-          this.orderFulfilledMap.set(orderId, true);
         }
       }
     } catch (e) {
@@ -180,10 +227,19 @@ export class Executor {
 
   private async processing(
     nextOrderInfo: NextOrderInfo,
-    chainConfig: ChainConfig,
     logger: Logger
   ): Promise<boolean> {
-    const order = nextOrderInfo.order!;
+    const {
+      order,
+      orderId
+    } = nextOrderInfo;
+    if (!order || !orderId) throw new Error("Order is undefined")
+
+    const takeChain = this.chains[order.take.chainId];
+    if (!takeChain) throw new Error(`${ChainId[order.take.chainId]} not configured, skipping order`)
+
+    const giveChain = this.chains[order.give.chainId];
+    if (!giveChain) throw new Error(`${ChainId[order.give.chainId]} not configured, skipping order`);
 
     // to accept an order, all validators must approve the order.
     // executor invokes three groups of validators:
@@ -195,19 +251,16 @@ export class Executor {
     const listOrderValidators = [];
 
     // dstValidators@takeChain
-    if (chainConfig.dstValidators && chainConfig.dstValidators.length > 0) {
-      listOrderValidators.push(...chainConfig.dstValidators);
+    if (takeChain.dstValidators && takeChain.dstValidators.length > 0) {
+      listOrderValidators.push(...takeChain.dstValidators);
     }
 
     // srcValidators@giveChain
-    const giveChainConfig = this.config.chains.find(
-      (chain) => chain.chain === order.give.chainId
-    )!;
     if (
-      giveChainConfig.srcValidators &&
-      giveChainConfig.srcValidators.length > 0
+      giveChain.srcValidators &&
+      giveChain.srcValidators.length > 0
     ) {
-      listOrderValidators.push(...giveChainConfig.srcValidators);
+      listOrderValidators.push(...giveChain.srcValidators);
     }
 
     //
@@ -215,21 +268,13 @@ export class Executor {
     //
     logger.info("Order validation is started");
     const orderValidators = await Promise.all(
-      listOrderValidators.map((validator) => {
-        if (validator instanceof OrderValidatorInterface) {
-          return validator.validate(order, this.config, {
-            client: this.pmmClient,
+      listOrderValidators.map((validator) => validator(order, {
             logger,
-            providers: this.providersForUnlock,
-          }) as Promise<boolean>;
-        } else {
-          return validator(order, this.config, {
-            client: this.pmmClient,
-            logger,
-            providers: this.providersForUnlock,
-          }) as Promise<boolean>;
-        }
-      }) || []
+            config: this,
+            giveChain,
+            takeChain
+          })
+        )
     );
 
     if (!orderValidators.every((it) => it)) {
@@ -242,42 +287,19 @@ export class Executor {
     // run processor
     //
     logger.info(`OrderProcessor is started`);
-    const orderProcessor =
-      chainConfig.orderProcessor || this.config.orderProcessor;
-
-    await orderProcessor!.process(
-      nextOrderInfo.orderId,
-      nextOrderInfo.order!,
-      this.config,
+    await takeChain.orderProcessor.process(
+      orderId,
+      order,
       {
         orderFulfilledMap: this.orderFulfilledMap,
-        client: this.pmmClient,
         logger,
-        providersForUnlock: this.providersForUnlock,
-        providersForFulfill: this.providersForFulfill,
+        config: this,
+        giveChain,
+        takeChain
       }
     );
     logger.info(`OrderProcessor is finished`);
 
     return true;
-  }
-
-  private configureProvidersMap() {
-    for (const chain of this.config.chains) {
-      if (chain.chain !== ChainId.Solana) {
-        const web3UnlockAuthority = createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey);
-        const web3Fulfill = createWeb3WithPrivateKey(chain.chainRpc, chain.unlockAuthorityPrivateKey);
-        this.providersForUnlock.set(chain.chain, new EvmAdapterProvider(web3UnlockAuthority));
-        this.providersForFulfill.set(chain.chain, new EvmRebroadcastAdapterProviderAdapter(web3Fulfill, chain.environment?.evm?.evmRebroadcastAdapterOpts));
-      } else {
-        const decodeKey = (key: string) => Keypair.fromSecretKey(
-          chain.takerPrivateKey.startsWith("0x") ?
-            helpers.hexToBuffer(key) : bs58.decode(key)
-        );
-        console.log('🔴 configureProvidersMap', this.solanaConnection)
-        this.providersForFulfill.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, decodeKey(chain.takerPrivateKey)));
-        this.providersForUnlock.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, decodeKey(chain.unlockAuthorityPrivateKey)));
-      }
-    }
   }
 }

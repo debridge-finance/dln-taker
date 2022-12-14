@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "ts-node": "10.9.1",
-    "@debridge-finance/dln-client": "github:debridge-finance/pmm-js-client#265c903",
+    "@debridge-finance/dln-client": "github:debridge-finance/pmm-js-client#5058b29",
     "@debridge-finance/solana-utils": "1.0.2",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",

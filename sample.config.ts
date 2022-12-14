@@ -1,16 +1,10 @@
 import { CachePriceFeed, ChainId, CoingeckoPriceFeed, TokensBucket } from "@debridge-finance/dln-client";
-import { ExecutorConfig } from "./src/config";
-import * as validators from "./src/validators";
+import { ExecutorLaunchConfig } from "./src/config";
 import * as processors from "./src/processors";
 import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
 
-const config: ExecutorConfig = {
+const config: ExecutorLaunchConfig = {
   orderFeed: environment.WSS,
-
-  validators: [
-    validators.srcChainDefined(),
-    validators.dstChainDefined(),
-  ],
 
   buckets: [
     new TokensBucket({
@@ -29,6 +23,8 @@ const config: ExecutorConfig = {
     60 * 5 // 5min cache
   ),
 
+  orderProcessor: processors.processor(4/*bps*/),
+
   chains: [
     {
       chain: ChainId.Solana,
@@ -46,41 +42,26 @@ const config: ExecutorConfig = {
       // Warn! base58 representation of a private key.
       // Warn! For security reasons, put it to the .env file
       unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-
-      srcValidators: [],
-      dstValidators: [],
-
-      orderProcessor: processors.processor(4),
     },
 
     {
       chain: ChainId.Polygon,
       chainRpc: `${process.env.RPC_POLYGON}`,
-      environment: environment.Polygon,
+      environment: environment.EVM,
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-
-      srcValidators: [],
-      dstValidators: [],
-
-      orderProcessor: processors.processor(4),
     },
 
     {
       chain: ChainId.BSC,
       chainRpc: `${process.env.RPC_BNB}`,
-      environment: environment.BNB,
+      environment: environment.EVM,
 
+      beneficiary: `${process.env.BNB_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-      beneficiary: `${process.env.BNB_BENEFICIARY}`,
-
-      srcValidators: [],
-      dstValidators: [],
-
-      orderProcessor: processors.processor(4),
     },
   ],
 };

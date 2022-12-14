@@ -30,9 +30,32 @@ const PRERELEASE_ENVIRONMENT_CODENAME_LIMA = {
     }
 }
 
-const CURRENT_ENVIRONMENT = PRERELEASE_ENVIRONMENT_CODENAME_LIMA;
+const PRODUCTION = {
+    WSS: 'wss://dln-ws.debridge.finance/ws',
+
+    EVM: {
+        deBridgeContract: "0x43dE2d77BF8027e25dBD179B491e8d64f38398aA",
+        pmmSrc: "0xeF4fB24aD0916217251F553c0596F8Edc630EB66",
+        pmmDst: "0xE7351Fd770A37282b91D153Ee690B63579D6dd7f",
+        evm: {
+          forwarderContract: '0x663DC15D3C1aC63ff12E45Ab68FeA3F0a883C251'
+        }
+    },
+
+    Solana: {
+        deBridgeContract: "Lima82j8YvHFYe8qa4kGgb3fvPFEnR3PoV6UyGUpHLq",
+        pmmSrc: "src5qyZHqTqecJV4aY6Cb6zDZLMDzrDKKezs22MPHr4",
+        pmmDst: "dst5MGcFPoBeREFAA5E3tU5ij8m5uVYwkzkSAbsLbNo",
+        solana: {
+            debridgeSetting: "settFZVDbqC9zBmV2ZCBfNMCtTzia2R7mVeR6ccK2nN"
+        }
+    },
+}
+
+const CURRENT_ENVIRONMENT = PRODUCTION;
 
 export {
     CURRENT_ENVIRONMENT,
+    PRODUCTION,
     PRERELEASE_ENVIRONMENT_CODENAME_LIMA
 }
