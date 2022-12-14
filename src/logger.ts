@@ -3,22 +3,22 @@ import {Logger} from "pino";
 
 export const createClientLogger = (logger: Logger) => {
   return new ClientLogger((level: LogLevel, ...args) => {
-    args = args[0];
-    const message = JSON.stringify(args);
+    // args = args[0];
+    // const message = JSON.stringify(args);
     switch (level) {
       case LogLevel.LOG: {
-        logger.info(message);
+        logger.info(...args);
         break;
       }
 
       case LogLevel.VERBOSE: {
-        logger.debug(message);
+        logger.debug(...args);
         break;
       }
 
       case LogLevel.ERROR:
       default: {
-        logger.error(message);
+        logger.error(...args);
         break;
       }
     }

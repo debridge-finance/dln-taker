@@ -5,8 +5,8 @@ import { Logger } from "pino";
 import { ChainConfig, ExecutorConfig } from "./config";
 import { GetNextOrder, NextOrderInfo } from "./interfaces";
 import { WsNextOrder } from "./orderFeeds/ws.order.feed";
-import { CoingeckoPriceFeed } from "./priceFeeds/coingecko.price.feed";
-import { OneInchConnector } from "./swapConnector/one.inch.connector";
+import { CoingeckoPriceFeed } from "@debridge-finance/dln-client";
+import { OneInchConnector } from "@debridge-finance/dln-client";
 import { ProviderAdapter } from "./providers/provider.adapter";
 import { EvmAdapterProvider } from "./providers/evm.provider.adapter";
 import { createWeb3WithPrivateKey } from "./processors/utils/create.web3.with.private.key";
@@ -15,8 +15,8 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { OrderValidatorInterface } from "./validators/order.validator.interface";
 import { EvmRebroadcastAdapterProviderAdapter } from "./providers/evm.rebroadcast.adapter.provider.adapter";
 import bs58 from "bs58";
-import { SwapConnectorImpl } from "./swapConnector/swap.connector.impl";
-import { JupiterWrapper } from "./swapConnector/jupiter.wrapper";
+import { SwapConnectorImpl } from "@debridge-finance/dln-client";
+import { JupiterWrapper } from "@debridge-finance/dln-client";
 
 export class Executor {
   private isInitialized = false;
@@ -36,7 +36,19 @@ export class Executor {
 
   async init() {
     if (this.isInitialized) return;
-    this.configureProvidersMap();
+
+
+    if (!this.config.tokenPriceService) {
+      this.config.tokenPriceService = new CoingeckoPriceFeed();
+    }
+
+    if (this.config.swapConnector) {
+      throw new Error("Custom swapConnector not implemented");
+    }
+
+    const oneInchConnector = new OneInchConnector(this.url1Inch);
+    const jupiterConnector = new JupiterWrapper();
+    this.config.swapConnector = new SwapConnectorImpl(oneInchConnector, jupiterConnector);
 
     const clients: { [key in ChainId]: Solana.PmmClient | Evm.PmmEvmClient } = {} as any;
     const evmAddresses: { [key in ChainId]: any } = {} as any;
@@ -71,7 +83,7 @@ export class Executor {
             solanaDebridgeSetting
           );
           // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
-          await (clients[chainId] as Solana.PmmClient).initForFulfillPreswap(new PublicKey(chain.beneficiary), []);
+          await (clients[chainId] as Solana.PmmClient).initForFulfillPreswap(new PublicKey(chain.beneficiary), [], jupiterConnector);
         } else {
           // TODO all these addresses are optional, so we need to provide defaults which represent the mainnet setup
           evmAddresses[chainId] = {
@@ -109,14 +121,6 @@ export class Executor {
 
     this.pmmClient = new PMMClient(clients);
 
-    if (!this.config.tokenPriceService) {
-      this.config.tokenPriceService = new CoingeckoPriceFeed();
-    }
-
-    if (!this.config.swapConnector) {
-      this.config.swapConnector = new SwapConnectorImpl(new OneInchConnector(this.url1Inch), new JupiterWrapper());
-    }
-
     let orderFeed = this.config.orderFeed;
     if (typeof orderFeed === "string") {
       orderFeed = new WsNextOrder(orderFeed);
@@ -127,6 +131,8 @@ export class Executor {
     this.orderFeed = orderFeed;
 
     // init processors finally
+    this.configureProvidersMap();
+
     await Promise.all(
       this.config.chains.map(async (chain) => {
         return chain.orderProcessor!.init(chain.chain, {
@@ -267,7 +273,8 @@ export class Executor {
         const decodeKey = (key: string) => Keypair.fromSecretKey(
           chain.takerPrivateKey.startsWith("0x") ?
             helpers.hexToBuffer(key) : bs58.decode(key)
-        )
+        );
+        console.log('🔴 configureProvidersMap', this.solanaConnection)
         this.providersForFulfill.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, decodeKey(chain.takerPrivateKey)));
         this.providersForUnlock.set(chain.chain, new SolanaProviderAdapter(this.solanaConnection, decodeKey(chain.unlockAuthorityPrivateKey)));
       }

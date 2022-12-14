@@ -1,4 +1,4 @@
-import { ChainId, TokensBucket } from "@debridge-finance/dln-client";
+import { CachePriceFeed, ChainId, CoingeckoPriceFeed, TokensBucket } from "@debridge-finance/dln-client";
 import { ExecutorConfig } from "./src/config";
 import * as validators from "./src/validators";
 import * as processors from "./src/processors";
@@ -23,6 +23,11 @@ const config: ExecutorConfig = {
       [ChainId.Solana]: ['EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'],
     })
   ],
+
+  tokenPriceService: new CachePriceFeed(
+    new CoingeckoPriceFeed(process?.env?.COINGECKO_API_KEY),
+    60 * 5 // 5min cache
+  ),
 
   chains: [
     {
