@@ -34,30 +34,39 @@ const config: ExecutorLaunchConfig = {
   orderProcessor: processors.processor(4/*bps*/),
 
   chains: [
+    // {
+    //   chain: ChainId.Solana,
+    //   chainRpc: `${process.env.RPC_SOLANA}`,
+
+    //   // address
+    //   // For security reasons, put it to the .env file
+    //   beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
+
+    //   // Warn! base58 representation of a private key.
+    //   // Warn! For security reasons, put it to the .env file
+    //   takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+
+    //   // Warn! base58 representation of a private key.
+    //   // Warn! For security reasons, put it to the .env file
+    //   unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+    // },
+
     {
-      chain: ChainId.Solana,
-      chainRpc: `${process.env.RPC_SOLANA}`,
+      chain: ChainId.Arbitrum,
+      chainRpc: `${process.env.RPC_ARBITRUM}`,
 
-      // address
-      // For security reasons, put it to the .env file
-      beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
-
-      // Warn! base58 representation of a private key.
-      // Warn! For security reasons, put it to the .env file
-      takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-
-      // Warn! base58 representation of a private key.
-      // Warn! For security reasons, put it to the .env file
-      unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+      beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.ARBITRUM_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.ARBITRUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     },
 
     {
-      chain: ChainId.Polygon,
-      chainRpc: `${process.env.RPC_POLYGON}`,
+      chain: ChainId.Avalanche,
+      chainRpc: `${process.env.RPC_AVALANCHE}`,
 
-      beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
-      takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+      beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.AVALANCHE_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.AVALANCHE_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     },
 
     {
@@ -67,6 +76,24 @@ const config: ExecutorLaunchConfig = {
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+    },
+
+    {
+      chain: ChainId.Ethereum,
+      chainRpc: `${process.env.RPC_ETHEREUM}`,
+
+      beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.ETHEREUM_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.ETHEREUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+    },
+
+    {
+      chain: ChainId.Polygon,
+      chainRpc: `${process.env.RPC_POLYGON}`,
+
+      beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     },
   ],
 };
