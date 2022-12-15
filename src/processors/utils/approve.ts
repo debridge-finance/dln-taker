@@ -64,13 +64,14 @@ export const isApproved = async (
 export const approveToken = async (chainId: ChainId, tokenAddress: string, contractAddress: string, provider: EvmAdapterProvider, logger: Logger): Promise<void> => {
   if (chainId === ChainId.Solana) return Promise.resolve();
   const { connection } = provider;
+  logger.debug(`Verifying approval given by ${provider.address} to ${contractAddress} to trade on ${tokenAddress} on ${ChainId[chainId]}`)
   const tokenIsApproved = await isApproved(connection, tokenAddress, contractAddress);
   if (!tokenIsApproved) {
-    logger.debug(`Token ${tokenAddress} approving is started`);
-    await approve(connection, tokenAddress, contractAddress);
-    logger.debug(`Token ${tokenAddress} approving is finished`);
+    logger.debug(`Approving ${tokenAddress} on ${ChainId[chainId]}`);
+    const tx = await approve(connection, tokenAddress, contractAddress);
+    logger.debug(`Setting approval for ${tokenAddress} on ${ChainId[chainId]} succeeded`);
   } else {
-    logger.debug(`Token ${tokenAddress} is approved`);
+    logger.debug(`${tokenAddress} already approved on on ${ChainId[chainId]}`);
   }
 
   return Promise.resolve();

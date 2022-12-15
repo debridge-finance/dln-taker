@@ -1,6 +1,7 @@
 import { ChainId, Evm, PMMClient, PriceTokenService, Solana, SwapConnector, TokensBucket } from "@debridge-finance/dln-client";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { Logger } from "pino";
+import { PRODUCTION } from "../src/environments";
 
 import { ChainDefinition, ExecutorLaunchConfig } from "./config";
 import { GetNextOrder, NextOrderInfo } from "./interfaces";
@@ -87,13 +88,13 @@ export class Executor implements ExecutorConf {
         let client, unlockProvider, fulfullProvider;
         if (chain.chain === ChainId.Solana) {
           const solanaConnection = new Connection(chain.chainRpc);
-          const solanaPmmSrc = new PublicKey(chain.environment?.pmmSrc!);
-          const solanaPmmDst = new PublicKey(chain.environment?.pmmDst!);
+          const solanaPmmSrc = new PublicKey(chain.environment?.pmmSrc || PRODUCTION.Solana.pmmSrc);
+          const solanaPmmDst = new PublicKey(chain.environment?.pmmDst || PRODUCTION.Solana.pmmDst);
           const solanaDebridge = new PublicKey(
-            chain.environment?.deBridgeContract!
+            chain.environment?.deBridgeContract || PRODUCTION.Solana.deBridgeContract
           );
           const solanaDebridgeSetting = new PublicKey(
-            chain.environment?.solana!.debridgeSetting!
+            chain.environment?.solana?.debridgeSetting || PRODUCTION.Solana.solana.debridgeSetting
           );
 
           const decodeKey = (key: string) => Keypair.fromSecretKey(
@@ -186,7 +187,7 @@ export class Executor implements ExecutorConf {
 
     this.client = this.pmmClient = new PMMClient(clients);
 
-    let orderFeed = config.orderFeed;
+    let orderFeed = config.orderFeed as GetNextOrder;
     if (typeof orderFeed === "string") {
       orderFeed = new WsNextOrder(orderFeed);
     }
