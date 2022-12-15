@@ -88,13 +88,13 @@ export class Executor implements ExecutorConf {
         let client, unlockProvider, fulfullProvider;
         if (chain.chain === ChainId.Solana) {
           const solanaConnection = new Connection(chain.chainRpc);
-          const solanaPmmSrc = new PublicKey(chain.environment?.pmmSrc || PRODUCTION.Solana.pmmSrc);
-          const solanaPmmDst = new PublicKey(chain.environment?.pmmDst || PRODUCTION.Solana.pmmDst);
+          const solanaPmmSrc = new PublicKey(chain.environment?.pmmSrc || PRODUCTION.chains[ChainId.Solana]!.pmmSrc!);
+          const solanaPmmDst = new PublicKey(chain.environment?.pmmDst || PRODUCTION.chains[ChainId.Solana]!.pmmDst!);
           const solanaDebridge = new PublicKey(
-            chain.environment?.deBridgeContract || PRODUCTION.Solana.deBridgeContract
+            chain.environment?.deBridgeContract || PRODUCTION.chains![ChainId.Solana]!.deBridgeContract!
           );
           const solanaDebridgeSetting = new PublicKey(
-            chain.environment?.solana?.debridgeSetting || PRODUCTION.Solana.solana.debridgeSetting
+            chain.environment?.solana?.debridgeSetting || PRODUCTION.chains![ChainId.Solana]!.solana!.debridgeSetting!
           );
 
           const decodeKey = (key: string) => Keypair.fromSecretKey(
@@ -125,10 +125,10 @@ export class Executor implements ExecutorConf {
             enableContractsCache: true,
             addresses: {
               [chain.chain]: {
-                pmmSourceAddress: chain.environment?.pmmSrc,
-                pmmDestinationAddress: chain.environment?.pmmDst,
-                deBridgeGateAddress: chain.environment?.deBridgeContract,
-                crossChainForwarderAddress: chain.environment?.evm?.forwarderContract
+                pmmSourceAddress: chain.environment?.pmmSrc || PRODUCTION.defaultEvmAddresses?.pmmSrc || PRODUCTION.chains[chain.chain]?.pmmSrc,
+                pmmDestinationAddress: chain.environment?.pmmDst || PRODUCTION.defaultEvmAddresses?.pmmDst || PRODUCTION.chains[chain.chain]?.pmmDst,
+                deBridgeGateAddress: chain.environment?.deBridgeContract || PRODUCTION.defaultEvmAddresses?.deBridgeContract || PRODUCTION.chains[chain.chain]?.deBridgeContract,
+                crossChainForwarderAddress: chain.environment?.evm?.forwarderContract || PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract || PRODUCTION.chains[chain.chain]?.evm?.forwarderContract
               }
             },
           });
@@ -188,7 +188,7 @@ export class Executor implements ExecutorConf {
     this.client = this.pmmClient = new PMMClient(clients);
 
     let orderFeed = config.orderFeed as GetNextOrder;
-    if (typeof orderFeed === "string") {
+    if (typeof orderFeed === "string" || !orderFeed) {
       orderFeed = new WsNextOrder(orderFeed);
     }
     orderFeed.setEnabledChains(Object.values(this.chains).map(chain => chain.chain));

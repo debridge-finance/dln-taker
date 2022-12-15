@@ -48,7 +48,7 @@ export class EvmRebroadcastAdapterOpts {
   rebroadcastMaxBumpedGasPriceWei?: number;
 }
 
-type ChainEnvironment = {
+export type ChainEnvironment = {
   /**
    * Address of the DLN contract responsible for order creation, unlocking and cancellation
    */
@@ -57,7 +57,7 @@ type ChainEnvironment = {
   /**
    * Address of the DLN contract responsible for order fulfillment
    */
-  pmmDst: address;
+  pmmDst?: address;
 
   /**
    * Address of the deBridgeGate contract responsible for cross-chain messaging (used by pmmDst)
@@ -160,7 +160,7 @@ export interface ExecutorLaunchConfig {
   /**
    * Source of orders
    */
-  orderFeed: string | GetNextOrder;
+  orderFeed?: string | GetNextOrder;
 
   chains: ChainDefinition[];
 

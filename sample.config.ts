@@ -9,7 +9,7 @@ const config: ExecutorLaunchConfig = {
     CURRENT_ENVIRONMENT.WSS,
     {
       headers: {
-        Authorization: `Bearer ${process?.env?.WS_API_KEY}`,
+        Authorization: `Bearer ${process.env.WS_API_KEY}`,
       }
     } as any
   ),
@@ -37,7 +37,6 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Solana,
       chainRpc: `${process.env.RPC_SOLANA}`,
-      environment: environment.Solana,
 
       // address
       // For security reasons, put it to the .env file
@@ -55,7 +54,6 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Polygon,
       chainRpc: `${process.env.RPC_POLYGON}`,
-      environment: environment.EVM,
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
@@ -65,7 +63,6 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.BSC,
       chainRpc: `${process.env.RPC_BNB}`,
-      environment: environment.EVM,
 
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,

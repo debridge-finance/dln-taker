@@ -90,13 +90,14 @@ export class WsNextOrder extends GetNextOrder {
     this.queue = [];
     this.socket = new WebSocket(...this.wsArgs)
     this.socket.on("open", () => {
+      this.logger.debug("🔌 ws opened connection")
       this.socket.send(JSON.stringify({ Subscription: {
         live: true
       } }));
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
-      this.logger.debug("ws received new message", data);
+      this.logger.debug("📨 ws received new message", data);
       if ("Order" in data) {
         const parsedEvent = data as WsOrderEvent;
         const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
