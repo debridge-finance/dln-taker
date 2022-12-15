@@ -1,39 +1,24 @@
 import {buffersAreEqual, ChainId, OrderData, tokenStringToBuffer} from "@debridge-finance/dln-client";
 
 import { helpers } from "@debridge-finance/solana-utils";
-
-import { ExecutorConfig } from "../config";
-
-import { ValidatorContext } from "./order.validator";
-import { OrderValidatorInterface } from "./order.validator.interface";
+import { OrderValidator, OrderValidatorInitContext, OrderValidatorInitializer, ValidatorContext } from "./order.validator";
 
 /**
  * Checks if the order's requested token is in the whitelist. This validator is useful to target orders that request specific tokens.
- * */
-export class WhiteListedTakeToken extends OrderValidatorInterface {
+ */
+export function whitelistedTakeToken(addresses: string[]): OrderValidatorInitializer {
+  return async (chainId: ChainId, context: OrderValidatorInitContext): Promise<OrderValidator> => {
+    const addressesBuffer = addresses.map((address) => tokenStringToBuffer(chainId, address));
+    return async (
+      order: OrderData,
+      context: ValidatorContext
+    ): Promise<boolean> => {
+      const logger = context.logger.child({ validator: "WhiteListedTakeToken" });
+      const result = addressesBuffer.some(address => buffersAreEqual(order.take.tokenAddress, address));
 
-  private addressesBuffer: Uint8Array[];
-
-  constructor(private readonly addresses: string[]) {
-    super();
+      const takeToken = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
+      logger.info(`approve status: ${result}, takeToken ${takeToken}`);
+      return Promise.resolve(result);
+    }
   }
-
-  init(chainId: ChainId): Promise<void> {
-    super.chainId = chainId;
-    this.addressesBuffer = this.addresses.map((address) => tokenStringToBuffer(chainId, address));
-    return Promise.resolve();
-  }
-
-  validate(order: OrderData, config: ExecutorConfig, context: ValidatorContext): Promise<boolean> {
-    const logger = context.logger.child({ validator: "WhiteListedTakeToken" });
-    const result = this.addressesBuffer.some(address => buffersAreEqual(order.take.tokenAddress, address));
-
-    const takeToken = helpers.bufferToHex(Buffer.from(order.take.tokenAddress));
-    logger.info(`approve status: ${result}, takeToken ${takeToken}`);
-    return Promise.resolve(result);
-  }
-}
-
-export function whitelistedTakeToken(addresses: string[]) {
-  return new WhiteListedTakeToken(addresses)
 }

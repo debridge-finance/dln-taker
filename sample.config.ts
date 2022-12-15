@@ -1,16 +1,18 @@
 import { CachePriceFeed, ChainId, CoingeckoPriceFeed, TokensBucket } from "@debridge-finance/dln-client";
-import { ExecutorConfig } from "./src/config";
-import * as validators from "./src/validators";
+import { ExecutorLaunchConfig } from "./src/config";
 import * as processors from "./src/processors";
-import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
+import { CURRENT_ENVIRONMENT, CURRENT_ENVIRONMENT as environment } from "./src/environments";
+import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 
-const config: ExecutorConfig = {
-  orderFeed: environment.WSS,
-
-  validators: [
-    validators.srcChainDefined(),
-    validators.dstChainDefined(),
-  ],
+const config: ExecutorLaunchConfig = {
+  orderFeed: new WsNextOrder(
+    CURRENT_ENVIRONMENT.WSS,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.WS_API_KEY}`,
+      }
+    } as any
+  ),
 
   buckets: [
     new TokensBucket({
@@ -29,58 +31,69 @@ const config: ExecutorConfig = {
     60 * 5 // 5min cache
   ),
 
+  orderProcessor: processors.processor(4/*bps*/),
+
   chains: [
+    // {
+    //   chain: ChainId.Solana,
+    //   chainRpc: `${process.env.RPC_SOLANA}`,
+
+    //   // address
+    //   // For security reasons, put it to the .env file
+    //   beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
+
+    //   // Warn! base58 representation of a private key.
+    //   // Warn! For security reasons, put it to the .env file
+    //   takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+
+    //   // Warn! base58 representation of a private key.
+    //   // Warn! For security reasons, put it to the .env file
+    //   unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+    // },
+
     {
-      chain: ChainId.Solana,
-      chainRpc: `${process.env.RPC_SOLANA}`,
-      environment: environment.Solana,
+      chain: ChainId.Arbitrum,
+      chainRpc: `${process.env.RPC_ARBITRUM}`,
 
-      // address
-      // For security reasons, put it to the .env file
-      beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
-
-      // Warn! base58 representation of a private key.
-      // Warn! For security reasons, put it to the .env file
-      takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-
-      // Warn! base58 representation of a private key.
-      // Warn! For security reasons, put it to the .env file
-      unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-
-      srcValidators: [],
-      dstValidators: [],
-
-      orderProcessor: processors.processor(4),
+      beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.ARBITRUM_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.ARBITRUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     },
 
     {
-      chain: ChainId.Polygon,
-      chainRpc: `${process.env.RPC_POLYGON}`,
-      environment: environment.Polygon,
+      chain: ChainId.Avalanche,
+      chainRpc: `${process.env.RPC_AVALANCHE}`,
 
-      beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
-      takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-
-      srcValidators: [],
-      dstValidators: [],
-
-      orderProcessor: processors.processor(4),
+      beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.AVALANCHE_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.AVALANCHE_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     },
 
     {
       chain: ChainId.BSC,
       chainRpc: `${process.env.RPC_BNB}`,
-      environment: environment.BNB,
 
+      beneficiary: `${process.env.BNB_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-      beneficiary: `${process.env.BNB_BENEFICIARY}`,
+    },
 
-      srcValidators: [],
-      dstValidators: [],
+    {
+      chain: ChainId.Ethereum,
+      chainRpc: `${process.env.RPC_ETHEREUM}`,
 
-      orderProcessor: processors.processor(4),
+      beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.ETHEREUM_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.ETHEREUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+    },
+
+    {
+      chain: ChainId.Polygon,
+      chainRpc: `${process.env.RPC_POLYGON}`,
+
+      beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     },
   ],
 };

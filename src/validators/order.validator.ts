@@ -2,14 +2,23 @@ import { ChainId, OrderData, PMMClient } from "@debridge-finance/dln-client";
 
 import { Logger } from "pino";
 
-import { ExecutorConfig } from "../config";
+import { ExecutorLaunchConfig } from "../config";
+import { ExecutorConf, InitializingChain, SupportedChainConfig } from "../executor";
 import { ProviderAdapter } from "../providers/provider.adapter";
 
 export interface ValidatorContext {
   logger: Logger;
-  client: PMMClient;
-  providers: Map<ChainId, ProviderAdapter>;
+  config: ExecutorConf;
+  giveChain: SupportedChainConfig;
+  takeChain: SupportedChainConfig;
 }
+
+export type OrderValidatorInitContext = {
+  logger: Logger,
+  chain: InitializingChain
+}
+
+export type OrderValidatorInitializer = (chainId: ChainId, context: OrderValidatorInitContext) => Promise<OrderValidator>
 
 /**
  * Represents an order validation routine. Can be chained.
@@ -18,6 +27,5 @@ export interface ValidatorContext {
  */
 export type OrderValidator = (
   order: OrderData,
-  config: ExecutorConfig,
   context: ValidatorContext
 ) => Promise<boolean>;

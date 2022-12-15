@@ -6,9 +6,8 @@ import {
 } from "@debridge-finance/dln-client";
 
 import { GetNextOrder } from "./interfaces";
-import { OrderProcessor } from "./processors";
-import { OrderValidator } from "./validators";
-import { OrderValidatorInterface } from "./validators/order.validator.interface";
+import { OrderProcessorInitializer } from "./processors";
+import { OrderValidatorInitializer } from "./validators/order.validator";
 
 type address = string;
 
@@ -49,7 +48,7 @@ export class EvmRebroadcastAdapterOpts {
   rebroadcastMaxBumpedGasPriceWei?: number;
 }
 
-type Environment = {
+export type ChainEnvironment = {
   /**
    * Address of the DLN contract responsible for order creation, unlocking and cancellation
    */
@@ -58,7 +57,7 @@ type Environment = {
   /**
    * Address of the DLN contract responsible for order fulfillment
    */
-  pmmDst: address;
+  pmmDst?: address;
 
   /**
    * Address of the deBridgeGate contract responsible for cross-chain messaging (used by pmmDst)
@@ -78,7 +77,7 @@ type Environment = {
 /**
  * Represents a chain configuration where orders can be fulfilled.
  */
-export interface ChainConfig {
+export interface ChainDefinition {
   //
   // network related
   //
@@ -97,7 +96,7 @@ export interface ChainConfig {
   // chain context related
   //
 
-  environment?: Environment,
+  environment?: ChainEnvironment,
 
   //
   // taker related
@@ -123,24 +122,29 @@ export interface ChainConfig {
   /**
    * Represents a list of validators which filter out orders for fulfillment
    */
-  srcValidators?: (OrderValidator | OrderValidatorInterface)[];
+  srcValidators?: OrderValidatorInitializer[];
 
   /**
    * Represents a list of validators which filter out orders for fulfillment
    */
-  dstValidators?: (OrderValidator | OrderValidatorInterface)[];
+  dstValidators?: OrderValidatorInitializer[];
 
   /**
    * Defines an order processor that implements the fulfillment strategy
    */
-  orderProcessor?: OrderProcessor;
+  orderProcessor?: OrderProcessorInitializer;
 }
 
-export interface ExecutorConfig {
+export interface ExecutorLaunchConfig {
   /**
    * Represents a list of validators which filter out orders for fulfillment
    */
-  validators?: (OrderValidator | OrderValidatorInterface)[];
+  validators?: OrderValidatorInitializer[];
+
+  /**
+   * Defines an order processor that implements the fulfillment strategy
+   */
+  orderProcessor?: OrderProcessorInitializer;
 
   /**
    * Token price provider
@@ -156,14 +160,9 @@ export interface ExecutorConfig {
   /**
    * Source of orders
    */
-  orderFeed: string | GetNextOrder;
+  orderFeed?: string | GetNextOrder;
 
-  /**
-   * Defines an order processor that implements the fulfillment strategy
-   */
-  orderProcessor?: OrderProcessor;
-
-  chains: ChainConfig[];
+  chains: ChainDefinition[];
 
   buckets: TokensBucket[];
 }

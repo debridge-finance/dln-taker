@@ -48,8 +48,10 @@ type WsOrderEvent = {
 };
 
 export class WsNextOrder extends GetNextOrder {
-  constructor(private wsUrl: string) {
+  private wsArgs;
+  constructor(...args: ConstructorParameters<typeof WebSocket>) {
     super();
+    this.wsArgs = args;
   }
 
   async getNextOrder(): Promise<NextOrderInfo | undefined> {
@@ -85,18 +87,22 @@ export class WsNextOrder extends GetNextOrder {
   }
 
   init(): void {
-    this.socket = new WebSocket(this.wsUrl);
     this.queue = [];
+    this.socket = new WebSocket(...this.wsArgs)
     this.socket.on("open", () => {
-      this.socket.send(JSON.stringify({ Subcription: {} }));
+      this.logger.debug("🔌 ws opened connection")
+      this.socket.send(JSON.stringify({ Subscription: {
+        live: true
+      } }));
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
-      this.logger.debug(data);
+      this.logger.debug("📨 ws received new message", data);
       if ("Order" in data) {
         const parsedEvent = data as WsOrderEvent;
-        this.logger.debug(parsedEvent.Order.order_info);
         const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
+        this.logger.debug("ws parsed order", order);
+
         const [status, taker] = this.flattenStatus(
           parsedEvent.Order.order_info
         );
