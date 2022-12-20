@@ -1,10 +1,10 @@
 import { Logger } from "pino";
 
-import { ProcessOrder, ProcessorParams } from "../interfaces";
+import { ProcessOrder, IncomingOrderContext } from "../interfaces";
 
 export class MempoolService {
   private readonly logger: Logger;
-  private readonly orderParams: ProcessorParams[] = [];
+  private readonly orderParams: IncomingOrderContext[] = [];
   private isLocked: boolean = false; // for lock process while current processing is working
   constructor(
     logger: Logger,
@@ -17,7 +17,7 @@ export class MempoolService {
     }, mempoolIntervalMs);
   }
 
-  addOrder(params: ProcessorParams) {
+  addOrder(params: IncomingOrderContext) {
     const orderId = params.orderInfo.orderId;
     this.orderParams.push(params);
     this.logger.info(`Order ${orderId} is added to mempool`);

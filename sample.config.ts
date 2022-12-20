@@ -31,7 +31,10 @@ const config: ExecutorLaunchConfig = {
     60 * 5 // 5min cache
   ),
 
-  orderProcessor: processors.processor(4/*bps*/),
+  orderProcessor: processors.universalProcessor({
+    minProfitabilityBps: 4,
+    mempoolIntervalMs: 60*5*10000 // 5m
+  }),
 
   chains: [
     {

@@ -3,7 +3,7 @@ import client, { Connection as MQConnection } from "amqplib";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { eventToOrderData, timeDiff, U256 } from "../helpers";
-import { ExecuteNextOrder, GetNextOrder, NextOrderInfo } from "../interfaces";
+import { OrderProcessorFunc, GetNextOrder, IncomingOrder } from "../interfaces";
 import { PmmEvent } from "../pmm_common";
 
 type RabbitMqConfig = {
@@ -24,7 +24,7 @@ export class RabbitNextOrder extends GetNextOrder {
     this.initialized = false;
   }
 
-  async init(process: ExecuteNextOrder) {
+  async init(process: OrderProcessorFunc) {
     this.processNextOrder = process;
     this.mqConnection = await client.connect(this.config.RABBIT_URL);
     const channel = await this.mqConnection.createChannel();
@@ -41,7 +41,7 @@ export class RabbitNextOrder extends GetNextOrder {
     this.initialized = true;
   }
 
-  transform(message: client.ConsumeMessage): NextOrderInfo | undefined {
+  transform(message: client.ConsumeMessage): IncomingOrder | undefined {
     const decoded = PmmEvent.fromBinary(message.content);
     switch (decoded.event.oneofKind) {
       case "createdSrc": {
