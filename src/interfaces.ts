@@ -1,6 +1,9 @@
 import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
+import { OrderInfoStatus } from "./enums/order.info.status";
+import { OrderProcessorContext } from "./processors/order.processor";
+
 export type ChainConfig = {
   PMM_SRC: string;
   PMM_DST: string;
@@ -22,18 +25,28 @@ export type Config = {
 
 export type NextOrderInfo = {
   orderId: string;
-  type: "created" | "fulfilled" | "other";
+  type: OrderInfoStatus;
   order: OrderData | null;
   taker?: string;
 };
 
+export type ProcessOrder = (params: ProcessorParams) => Promise<void>;
+
+export type ProcessorParams = {
+  orderInfo: NextOrderInfo;
+  context: OrderProcessorContext;
+};
+
+export type ExecuteNextOrder = (order?: NextOrderInfo) => Promise<void>;
+
 export abstract class GetNextOrder {
   protected enabledChains: ChainId[];
   protected logger: Logger;
+  protected processNextOrder: ExecuteNextOrder;
 
-  abstract init(): void;
+  constructor() {}
 
-  abstract getNextOrder(): Promise<NextOrderInfo | undefined>;
+  abstract init(processNextOrder: ExecuteNextOrder): void;
 
   setEnabledChains(enabledChains: ChainId[]) {
     this.enabledChains = enabledChains;

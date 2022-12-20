@@ -12,20 +12,18 @@ import {
   ExecutorConf,
   InitializingChain,
   SupportedChainConfig,
-} from "../executor";
+} from "../executors/executor";
+import { ProcessorParams } from "../interfaces";
 import { createClientLogger } from "../logger";
 
 export class OrderProcessorContext {
-  orderFulfilledMap: Map<string, boolean>;
   logger: Logger;
-
   config: ExecutorConf;
   giveChain: SupportedChainConfig;
-  takeChain: SupportedChainConfig;
 }
 
 export class OrderProcessorInitContext {
-  chain: InitializingChain;
+  takeChain: InitializingChain;
   buckets: TokensBucket[];
   logger: Logger;
 }
@@ -47,11 +45,7 @@ export abstract class OrderProcessor {
     chainId: ChainId,
     context: OrderProcessorInitContext
   ): Promise<void>;
-  abstract process(
-    orderId: string,
-    order: OrderData,
-    context: OrderProcessorContext
-  ): Promise<boolean>;
+  abstract process(params: ProcessorParams): Promise<void>;
 
   protected async waitIsOrderFulfilled(
     orderId: string,
@@ -63,7 +57,7 @@ export abstract class OrderProcessor {
       let state = await context.config.client.getTakeOrderStatus(
         orderId,
         order.take.chainId,
-        { web3: context.takeChain.fulfullProvider.connection as Web3 }
+        { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
       );
       const limit = 10;
       let iteration = 0;
@@ -99,7 +93,7 @@ export abstract class OrderProcessor {
       takeNativePrice,
       {
         giveWeb3: context.giveChain.fulfullProvider.connection as Web3,
-        takeWeb3: context.takeChain.fulfullProvider.connection as Web3,
+        takeWeb3: this.context.takeChain.fulfullProvider.connection as Web3,
       }
     );
     context.logger.debug(`fees=${JSON.stringify(fees)}`);

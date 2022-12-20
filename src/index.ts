@@ -1,6 +1,7 @@
-import { ExecutorEngine } from "./executor.engine";
 import { config } from "dotenv";
 import path from "path";
+
+import { ExecutorEngine } from "./executors/executor.engine";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -12,23 +13,20 @@ async function main() {
   let configPath = process.argv[2];
 
   if (configPath === undefined) {
-    configPath = path.resolve(__dirname, '..', 'executor.config.ts');
+    configPath = path.resolve(__dirname, "..", "executor.config.ts");
   }
 
-  if (!configPath.startsWith('/')) {
-    configPath = process.cwd() + '/' + configPath;
+  if (!configPath.startsWith("/")) {
+    configPath = process.cwd() + "/" + configPath;
   }
 
   console.log(`Using config file: ${configPath}`);
   const config = await import(configPath);
-  const configs = [config];
 
-  const executor = new ExecutorEngine(configs);
+  const executor = new ExecutorEngine(config);
   await executor.init();
-  await executor.start();
 }
 
-main()
-  .catch(e => {
-    console.error(`Executor failed: ${(e as Error).message}`, e.stack);
-  })
+main().catch((e) => {
+  console.error(`Executor failed: ${(e as Error).message}`, e.stack);
+});

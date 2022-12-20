@@ -9,6 +9,8 @@ import {
 import { Logger } from "pino";
 import Web3 from "web3";
 
+import { OrderInfoStatus } from "../enums/order.info.status";
+import { ProcessorParams } from "../interfaces";
 import { createClientLogger } from "../logger";
 import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
@@ -24,6 +26,11 @@ import { approveToken } from "./utils/approve";
 
 class PreswapProcessor extends OrderProcessor {
   private mempoolService: MempoolService;
+  private internalNewOrderQueue = new Set<string>();
+  private internalOldOrderQueue = new Set<string>();
+  private ordersMap = new Map<string, ProcessorParams>();
+
+  private isLocked: boolean = false;
 
   constructor(
     private readonly minProfitabilityBps: number,
@@ -37,21 +44,24 @@ class PreswapProcessor extends OrderProcessor {
     context: OrderProcessorInitContext
   ): Promise<void> {
     this.chainId = chainId;
+    this.context = context;
 
-    this.mempoolService = new MempoolService(context.logger);
-    setInterval(() => {
-      this.mempoolService.process();
-    }, this.mempoolIntervalMs);
+    this.mempoolService = new MempoolService(
+      context.logger,
+      this.process.bind(this),
+      this.mempoolIntervalMs
+    );
 
     if (chainId !== ChainId.Solana) {
       const tokens: string[] = [];
       context.buckets.forEach((bucket) => {
-        (bucket.findTokens(this.chainId) || []).forEach((token) => {
+        const tokensFromBucket = bucket.findTokens(this.chainId) || [];
+        tokensFromBucket.forEach((token) => {
           tokens.push(tokenAddressToString(this.chainId, token));
         });
       });
 
-      const client = context.chain.client as evm.PmmEvmClient;
+      const client = context.takeChain.client as evm.PmmEvmClient;
       await Promise.all([
         ...tokens.map((token) =>
           approveToken(
@@ -61,7 +71,7 @@ class PreswapProcessor extends OrderProcessor {
               chainId,
               evm.ServiceType.CrosschainForwarder
             ),
-            context.chain.fulfullProvider as EvmAdapterProvider,
+            context.takeChain.fulfullProvider as EvmAdapterProvider,
             context.logger
           )
         ),
@@ -70,7 +80,7 @@ class PreswapProcessor extends OrderProcessor {
             chainId,
             token,
             client.getContractAddress(chainId, evm.ServiceType.Destination),
-            context.chain.fulfullProvider as EvmAdapterProvider,
+            context.takeChain.fulfullProvider as EvmAdapterProvider,
             context.logger
           )
         ),
@@ -78,13 +88,71 @@ class PreswapProcessor extends OrderProcessor {
     }
   }
 
-  async process(
-    orderId: string,
-    order: OrderData,
-    context: OrderProcessorContext
-  ): Promise<boolean> {
+  async process(params: ProcessorParams): Promise<void> {
+    const { context, orderInfo } = params;
+    const { orderId, type } = orderInfo;
+    const logger = context.logger.child({ processor: "preswapProcessor" });
+
+    if (type === OrderInfoStatus.other) {
+      const message = `Order is not supported`;
+      logger.error(message);
+      throw new Error(message);
+    }
+
+    // delete completed order
+    if ([OrderInfoStatus.fulfilled, OrderInfoStatus.cancelled].includes(type)) {
+      this.internalOldOrderQueue.delete(orderId);
+      this.internalNewOrderQueue.delete(orderId);
+      this.ordersMap.delete(orderId);
+      logger.debug(`orderId ${orderId} is deleted from queue`);
+      return;
+    }
+    if (this.isLocked) {
+      if (type === OrderInfoStatus.archival) {
+        this.internalOldOrderQueue.add(orderId);
+      } else if (type === OrderInfoStatus.created) {
+        this.internalNewOrderQueue.add(orderId);
+      }
+      this.ordersMap.set(orderId, params);
+      logger.info(`Process is working`);
+      return;
+    }
+    this.isLocked = true;
+
+    try {
+      await this.processOrder(params);
+    } catch (e) {
+      logger.error(`processing ${orderId} with error: ${e}`);
+      this.mempoolService.addOrder({ orderInfo, context });
+    }
+    this.isLocked = false;
+
+    // get next order new then old
+    const nextOrderId =
+      this.internalNewOrderQueue.values().next().value ||
+      this.internalOldOrderQueue.values().next().value;
+
+    if (nextOrderId) {
+      this.process(this.ordersMap.get(nextOrderId)!);
+    }
+
+    // delete next order from quees
+    this.internalNewOrderQueue.delete(nextOrderId);
+    this.internalOldOrderQueue.delete(nextOrderId);
+    this.ordersMap.delete(nextOrderId);
+  }
+
+  private async processOrder(params: ProcessorParams): Promise<void | never> {
+    const { orderInfo, context } = params;
+    const { orderId, order } = orderInfo;
     const logger = context.logger.child({ processor: "preswapProcessor" });
     const clientLogger = createClientLogger(logger);
+
+    if (order === null) {
+      const message = "order is empty";
+      logger.error(message);
+      throw new Error(message);
+    }
 
     const bucket = context.config.buckets.find(
       (bucket) =>
@@ -92,8 +160,9 @@ class PreswapProcessor extends OrderProcessor {
         bucket.findFirstToken(order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
-      logger.info("no token bucket effectively covering both chains");
-      return false;
+      const message = "no token bucket effectively covering both chains";
+      logger.error(message);
+      throw new Error(message);
     }
     const { reserveDstToken, requiredReserveDstAmount, isProfitable } =
       await calculateExpectedTakeAmount(
@@ -103,7 +172,8 @@ class PreswapProcessor extends OrderProcessor {
         {
           client: context.config.client,
           giveConnection: context.giveChain.fulfullProvider.connection as Web3,
-          takeConnection: context.takeChain.fulfullProvider.connection as Web3,
+          takeConnection: this.context.takeChain.fulfullProvider
+            .connection as Web3,
           priceTokenService: context.config.tokenPriceService,
           buckets: context.config.buckets,
           swapConnector: context.config.swapConnector,
@@ -112,12 +182,9 @@ class PreswapProcessor extends OrderProcessor {
       );
 
     if (!isProfitable) {
-      logger.info("order is not profitable, skipping");
-      this.mempoolService.addOrder({
-        params: { orderId, order, context },
-        orderProcessor: this,
-      });
-      return false;
+      const message = "order is not profitable, skipping";
+      logger.error(message);
+      throw new Error(message);
     }
 
     const fees = await this.getFee(order, context);
@@ -125,7 +192,7 @@ class PreswapProcessor extends OrderProcessor {
       order.take.chainId,
       order.give.chainId,
       fees.executionFees.total,
-      context.takeChain.fulfullProvider.connection as Web3
+      this.context.takeChain.fulfullProvider.connection as Web3
     );
     logger.debug(`executionFeeAmount=${JSON.stringify(executionFeeAmount)}`);
 
@@ -138,22 +205,19 @@ class PreswapProcessor extends OrderProcessor {
       context,
       logger
     );
-    if (context.orderFulfilledMap.has(orderId)) {
-      context.orderFulfilledMap.delete(orderId);
-      logger.error(`transaction is fulfilled`);
-      return false;
-    }
 
     try {
-      const txFulfill = await context.takeChain.fulfullProvider.sendTransaction(
-        fulfillTx.tx,
-        { logger }
-      );
+      const txFulfill =
+        await this.context.takeChain.fulfullProvider.sendTransaction(
+          fulfillTx.tx,
+          { logger }
+        );
       logger.info(`fulfill transaction ${txFulfill} is completed`);
     } catch (e) {
       console.error(e);
-      logger.error(`fulfill transaction failed: ${e}`);
-      return false;
+      const message = `fulfill transaction failed: ${e}`;
+      logger.error(message);
+      throw new Error(message);
     }
     await this.waitIsOrderFulfilled(orderId, order, context, logger);
 
@@ -168,13 +232,11 @@ class PreswapProcessor extends OrderProcessor {
       context,
       logger
     );
-    const txUnlock = await context.takeChain.unlockProvider.sendTransaction(
-      unlockTx,
-      { logger }
-    );
+    const txUnlock =
+      await this.context.takeChain.unlockProvider.sendTransaction(unlockTx, {
+        logger,
+      });
     logger.info(`unlock transaction ${txUnlock} is completed`);
-
-    return true;
   }
 
   private async createOrderUnlockTx(
@@ -189,8 +251,9 @@ class PreswapProcessor extends OrderProcessor {
     // todo fix any
     let unlockTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (context.takeChain.unlockProvider as SolanaProviderAdapter)
-        .wallet.publicKey;
+      const wallet = (
+        this.context.takeChain.unlockProvider as SolanaProviderAdapter
+      ).wallet.publicKey;
       unlockTxPayload = {
         unlocker: wallet,
       };
@@ -206,7 +269,7 @@ class PreswapProcessor extends OrderProcessor {
               reward2: "0",
             };
       unlockTxPayload = {
-        web3: (context.takeChain.unlockProvider as EvmAdapterProvider)
+        web3: (this.context.takeChain.unlockProvider as EvmAdapterProvider)
           .connection,
         ...rewards,
       };
@@ -239,17 +302,17 @@ class PreswapProcessor extends OrderProcessor {
     let fullFillTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
       const wallet = (
-        context.takeChain.fulfullProvider as SolanaProviderAdapter
+        this.context.takeChain.fulfullProvider as SolanaProviderAdapter
       ).wallet.publicKey;
       fullFillTxPayload = {
         taker: wallet,
       };
     } else {
       fullFillTxPayload = {
-        web3: context.takeChain.fulfullProvider.connection,
+        web3: this.context.takeChain.fulfullProvider.connection,
         permit: "0x",
-        takerAddress: context.takeChain.fulfullProvider.address,
-        unlockAuthority: context.takeChain.unlockProvider.address,
+        takerAddress: this.context.takeChain.fulfullProvider.address,
+        unlockAuthority: this.context.takeChain.unlockProvider.address,
       };
     }
     fullFillTxPayload.swapConnector = context.config.swapConnector;
