@@ -4,7 +4,7 @@ import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { U256 } from "../helpers";
-import { ExecuteNextOrder, GetNextOrder, NextOrderInfo } from "../interfaces";
+import { OrderProcessorFunc, GetNextOrder, IncomingOrder } from "../interfaces";
 
 type OrderInfo = {
   order: OrderData;
@@ -71,7 +71,7 @@ export class WsNextOrder extends GetNextOrder {
     this.wsArgs = args;
   }
 
-  init(process: ExecuteNextOrder): void {
+  init(process: OrderProcessorFunc): void {
     super.processNextOrder = process;
     this.socket = new WebSocket(...this.wsArgs);
     this.socket.on("open", () => {
@@ -108,7 +108,7 @@ export class WsNextOrder extends GetNextOrder {
 
   private transformToNextOrderInfo(
     orderInfo: OrderInfo
-  ): NextOrderInfo | undefined {
+  ): IncomingOrder | undefined {
     switch (orderInfo.state) {
       case "Created":
         return {

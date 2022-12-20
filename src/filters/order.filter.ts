@@ -2,21 +2,21 @@ import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
 import {
-  ExecutorConf,
-  InitializingChain,
-  SupportedChainConfig,
+  IExecutor,
+  ExecutorInitializingChain,
+  ExecutorSupportedChain,
 } from "../executors/executor";
 
 export interface FilterContext {
   logger: Logger;
-  config: ExecutorConf;
-  giveChain: SupportedChainConfig;
-  takeChain: SupportedChainConfig;
+  config: IExecutor;
+  giveChain: ExecutorSupportedChain;
+  takeChain: ExecutorSupportedChain;
 }
 
 export type OrderFilterInitContext = {
   logger: Logger;
-  chain: InitializingChain;
+  chain: ExecutorInitializingChain;
 };
 
 export type OrderFilterInitializer = (

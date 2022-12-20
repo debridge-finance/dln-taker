@@ -19,7 +19,7 @@ import { Logger } from "pino";
 import { ExecutorLaunchConfig } from "../config";
 import { PRODUCTION } from "../environments";
 import { OrderFilter } from "../filters";
-import { GetNextOrder, NextOrderInfo } from "../interfaces";
+import { GetNextOrder, IncomingOrder } from "../interfaces";
 import { WsNextOrder } from "../orderFeeds/ws.order.feed";
 import * as processors from "../processors";
 import { createWeb3WithPrivateKey } from "../processors/utils/create.web3.with.private.key";
@@ -28,7 +28,7 @@ import { EvmRebroadcastAdapterProviderAdapter } from "../providers/evm.rebroadca
 import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
-export type InitializingChain = {
+export type ExecutorInitializingChain = {
   chain: ChainId;
   chainRpc: string;
   unlockProvider: ProviderAdapter;
@@ -36,37 +36,36 @@ export type InitializingChain = {
   client: Solana.PmmClient | Evm.PmmEvmClient;
 };
 
-export type SupportedChainConfig = {
+export type ExecutorSupportedChain = {
   chain: ChainId;
   chainRpc: string;
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
-  orderProcessor: processors.OrderProcessor;
+  orderProcessor: processors.IOrderProcessor;
   unlockProvider: ProviderAdapter;
   fulfullProvider: ProviderAdapter;
   beneficiary: string;
   client: Solana.PmmClient | Evm.PmmEvmClient;
 };
 
-export interface ExecutorConf {
+export interface IExecutor {
   readonly tokenPriceService: PriceTokenService;
   readonly swapConnector: SwapConnector;
   readonly orderFeed: GetNextOrder;
-  readonly chains: { [key in ChainId]?: SupportedChainConfig };
+  readonly chains: { [key in ChainId]?: ExecutorSupportedChain };
   readonly buckets: TokensBucket[];
   readonly client: PMMClient;
 }
 
-export class Executor implements ExecutorConf {
+export class Executor implements IExecutor {
   tokenPriceService: PriceTokenService;
   swapConnector: SwapConnector;
   orderFeed: GetNextOrder;
-  chains: { [key in ChainId]?: SupportedChainConfig } = {};
+  chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
   buckets: TokensBucket[] = [];
   client: PMMClient;
 
   private isInitialized = false;
-  private pmmClient: PMMClient;
   private readonly url1Inch = "https://nodes.debridge.finance";
   constructor(private readonly logger: Logger) {}
 
@@ -185,7 +184,7 @@ export class Executor implements ExecutorConf {
         const processorInitializer =
           chain.orderProcessor ||
           config.orderProcessor ||
-          processors.processor(4);
+          processors.universalProcessor();
         const initializingChain = {
           chain: chain.chain,
           chainRpc: chain.chainRpc,
@@ -235,7 +234,7 @@ export class Executor implements ExecutorConf {
       })
     );
 
-    this.client = this.pmmClient = new PMMClient(clients);
+    this.client = new PMMClient(clients);
 
     let orderFeed = config.orderFeed as GetNextOrder;
     if (typeof orderFeed === "string" || !orderFeed) {
@@ -251,7 +250,7 @@ export class Executor implements ExecutorConf {
     this.isInitialized = true;
   }
 
-  async execute(nextOrderInfo?: NextOrderInfo) {
+  async execute(nextOrderInfo?: IncomingOrder) {
     if (!this.isInitialized) throw new Error("executor is not initialized");
     try {
       this.logger.info(
@@ -271,7 +270,7 @@ export class Executor implements ExecutorConf {
   }
 
   private async processing(
-    nextOrderInfo: NextOrderInfo,
+    nextOrderInfo: IncomingOrder,
     logger: Logger
   ): Promise<boolean> {
     const { order, orderId } = nextOrderInfo;

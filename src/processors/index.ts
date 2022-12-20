@@ -1,4 +1,4 @@
-import { OrderProcessor, OrderProcessorInitializer } from "./order.processor";
-import { processor } from "./processor";
+import { IOrderProcessor, OrderProcessorInitializer } from "./base";
+import { universalProcessor } from "./universal";
 
-export { OrderProcessor, processor, OrderProcessorInitializer };
+export { IOrderProcessor, universalProcessor, OrderProcessorInitializer };

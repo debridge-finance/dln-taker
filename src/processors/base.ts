@@ -9,21 +9,21 @@ import { Logger } from "pino";
 import Web3 from "web3";
 
 import {
-  ExecutorConf,
-  InitializingChain,
-  SupportedChainConfig,
+  IExecutor,
+  ExecutorInitializingChain,
+  ExecutorSupportedChain,
 } from "../executors/executor";
-import { ProcessorParams } from "../interfaces";
+import { IncomingOrderContext } from "../interfaces";
 import { createClientLogger } from "../logger";
 
 export class OrderProcessorContext {
   logger: Logger;
-  config: ExecutorConf;
-  giveChain: SupportedChainConfig;
+  config: IExecutor;
+  giveChain: ExecutorSupportedChain;
 }
 
 export class OrderProcessorInitContext {
-  takeChain: InitializingChain;
+  takeChain: ExecutorInitializingChain;
   buckets: TokensBucket[];
   logger: Logger;
 }
@@ -31,13 +31,17 @@ export class OrderProcessorInitContext {
 export type OrderProcessorInitializer = (
   chainId: ChainId,
   context: OrderProcessorInitContext
-) => Promise<OrderProcessor>;
+) => Promise<IOrderProcessor>;
+
+export interface IOrderProcessor {
+  process(params: IncomingOrderContext): Promise<void>;
+}
 
 /**
  * Represents an order fulfillment engine. Cannot be chained, but can be nested.
  *
  */
-export abstract class OrderProcessor {
+export abstract class BaseOrderProcessor implements IOrderProcessor {
   protected chainId: ChainId;
   protected context: OrderProcessorInitContext;
 
@@ -45,7 +49,7 @@ export abstract class OrderProcessor {
     chainId: ChainId,
     context: OrderProcessorInitContext
   ): Promise<void>;
-  abstract process(params: ProcessorParams): Promise<void>;
+  abstract process(params: IncomingOrderContext): Promise<void>;
 
   protected async waitIsOrderFulfilled(
     orderId: string,

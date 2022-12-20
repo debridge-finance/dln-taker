@@ -6,37 +6,44 @@ import {
   OrderData,
   tokenAddressToString,
 } from "@debridge-finance/dln-client";
-import { Logger } from "pino";
+import { Logger, P } from "pino";
 import Web3 from "web3";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
-import { ProcessorParams } from "../interfaces";
+import { IncomingOrderContext } from "../interfaces";
 import { createClientLogger } from "../logger";
 import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
 import { MempoolService } from "./mempool.service";
 import {
-  OrderProcessor,
+  BaseOrderProcessor,
   OrderProcessorContext,
   OrderProcessorInitContext,
   OrderProcessorInitializer,
-} from "./order.processor";
+} from "./base";
 import { approveToken } from "./utils/approve";
 
-class PreswapProcessor extends OrderProcessor {
+export type UniversalProcessorParams = {
+  minProfitabilityBps: number
+  mempoolIntervalMs: number
+}
+
+class UniversalProcessor extends BaseOrderProcessor {
   private mempoolService: MempoolService;
-  private internalNewOrderQueue = new Set<string>();
-  private internalOldOrderQueue = new Set<string>();
-  private ordersMap = new Map<string, ProcessorParams>();
+  private priorityQueue = new Set<string>();
+  private queue = new Set<string>();
+  private ordersMap = new Map<string, IncomingOrderContext>();
 
   private isLocked: boolean = false;
+  private params: UniversalProcessorParams = {
+    minProfitabilityBps: 4,
+    mempoolIntervalMs: 60 * 10000 // every 60s
+  }
 
-  constructor(
-    private readonly minProfitabilityBps: number,
-    private readonly mempoolIntervalMs: number
-  ) {
+  constructor(params?: Partial<UniversalProcessorParams>) {
     super();
+    Object.assign(this.params, params || {});
   }
 
   async init(
@@ -49,7 +56,7 @@ class PreswapProcessor extends OrderProcessor {
     this.mempoolService = new MempoolService(
       context.logger,
       this.process.bind(this),
-      this.mempoolIntervalMs
+      this.params.mempoolIntervalMs
     );
 
     if (chainId !== ChainId.Solana) {
@@ -88,70 +95,97 @@ class PreswapProcessor extends OrderProcessor {
     }
   }
 
-  async process(params: ProcessorParams): Promise<void> {
+  async process(params: IncomingOrderContext): Promise<void> {
     const { context, orderInfo } = params;
     const { orderId, type } = orderInfo;
-    const logger = context.logger.child({ processor: "preswapProcessor" });
 
-    if (type === OrderInfoStatus.other) {
-      const message = `Order is not supported`;
-      logger.error(message);
-      throw new Error(message);
-    }
+    switch (type) {
+      case OrderInfoStatus.archival:
+      case OrderInfoStatus.created: {
+        return this.tryProcess(params);
+      }
 
-    // delete completed order
-    if ([OrderInfoStatus.fulfilled, OrderInfoStatus.cancelled].includes(type)) {
-      this.internalOldOrderQueue.delete(orderId);
-      this.internalNewOrderQueue.delete(orderId);
-      this.ordersMap.delete(orderId);
-      logger.debug(`orderId ${orderId} is deleted from queue`);
-      return;
+      case OrderInfoStatus.cancelled:
+      case OrderInfoStatus.fulfilled: {
+        this.queue.delete(orderId);
+        this.priorityQueue.delete(orderId);
+        this.ordersMap.delete(orderId);
+        context.logger.debug(`Order ${orderId} is deleted from queues`);
+        return;
+      }
+
+      case OrderInfoStatus.other:
+      default: {
+        context.logger.error(`OrderInfo status=${OrderInfoStatus[type]} not implemented, skipping`)
+        return;
+      }
     }
+  }
+
+  private async tryProcess(params: IncomingOrderContext): Promise<void> {
+    const { context, orderInfo } = params;
+    const { orderId, type } = orderInfo;
+
+    // already processing an order
     if (this.isLocked) {
-      if (type === OrderInfoStatus.archival) {
-        this.internalOldOrderQueue.add(orderId);
-      } else if (type === OrderInfoStatus.created) {
-        this.internalNewOrderQueue.add(orderId);
+      context.logger.debug(`Processor is currently processing an order, enqueuing order to ${OrderInfoStatus[params.orderInfo.type]} queue`)
+
+      switch (params.orderInfo.type) {
+        case OrderInfoStatus.archival: {
+          this.queue.add(orderId);
+          break;
+        }
+        case OrderInfoStatus.created: {
+          this.priorityQueue.add(orderId);
+          break;
+        }
+        default: throw new Error(`Unexpected case ${OrderInfoStatus[params.orderInfo.type]} in tryProcess`)
       }
       this.ordersMap.set(orderId, params);
-      logger.info(`Process is working`);
       return;
     }
-    this.isLocked = true;
 
+    // process this order
+    this.isLocked = true;
     try {
       await this.processOrder(params);
     } catch (e) {
-      logger.error(`processing ${orderId} with error: ${e}`);
-      this.mempoolService.addOrder({ orderInfo, context });
+      context.logger.error(`processing ${orderId} failed with error: ${e}`, e);
     }
     this.isLocked = false;
 
-    // get next order new then old
-    const nextOrderId =
-      this.internalNewOrderQueue.values().next().value ||
-      this.internalOldOrderQueue.values().next().value;
-
-    if (nextOrderId) {
-      this.process(this.ordersMap.get(nextOrderId)!);
+    // forward to the next order
+    // TODO try to get rid of recursion here. Use setInterval?
+    const nextOrder = this.pickNextOrder()
+    if (nextOrder) {
+      this.process(nextOrder);
     }
-
-    // delete next order from quees
-    this.internalNewOrderQueue.delete(nextOrderId);
-    this.internalOldOrderQueue.delete(nextOrderId);
-    this.ordersMap.delete(nextOrderId);
   }
 
-  private async processOrder(params: ProcessorParams): Promise<void | never> {
+  private pickNextOrder() {
+    const nextOrderId =
+      this.priorityQueue.values().next().value ||
+      this.queue.values().next().value;
+
+    if (nextOrderId) {
+      const order = this.ordersMap.get(nextOrderId);
+
+      this.priorityQueue.delete(nextOrderId);
+      this.queue.delete(nextOrderId);
+      this.ordersMap.delete(nextOrderId);
+
+      return order
+    }
+  }
+
+  private async processOrder(params: IncomingOrderContext): Promise<void | never> {
     const { orderInfo, context } = params;
     const { orderId, order } = orderInfo;
-    const logger = context.logger.child({ processor: "preswapProcessor" });
-    const clientLogger = createClientLogger(logger);
+    const logger = context.logger.child({ processor: "universalProcessor", orderId: orderId });
 
-    if (order === null) {
-      const message = "order is empty";
-      logger.error(message);
-      throw new Error(message);
+    if (!order || !orderId) {
+      logger.error("order is empty, should not happen")
+      throw new Error("order is empty, should not happen");
     }
 
     const bucket = context.config.buckets.find(
@@ -160,15 +194,14 @@ class PreswapProcessor extends OrderProcessor {
         bucket.findFirstToken(order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
-      const message = "no token bucket effectively covering both chains";
-      logger.error(message);
-      throw new Error(message);
+      throw new Error("no token bucket effectively covering both chains. Seems like no reserve tokens are configured to fulfill orders");
     }
+
     const { reserveDstToken, requiredReserveDstAmount, isProfitable } =
       await calculateExpectedTakeAmount(
         order,
         optimisticSlippageBps(),
-        this.minProfitabilityBps,
+        this.params.minProfitabilityBps,
         {
           client: context.config.client,
           giveConnection: context.giveChain.fulfullProvider.connection as Web3,
@@ -177,14 +210,13 @@ class PreswapProcessor extends OrderProcessor {
           priceTokenService: context.config.tokenPriceService,
           buckets: context.config.buckets,
           swapConnector: context.config.swapConnector,
-          logger: clientLogger,
+          logger: createClientLogger(logger),
         }
       );
 
     if (!isProfitable) {
-      const message = "order is not profitable, skipping";
-      logger.error(message);
-      throw new Error(message);
+      logger.info("order is not profitable, postponing it to the mempool");
+      this.mempoolService.addOrder({ orderInfo, context });
     }
 
     const fees = await this.getFee(order, context);
@@ -194,7 +226,6 @@ class PreswapProcessor extends OrderProcessor {
       fees.executionFees.total,
       this.context.takeChain.fulfullProvider.connection as Web3
     );
-    logger.debug(`executionFeeAmount=${JSON.stringify(executionFeeAmount)}`);
 
     // fulfill order
     const fulfillTx = await this.createOrderFullfillTx(
@@ -214,15 +245,15 @@ class PreswapProcessor extends OrderProcessor {
         );
       logger.info(`fulfill transaction ${txFulfill} is completed`);
     } catch (e) {
-      console.error(e);
-      const message = `fulfill transaction failed: ${e}`;
-      logger.error(message);
-      throw new Error(message);
+      logger.error(`fulfill transaction failed: ${e}`)
+      this.mempoolService.addOrder({ orderInfo, context });
+      return;
     }
+
     await this.waitIsOrderFulfilled(orderId, order, context, logger);
 
+    // unlocking
     const beneficiary = context.giveChain.beneficiary;
-
     const unlockTx = await this.createOrderUnlockTx(
       orderId,
       order,
@@ -335,15 +366,9 @@ class PreswapProcessor extends OrderProcessor {
   }
 }
 
-export const processor = (
-  minProfitabilityBps: number,
-  mempoolIntervalMs: number = 30_000
-): OrderProcessorInitializer => {
+export const universalProcessor = (params?: Partial<UniversalProcessorParams>): OrderProcessorInitializer => {
   return async (chainId: ChainId, context: OrderProcessorInitContext) => {
-    const processor = new PreswapProcessor(
-      minProfitabilityBps,
-      mempoolIntervalMs
-    );
+    const processor = new UniversalProcessor(params);
     await processor.init(chainId, context);
     return processor;
   };
