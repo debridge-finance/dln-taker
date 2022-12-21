@@ -53,23 +53,11 @@ const PRODUCTION: Env = {
     pmmSrc: "0xeF4fB24aD0916217251F553c0596F8Edc630EB66",
     pmmDst: "0xE7351Fd770A37282b91D153Ee690B63579D6dd7f",
     evm: {
-      forwarderContract: undefined, // MUST BE OVERWRITTEN WHEN BEING DEPLOYED
+      forwarderContract: '0xc31fc94F3Fd088eE53ac915D6e8a14fF25a23C47'
     },
   },
 
   chains: {
-    [ChainId.Polygon]: {
-      evm: {
-        forwarderContract: "0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd",
-      },
-    },
-
-    [ChainId.BSC]: {
-      evm: {
-        forwarderContract: "0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd",
-      },
-    },
-
     [ChainId.Solana]: {
       deBridgeContract: "Lima82j8YvHFYe8qa4kGgb3fvPFEnR3PoV6UyGUpHLq",
       pmmSrc: "src5qyZHqTqecJV4aY6Cb6zDZLMDzrDKKezs22MPHr4",

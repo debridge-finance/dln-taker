@@ -5,13 +5,13 @@ import { PRODUCTION as environment } from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 
 const ENABLED_CHAINS: ChainId[] =
-(process?.env?.ENABLED_CHAINS || '')
-  .split(',')
-  .map(id => {
-    const chainId = parseInt(id, 10);
-    if (!ChainId[chainId]) throw new Error(`Unknown chain id: ${id}`)
-    return chainId
-  })
+  (process?.env?.ENABLED_CHAINS || '')
+    .split(',')
+    .map(id => {
+      const chainId = parseInt(id, 10);
+      if (!ChainId[chainId]) throw new Error(`Unknown chain id: ${id}`)
+      return chainId
+    })
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(
