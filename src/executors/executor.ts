@@ -89,8 +89,7 @@ export class Executor implements IExecutor {
     this.buckets = config.buckets;
 
     const clients: { [key in number]: any } = {};
-    await Promise.all(
-      config.chains.map(async (chain) => {
+    for (let chain of config.chains) {
         this.logger.info(`initializing ${ChainId[chain.chain]}...`);
 
         let client, unlockProvider, fulfullProvider;
@@ -237,8 +236,7 @@ export class Executor implements IExecutor {
         };
 
         clients[chain.chain] = client;
-      })
-    );
+      }
 
     this.client = new PMMClient(clients);
 

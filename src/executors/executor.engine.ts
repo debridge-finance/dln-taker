@@ -19,6 +19,6 @@ export class ExecutorEngine {
   }
 
   async init() {
-    await this.executor.init(this.executorConfig);
+    return this.executor.init(this.executorConfig);
   }
 }

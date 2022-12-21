@@ -28,5 +28,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(`Executor failed: ${(e as Error).message}`, e.stack);
+  console.error(`Launching executor failed: ${(e as Error).message}`, e.stack);
+  process.exit(1);
 });
