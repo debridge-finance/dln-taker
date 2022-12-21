@@ -42,7 +42,7 @@ const config: ExecutorLaunchConfig = {
 
   orderProcessor: processors.universalProcessor({
     minProfitabilityBps: 4,
-    mempoolIntervalMs: 60*5*10000 // 5m
+    mempoolInterval: 60 * 5 // 5m
   }),
 
   chains: [

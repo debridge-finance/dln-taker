@@ -9,12 +9,12 @@ export class MempoolService {
   constructor(
     logger: Logger,
     private readonly processOrderFunction: ProcessOrder,
-    mempoolIntervalMs: number
+    mempoolInterval: number
   ) {
     this.logger = logger.child({ service: "MempoolService" });
     setInterval(() => {
       this.process();
-    }, mempoolIntervalMs);
+    }, mempoolInterval * 1000);
   }
 
   addOrder(params: IncomingOrderContext) {

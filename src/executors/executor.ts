@@ -262,12 +262,12 @@ export class Executor implements IExecutor {
     if (nextOrderInfo && nextOrderInfo.order && nextOrderInfo.orderId) {
       const orderId = nextOrderInfo.orderId;
       const logger = this.logger.child({ orderId });
-      logger.info(`start processing`);
+      logger.info(`executing order...`);
       try {
-        await this.processing(nextOrderInfo, logger);
-        logger.info(`successfully processed`);
+        await this.executeOrder(nextOrderInfo, logger);
+        logger.info(`execution finished`);
       } catch (e) {
-        logger.error(`received error while processing order: ${e}`, e);
+        logger.error(`received error while execution: ${e}`, e);
         console.error(e);
       }
     }
@@ -276,7 +276,7 @@ export class Executor implements IExecutor {
     }
   }
 
-  private async processing(
+  private async executeOrder(
     nextOrderInfo: IncomingOrder,
     logger: Logger
   ): Promise<boolean> {
@@ -284,16 +284,16 @@ export class Executor implements IExecutor {
     if (!order || !orderId) throw new Error("Order is undefined");
 
     const takeChain = this.chains[order.take.chainId];
-    if (!takeChain)
-      throw new Error(
-        `${ChainId[order.take.chainId]} not configured, skipping order`
-      );
+    if (!takeChain) {
+      logger.info(`${ChainId[order.take.chainId]} not configured, dropping`);
+      return false;
+    }
 
     const giveChain = this.chains[order.give.chainId];
-    if (!giveChain)
-      throw new Error(
-        `${ChainId[order.give.chainId]} not configured, skipping order`
-      );
+    if (!giveChain) {
+      logger.info(`${ChainId[order.give.chainId]} not configured, dropping`);
+      return false;
+    }
 
     // to accept an order, all filters must approve the order.
     // executor invokes three groups of filters:
@@ -317,7 +317,7 @@ export class Executor implements IExecutor {
     //
     // run filters
     //
-    logger.info("Order filtering is started");
+    logger.info("running filters against the order");
     const orderFilters = await Promise.all(
       listOrderFilters.map((filter) =>
         filter(order, {
@@ -330,15 +330,15 @@ export class Executor implements IExecutor {
     );
 
     if (!orderFilters.every((it) => it)) {
-      logger.info("Order filtering is failed");
+      logger.info("order has been filtered off, dropping");
       return false;
     }
-    logger.info("Order filtering is finished");
+    logger.info("order has been filtered out, accepting");
 
     //
     // run processor
     //
-    logger.info(`OrderProcessor is started`);
+    logger.info(`passing the order to the processor`);
     takeChain.orderProcessor.process({
       orderInfo: nextOrderInfo,
       context: {

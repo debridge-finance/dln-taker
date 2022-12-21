@@ -26,7 +26,7 @@ import { approveToken } from "./utils/approve";
 
 export type UniversalProcessorParams = {
   minProfitabilityBps: number
-  mempoolIntervalMs: number
+  mempoolInterval: number
 }
 
 class UniversalProcessor extends BaseOrderProcessor {
@@ -38,7 +38,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   private isLocked: boolean = false;
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
-    mempoolIntervalMs: 60 * 10000 // every 60s
+    mempoolInterval: 60 // every 60s
   }
 
   constructor(params?: Partial<UniversalProcessorParams>) {
@@ -54,9 +54,9 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.context = context;
 
     this.mempoolService = new MempoolService(
-      context.logger,
+      context.logger.child({ universalProcessorChain: chainId }),
       this.process.bind(this),
-      this.params.mempoolIntervalMs
+      this.params.mempoolInterval
     );
 
     if (chainId !== ChainId.Solana) {
@@ -197,10 +197,9 @@ class UniversalProcessor extends BaseOrderProcessor {
       throw new Error("no token bucket effectively covering both chains. Seems like no reserve tokens are configured to fulfill orders");
     }
 
-    const { reserveDstToken, requiredReserveDstAmount, isProfitable } =
+    const { reserveDstToken, requiredReserveDstAmount, isProfitable, reserveToTakeSlippageBps } =
       await calculateExpectedTakeAmount(
         order,
-        optimisticSlippageBps(),
         this.params.minProfitabilityBps,
         {
           client: context.config.client,
@@ -234,6 +233,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       order,
       reserveDstToken,
       requiredReserveDstAmount,
+      reserveToTakeSlippageBps,
       context,
       logger
     );
@@ -328,6 +328,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     order: OrderData,
     reserveDstToken: Uint8Array,
     reservedAmount: string,
+    reserveToTakeSlippageBps: number | null,
     context: OrderProcessorContext,
     logger: Logger
   ) {
@@ -349,7 +350,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
     fullFillTxPayload.swapConnector = context.config.swapConnector;
     fullFillTxPayload.reservedAmount = reservedAmount;
-    fullFillTxPayload.slippageBps = optimisticSlippageBps();
+    fullFillTxPayload.slippageBps = reserveToTakeSlippageBps;
     fullFillTxPayload.loggerInstance = createClientLogger(logger);
     const fulfillTx = await context.config.client.preswapAndFulfillOrder(
       order,
