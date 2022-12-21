@@ -4,7 +4,7 @@ import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { U256 } from "../helpers";
-import { OrderProcessorFunc, GetNextOrder, IncomingOrder } from "../interfaces";
+import { GetNextOrder, IncomingOrder, OrderProcessorFunc } from "../interfaces";
 
 type OrderInfo = {
   order: OrderData;
@@ -81,6 +81,11 @@ export class WsNextOrder extends GetNextOrder {
           Subscription: {
             live: true,
           },
+        })
+      );
+      this.socket.send(
+        JSON.stringify({
+          GetArchive: {},
         })
       );
     });
