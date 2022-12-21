@@ -1,10 +1,12 @@
-import Web3 from "web3";
-import {ProviderAdapter, SendTransactionContext} from "./provider.adapter";
-import { clearInterval, clearTimeout } from "timers";
 import BigNumber from "bignumber.js";
-import {EvmRebroadcastAdapterOpts} from "../config";
-import {Tx} from "./types/tx";
-import {Logger} from "pino";
+import { Logger } from "pino";
+import { clearInterval, clearTimeout } from "timers";
+import Web3 from "web3";
+
+import { EvmRebroadcastAdapterOpts } from "../config";
+
+import { ProviderAdapter, SendTransactionContext } from "./provider.adapter";
+import { Tx } from "./types/tx";
 
 export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
   wallet: never;
@@ -13,7 +15,10 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
   private rebroadcast: EvmRebroadcastAdapterOpts = {};
 
-  constructor(public readonly connection: Web3,  rebroadcast?: EvmRebroadcastAdapterOpts) {
+  constructor(
+    public readonly connection: Web3,
+    rebroadcast?: EvmRebroadcastAdapterOpts
+  ) {
     this.fillDefaultVariables(rebroadcast);
   }
 
@@ -21,10 +26,11 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
     return this.connection.eth.defaultAccount!;
   }
 
-
   async sendTransaction(data: unknown, context: SendTransactionContext) {
     const tx = data as Tx;
-    const nonce = await this.connection.eth.getTransactionCount (this.connection.eth.defaultAccount!);
+    const nonce = await this.connection.eth.getTransactionCount(
+      this.connection.eth.defaultAccount!
+    );
     let nextGasPrice = await this.connection.eth.getGasPrice();
 
     // {{{ DEBUG
@@ -33,10 +39,15 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
     // }}}
 
     if (this.staleTx && this.staleTx.nonce! >= nonce) {
-      nextGasPrice = BigNumber.max(nextGasPrice, new BigNumber(this.staleTx.gasPrice!).multipliedBy(this.rebroadcast.bumpGasPriceMultiplier!)).toFixed(0);
+      nextGasPrice = BigNumber.max(
+        nextGasPrice,
+        new BigNumber(this.staleTx.gasPrice!).multipliedBy(
+          this.rebroadcast.bumpGasPriceMultiplier!
+        )
+      ).toFixed(0);
     }
 
-    let currentTx = {
+    const currentTx = {
       ...tx,
       nonce,
       gasPrice: nextGasPrice,
@@ -57,7 +68,9 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
       const fail = (message: string) => {
         this.staleTx = currentTx;
         clear();
-        context.logger.error(`Cannot confirm tx ${currentTxHash}, marking it as stale for future replacement. Reason: ${message}`);
+        context.logger.error(
+          `Cannot confirm tx ${currentTxHash}, marking it as stale for future replacement. Reason: ${message}`
+        );
         reject(message);
       };
 
@@ -66,10 +79,13 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
         pollingInterval = setInterval(async () => {
           try {
-            context.logger.debug(`[EVM ${currentTxHash}] poller`)
+            context.logger.debug(`[EVM ${currentTxHash}] poller`);
 
-            let transactionReceiptResult = await this.connection.eth.getTransactionReceipt(currentTxHash);
-            context.logger.debug(`[EVM ${currentTxHash}] poller received tx receipt, status: ${transactionReceiptResult?.status}`);
+            const transactionReceiptResult =
+              await this.connection.eth.getTransactionReceipt(currentTxHash);
+            context.logger.debug(
+              `[EVM ${currentTxHash}] poller received tx receipt, status: ${transactionReceiptResult?.status}`
+            );
 
             if (transactionReceiptResult?.status === true) {
               context.logger.debug(`[EVM ${currentTxHash}] succeeded`);
@@ -83,9 +99,11 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
               fail(`tx ${currentTxHash} reverted`);
             }
           } catch (e) {
-            context.logger.error(`[EVM ${currentTxHash}] poller raised an error: ${e}`);
+            context.logger.error(
+              `[EVM ${currentTxHash}] poller raised an error: ${e}`
+            );
             context.logger.error(e);
-            //todo discuss should we throw here
+            // todo discuss should we throw here
           }
         }, this.rebroadcast.pollingInterval);
 
@@ -94,50 +112,78 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
           try {
             context.logger.debug(`[EVM ${currentTxHash}] rebroadcasting`);
 
-            if (this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast) {
-              context.logger.debug(`[EVM ${currentTxHash}] rebroadcasting aborted, no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts})`);
+            if (
+              this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast
+            ) {
+              context.logger.debug(
+                `[EVM ${currentTxHash}] rebroadcasting aborted, no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts})`
+              );
 
-              fail(`rebroadcasting aborted, no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts}`)
+              fail(
+                `rebroadcasting aborted, no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts}`
+              );
             }
 
             // pick gas price for bumping
             const currentGasPrice = await this.connection.eth.getGasPrice();
-            const bumpedGasPrice = new BigNumber(nextGasPrice).multipliedBy(this.rebroadcast.bumpGasPriceMultiplier!);
-            nextGasPrice = BigNumber.max(currentGasPrice, bumpedGasPrice).toFixed(0);
-            context.logger.debug(`[EVM ${currentTxHash}] picking bumped gas: current=${currentGasPrice}, bumped=${bumpedGasPrice}, picked=${nextGasPrice}`)
+            const bumpedGasPrice = new BigNumber(nextGasPrice).multipliedBy(
+              this.rebroadcast.bumpGasPriceMultiplier!
+            );
+            nextGasPrice = BigNumber.max(
+              currentGasPrice,
+              bumpedGasPrice
+            ).toFixed(0);
+            context.logger.debug(
+              `[EVM ${currentTxHash}] picking bumped gas: current=${currentGasPrice}, bumped=${bumpedGasPrice}, picked=${nextGasPrice}`
+            );
 
             // check bumped gas price
             currentTx.gasPrice = nextGasPrice;
-            if (this.rebroadcast.rebroadcastMaxBumpedGasPriceWei
-              && new BigNumber(nextGasPrice).gt(this.rebroadcast.rebroadcastMaxBumpedGasPriceWei)) {
-                context.logger.debug(`[EVM ${currentTxHash}] rebroadcasting aborted, picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`)
-                fail(`rebroadcasting aborted, picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`)
+            if (
+              this.rebroadcast.rebroadcastMaxBumpedGasPriceWei &&
+              new BigNumber(nextGasPrice).gt(
+                this.rebroadcast.rebroadcastMaxBumpedGasPriceWei
+              )
+            ) {
+              context.logger.debug(
+                `[EVM ${currentTxHash}] rebroadcasting aborted, picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`
+              );
+              fail(
+                `rebroadcasting aborted, picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`
+              );
             }
 
             // run re-broadcast
             attemptsRebroadcast++;
-            const rebroadcastedTxHash = await this.sendTx(currentTx, context.logger);
-            context.logger.debug(`[EVM ${currentTxHash}] rebroadcasted as ${rebroadcastedTxHash}`);
+            const rebroadcastedTxHash = await this.sendTx(
+              currentTx,
+              context.logger
+            );
+            context.logger.debug(
+              `[EVM ${currentTxHash}] rebroadcasted as ${rebroadcastedTxHash}`
+            );
             currentTxHash = rebroadcastedTxHash;
-
           } catch (e) {
-            context.logger.error(`[EVM ${currentTxHash}] rebroadcast raised an error: ${e}`);
+            context.logger.error(
+              `[EVM ${currentTxHash}] rebroadcast raised an error: ${e}`
+            );
             context.logger.error(e);
             // fail(`rebroadcasting ${currentTxHash} raised an error: ${e}`);
           }
         }, this.rebroadcast.rebroadcastInterval);
 
         timeout = setTimeout(() => {
-            context.logger.error(`[EVM ${currentTxHash}] poller reached timeout of ${this.rebroadcast.pollingTimeframe}ms`);
-            fail('poller reached timeout');
+          context.logger.error(
+            `[EVM ${currentTxHash}] poller reached timeout of ${this.rebroadcast.pollingTimeframe}ms`
+          );
+          fail("poller reached timeout");
         }, this.rebroadcast.pollingTimeframe);
-
       } catch (e) {
         context.logger.error(`[EVM] sending tx failed`);
         context.logger.error(e);
         fail(`sending tx failed`);
       }
-    })
+    });
 
     context.logger.info(`[EVM ${transactionHash}] transaction confirmed`);
 
@@ -151,7 +197,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
         const estimatedGas = await this.connection.eth.estimateGas({
           ...tx,
-          from
+          from,
         });
         const gasLimit = (estimatedGas * 1.1).toFixed(0);
 
@@ -162,11 +208,13 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
         };
 
         logger.debug(`[EVM] sending tx: ${JSON.stringify(txForSign)}`);
-        this.connection.eth.sendTransaction(txForSign)
-          .once('transactionHash', (hash: string) =>{
+        this.connection.eth
+          .sendTransaction(txForSign)
+          .once("transactionHash", (hash: string) => {
             logger.debug(`[EVM] tx sent, txHash: ${hash}`);
             resolve(hash);
-          }).catch(error => {
+          })
+          .catch((error) => {
             logger.error(error);
             reject(error);
           });
@@ -179,7 +227,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
   private fillDefaultVariables(rebroadcast?: EvmRebroadcastAdapterOpts) {
     if (rebroadcast) {
-      this.rebroadcast = Object.assign({}, rebroadcast);
+      this.rebroadcast = { ...rebroadcast };
     }
     if (rebroadcast?.rebroadcastInterval === undefined) {
       this.rebroadcast.rebroadcastInterval = 60_000;
@@ -205,5 +253,4 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
       this.rebroadcast.pollingInterval = 5_000;
     }
   }
-
 }

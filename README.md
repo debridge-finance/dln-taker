@@ -182,7 +182,7 @@ const config: ExecutorConfig = {
         {
             chain: ChainId.BSC,
 
-            // defines validators for orders coming FROM the BNB Chain
+            // defines filters for orders coming FROM the BNB Chain
             srcValidators: [
                 // if the order is coming from BNB chain, accept it only if BUSD is the giveToken
                 validators.whitelistedGiveToken([
@@ -190,7 +190,7 @@ const config: ExecutorConfig = {
                 ]),
             ],
 
-            // defines validators for orders coming TO the BNB Chain
+            // defines filters for orders coming TO the BNB Chain
             dstValidators: [
                 // fulfill orders on BNB only if the requested amount from $0 to $10,000
                 validators.takeAmountUsdEquivalentBetween(0, 10_000),
