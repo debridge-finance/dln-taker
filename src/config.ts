@@ -92,6 +92,11 @@ export interface ChainDefinition {
    */
   chainRpc: string;
 
+  /**
+   * Forcibly disable fulfills in this chain?
+   */
+  disabled?: boolean;
+
   //
   // chain context related
   //
