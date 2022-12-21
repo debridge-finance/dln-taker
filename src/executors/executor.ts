@@ -18,6 +18,7 @@ import { Logger } from "pino";
 
 import { ExecutorLaunchConfig } from "../config";
 import { PRODUCTION } from "../environments";
+import * as filters from "../filters";
 import { OrderFilter } from "../filters";
 import { GetNextOrder, IncomingOrder } from "../interfaces";
 import { WsNextOrder } from "../orderFeeds/ws.order.feed";
@@ -87,154 +88,155 @@ export class Executor implements IExecutor {
 
     this.buckets = config.buckets;
 
-    const supportedChains = process.env.ENABLED_CHAINS || "";
     const clients: { [key in number]: any } = {};
     await Promise.all(
-      config.chains
-        .filter((chain) => supportedChains.includes(chain.chain.toString()))
-        .map(async (chain) => {
-          this.logger.info(`initializing ${ChainId[chain.chain]}...`);
+      config.chains.map(async (chain) => {
+        this.logger.info(`initializing ${ChainId[chain.chain]}...`);
 
-          let client, unlockProvider, fulfullProvider;
-          if (chain.chain === ChainId.Solana) {
-            const solanaConnection = new Connection(chain.chainRpc);
-            const solanaPmmSrc = new PublicKey(
-              chain.environment?.pmmSrc ||
-                PRODUCTION.chains[ChainId.Solana]!.pmmSrc!
-            );
-            const solanaPmmDst = new PublicKey(
-              chain.environment?.pmmDst ||
-                PRODUCTION.chains[ChainId.Solana]!.pmmDst!
-            );
-            const solanaDebridge = new PublicKey(
-              chain.environment?.deBridgeContract ||
-                PRODUCTION.chains![ChainId.Solana]!.deBridgeContract!
-            );
-            const solanaDebridgeSetting = new PublicKey(
-              chain.environment?.solana?.debridgeSetting ||
-                PRODUCTION.chains![ChainId.Solana]!.solana!.debridgeSetting!
-            );
+        let client, unlockProvider, fulfullProvider;
+        if (chain.chain === ChainId.Solana) {
+          const solanaConnection = new Connection(chain.chainRpc);
+          const solanaPmmSrc = new PublicKey(
+            chain.environment?.pmmSrc ||
+              PRODUCTION.chains[ChainId.Solana]!.pmmSrc!
+          );
+          const solanaPmmDst = new PublicKey(
+            chain.environment?.pmmDst ||
+              PRODUCTION.chains[ChainId.Solana]!.pmmDst!
+          );
+          const solanaDebridge = new PublicKey(
+            chain.environment?.deBridgeContract ||
+              PRODUCTION.chains![ChainId.Solana]!.deBridgeContract!
+          );
+          const solanaDebridgeSetting = new PublicKey(
+            chain.environment?.solana?.debridgeSetting ||
+              PRODUCTION.chains![ChainId.Solana]!.solana!.debridgeSetting!
+          );
 
-            const decodeKey = (key: string) =>
-              Keypair.fromSecretKey(
-                chain.takerPrivateKey.startsWith("0x")
-                  ? helpers.hexToBuffer(key)
-                  : bs58.decode(key)
-              );
-            fulfullProvider = new SolanaProviderAdapter(
-              solanaConnection,
-              decodeKey(chain.takerPrivateKey)
+          const decodeKey = (key: string) =>
+            Keypair.fromSecretKey(
+              chain.takerPrivateKey.startsWith("0x")
+                ? helpers.hexToBuffer(key)
+                : bs58.decode(key)
             );
-            unlockProvider = new SolanaProviderAdapter(
-              solanaConnection,
-              decodeKey(chain.unlockAuthorityPrivateKey)
-            );
+          fulfullProvider = new SolanaProviderAdapter(
+            solanaConnection,
+            decodeKey(chain.takerPrivateKey)
+          );
+          unlockProvider = new SolanaProviderAdapter(
+            solanaConnection,
+            decodeKey(chain.unlockAuthorityPrivateKey)
+          );
 
-            client = new Solana.PmmClient(
-              solanaConnection,
-              solanaPmmSrc,
-              solanaPmmDst,
-              solanaDebridge,
-              solanaDebridgeSetting
-            );
-            // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
-            await client.initForFulfillPreswap(
-              new PublicKey(chain.beneficiary),
-              [],
-              jupiterConnector
-            );
-          } else {
-            const web3UnlockAuthority = createWeb3WithPrivateKey(
-              chain.chainRpc,
-              chain.unlockAuthorityPrivateKey
-            );
-            unlockProvider = new EvmAdapterProvider(web3UnlockAuthority);
+          client = new Solana.PmmClient(
+            solanaConnection,
+            solanaPmmSrc,
+            solanaPmmDst,
+            solanaDebridge,
+            solanaDebridgeSetting
+          );
+          // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
+          await client.initForFulfillPreswap(
+            new PublicKey(chain.beneficiary),
+            [],
+            jupiterConnector
+          );
+        } else {
+          const web3UnlockAuthority = createWeb3WithPrivateKey(
+            chain.chainRpc,
+            chain.unlockAuthorityPrivateKey
+          );
+          unlockProvider = new EvmAdapterProvider(web3UnlockAuthority);
 
-            const web3Fulfill = createWeb3WithPrivateKey(
-              chain.chainRpc,
-              chain.unlockAuthorityPrivateKey
-            );
-            fulfullProvider = new EvmRebroadcastAdapterProviderAdapter(
-              web3Fulfill,
-              chain.environment?.evm?.evmRebroadcastAdapterOpts
-            );
+          const web3Fulfill = createWeb3WithPrivateKey(
+            chain.chainRpc,
+            chain.unlockAuthorityPrivateKey
+          );
+          fulfullProvider = new EvmRebroadcastAdapterProviderAdapter(
+            web3Fulfill,
+            chain.environment?.evm?.evmRebroadcastAdapterOpts
+          );
 
-            client = new Evm.PmmEvmClient({
-              enableContractsCache: true,
-              addresses: {
-                [chain.chain]: {
-                  pmmSourceAddress:
-                    chain.environment?.pmmSrc ||
-                    PRODUCTION.defaultEvmAddresses?.pmmSrc ||
-                    PRODUCTION.chains[chain.chain]?.pmmSrc,
-                  pmmDestinationAddress:
-                    chain.environment?.pmmDst ||
-                    PRODUCTION.defaultEvmAddresses?.pmmDst ||
-                    PRODUCTION.chains[chain.chain]?.pmmDst,
-                  deBridgeGateAddress:
-                    chain.environment?.deBridgeContract ||
-                    PRODUCTION.defaultEvmAddresses?.deBridgeContract ||
-                    PRODUCTION.chains[chain.chain]?.deBridgeContract,
-                  crossChainForwarderAddress:
-                    chain.environment?.evm?.forwarderContract ||
-                    PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract ||
-                    PRODUCTION.chains[chain.chain]?.evm?.forwarderContract,
-                },
+          client = new Evm.PmmEvmClient({
+            enableContractsCache: true,
+            addresses: {
+              [chain.chain]: {
+                pmmSourceAddress:
+                  chain.environment?.pmmSrc ||
+                  PRODUCTION.defaultEvmAddresses?.pmmSrc ||
+                  PRODUCTION.chains[chain.chain]?.pmmSrc,
+                pmmDestinationAddress:
+                  chain.environment?.pmmDst ||
+                  PRODUCTION.defaultEvmAddresses?.pmmDst ||
+                  PRODUCTION.chains[chain.chain]?.pmmDst,
+                deBridgeGateAddress:
+                  chain.environment?.deBridgeContract ||
+                  PRODUCTION.defaultEvmAddresses?.deBridgeContract ||
+                  PRODUCTION.chains[chain.chain]?.deBridgeContract,
+                crossChainForwarderAddress:
+                  chain.environment?.evm?.forwarderContract ||
+                  PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract ||
+                  PRODUCTION.chains[chain.chain]?.evm?.forwarderContract,
               },
-            });
-          }
-
-          const processorInitializer =
-            chain.orderProcessor ||
-            config.orderProcessor ||
-            processors.universalProcessor();
-          const initializingChain = {
-            chain: chain.chain,
-            chainRpc: chain.chainRpc,
-            unlockProvider,
-            fulfullProvider,
-            client,
-          };
-          const orderProcessor = await processorInitializer(chain.chain, {
-            takeChain: initializingChain,
-            buckets: config.buckets,
-            logger: this.logger,
+            },
           });
+        }
 
-          // append global filters to the list of dstFilters
-          const dstFilters = await Promise.all(
-            [...(chain.dstFilters || []), ...(config.filters || [])].map(
-              (filter) =>
-                filter(chain.chain, {
-                  chain: initializingChain,
-                  logger: this.logger,
-                })
-            )
-          );
+        const processorInitializer =
+          chain.orderProcessor ||
+          config.orderProcessor ||
+          processors.universalProcessor();
+        const initializingChain = {
+          chain: chain.chain,
+          chainRpc: chain.chainRpc,
+          unlockProvider,
+          fulfullProvider,
+          client,
+        };
+        const orderProcessor = await processorInitializer(chain.chain, {
+          takeChain: initializingChain,
+          buckets: config.buckets,
+          logger: this.logger,
+        });
 
-          const srcFilters = await Promise.all(
-            (chain.srcFilters || []).map((initializer) =>
-              initializer(chain.chain, {
-                chain: initializingChain,
-                logger: this.logger,
-              })
-            )
-          );
+        const dstFiltersInitializers = chain.dstFilters || [];
+        if (chain.disabled) {
+          dstFiltersInitializers.push(filters.disableFulfill());
+        }
 
-          this.chains[chain.chain] = {
-            chain: chain.chain,
-            chainRpc: chain.chainRpc,
-            srcFilters,
-            dstFilters,
-            orderProcessor,
-            unlockProvider,
-            fulfullProvider,
-            client,
-            beneficiary: chain.beneficiary,
-          };
+        // append global filters to the list of dstFilters
+        const dstFilters = await Promise.all(
+          [...dstFiltersInitializers, ...(config.filters || [])].map((filter) =>
+            filter(chain.chain, {
+              chain: initializingChain,
+              logger: this.logger,
+            })
+          )
+        );
 
-          clients[chain.chain] = client;
-        })
+        const srcFilters = await Promise.all(
+          (chain.srcFilters || []).map((initializer) =>
+            initializer(chain.chain, {
+              chain: initializingChain,
+              logger: this.logger,
+            })
+          )
+        );
+
+        this.chains[chain.chain] = {
+          chain: chain.chain,
+          chainRpc: chain.chainRpc,
+          srcFilters,
+          dstFilters,
+          orderProcessor,
+          unlockProvider,
+          fulfullProvider,
+          client,
+          beneficiary: chain.beneficiary,
+        };
+
+        clients[chain.chain] = client;
+      })
     );
 
     this.client = new PMMClient(clients);

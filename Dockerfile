@@ -29,5 +29,6 @@ COPY --from=builder /build/tsconfig.base.json /app
 COPY --from=builder /build/tsconfig.cjs.json /app
 COPY --from=builder /build/tsconfig.esm.json /app
 COPY --from=builder /build/src  /app/src
+COPY . debridge.config.ts
 
-CMD npm run executor config/sample.config.ts
+CMD npm run executor debridge.config.ts
