@@ -1,9 +1,17 @@
 import { CachePriceFeed, ChainId, CoingeckoPriceFeed, TokensBucket } from "@debridge-finance/dln-client";
 import { ExecutorLaunchConfig } from "./src/config";
 import * as processors from "./src/processors";
-import * as filters from "./src/filters";
-import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
+import { PRODUCTION as environment } from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
+
+const ENABLED_CHAINS: ChainId[] =
+  (process?.env?.ENABLED_CHAINS || '')
+    .split(',')
+    .map(id => {
+      const chainId = parseInt(id, 10);
+      if (!ChainId[chainId]) throw new Error(`Unknown chain id: ${id}`)
+      return chainId
+    })
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(
@@ -58,6 +66,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Arbitrum,
       chainRpc: `${process.env.RPC_ARBITRUM}`,
+      disabled: !ENABLED_CHAINS.includes(ChainId.Arbitrum),
 
       beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
       takerPrivateKey: `${process.env.ARBITRUM_TAKER_PRIVATE_KEY}`,
@@ -67,6 +76,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Avalanche,
       chainRpc: `${process.env.RPC_AVALANCHE}`,
+      disabled: !ENABLED_CHAINS.includes(ChainId.Avalanche),
 
       beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
       takerPrivateKey: `${process.env.AVALANCHE_TAKER_PRIVATE_KEY}`,
@@ -76,6 +86,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.BSC,
       chainRpc: `${process.env.RPC_BNB}`,
+      disabled: !ENABLED_CHAINS.includes(ChainId.BSC),
 
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
@@ -85,6 +96,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Ethereum,
       chainRpc: `${process.env.RPC_ETHEREUM}`,
+      disabled: !ENABLED_CHAINS.includes(ChainId.Ethereum),
 
       beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
       takerPrivateKey: `${process.env.ETHEREUM_TAKER_PRIVATE_KEY}`,
@@ -94,6 +106,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Polygon,
       chainRpc: `${process.env.RPC_POLYGON}`,
+      disabled: !ENABLED_CHAINS.includes(ChainId.Polygon),
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,

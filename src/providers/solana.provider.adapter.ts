@@ -1,6 +1,12 @@
-import {helpers} from "@debridge-finance/solana-utils";
-import {Connection, Keypair, Transaction, VersionedTransaction} from "@solana/web3.js";
-import {ProviderAdapter, SendTransactionContext} from "./provider.adapter";
+import { helpers } from "@debridge-finance/solana-utils";
+import {
+  Connection,
+  Keypair,
+  Transaction,
+  VersionedTransaction,
+} from "@solana/web3.js";
+
+import { ProviderAdapter, SendTransactionContext } from "./provider.adapter";
 
 export class SolanaProviderAdapter implements ProviderAdapter {
   public wallet: Parameters<typeof helpers.sendAll>["1"];
@@ -13,7 +19,6 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     return helpers.bufferToHex(this.wallet.publicKey.toBuffer());
   }
 
-
   async sendTransaction(data: unknown, context: SendTransactionContext) {
     const txid = await helpers.sendAll(
       this.connection,
@@ -22,10 +27,9 @@ export class SolanaProviderAdapter implements ProviderAdapter {
       undefined,
       undefined,
       false,
-      true,
+      true
     );
     context.logger.info(`[Solana] Sent tx: ${txid}`);
     return txid;
   }
 }
-

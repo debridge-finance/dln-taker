@@ -1,5 +1,5 @@
-import {Logger as ClientLogger, LogLevel} from "@debridge-finance/dln-client";
-import {Logger} from "pino";
+import { Logger as ClientLogger, LogLevel } from "@debridge-finance/dln-client";
+import { Logger } from "pino";
 
 export const createClientLogger = (logger: Logger) => {
   return new ClientLogger((level: LogLevel, ...args) => {

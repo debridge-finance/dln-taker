@@ -2,8 +2,16 @@ import { Offer, Order, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import WebSocket from "ws";
 
+import { OrderInfoStatus } from "../enums/order.info.status";
 import { U256 } from "../helpers";
-import { GetNextOrder, NextOrderInfo } from "../interfaces";
+import { GetNextOrder, IncomingOrder, OrderProcessorFunc } from "../interfaces";
+
+type OrderInfo = {
+  order: OrderData;
+  orderId: string;
+  state: OrderChangeStatus;
+  taker?: string;
+};
 
 type WsOrderOffer = {
   chain_id: string;
@@ -30,9 +38,16 @@ type OrderChangeStatusInternal =
   | "Created"
   | FulfilledChangeStatus
   | "Cancelled"
-  | "Patched";
+  | "GiveOfferIncreased"
+  | "TakeOfferDecreased";
 
-type OrderChangeStatus = "Created" | "Fulfilled" | "Cancelled" | "Patched";
+type OrderChangeStatus =
+  | "Created"
+  | "Archival"
+  | "Fulfilled"
+  | "Cancelled"
+  | "GiveOfferIncreased"
+  | "TakeOfferDecreased";
 
 type WsOrderInfo = {
   order_id: string;
@@ -49,51 +64,26 @@ type WsOrderEvent = {
 
 export class WsNextOrder extends GetNextOrder {
   private wsArgs;
+  private socket: WebSocket;
+
   constructor(...args: ConstructorParameters<typeof WebSocket>) {
     super();
     this.wsArgs = args;
   }
 
-  async getNextOrder(): Promise<NextOrderInfo | undefined> {
-    while (this.queue.length > 0) {
-      const orderInfo = this.queue.shift()!;
-      if (
-        !this.enabledChains.includes(orderInfo.order.take.chainId) ||
-        !this.enabledChains.includes(orderInfo.order.give.chainId)
-      )
-        continue;
-      switch (orderInfo.state) {
-        case "Created":
-          return {
-            order: orderInfo.order,
-            type: "created",
-            orderId: orderInfo.orderId,
-          };
-        case "Fulfilled":
-          return {
-            order: orderInfo.order,
-            type: "fulfilled",
-            orderId: orderInfo.orderId,
-            taker: orderInfo.taker,
-          };
-        default:
-          return {
-            order: orderInfo.order,
-            type: "other",
-            orderId: orderInfo.orderId,
-          };
-      }
-    }
-  }
-
-  init(): void {
-    this.queue = [];
-    this.socket = new WebSocket(...this.wsArgs)
+  init(process: OrderProcessorFunc): void {
+    super.processNextOrder = process;
+    this.socket = new WebSocket(...this.wsArgs);
     this.socket.on("open", () => {
-      this.logger.debug("🔌 ws opened connection")
-      this.socket.send(JSON.stringify({ Subscription: {
-        live: true
-      } }));
+      this.logger.debug("🔌 ws opened connection");
+      this.socket.send(
+        JSON.stringify({
+          Subscription: {
+            live: true,
+          },
+        })
+      );
+      this.socket.send('"GetArchive"');
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
@@ -106,23 +96,55 @@ export class WsNextOrder extends GetNextOrder {
         const [status, taker] = this.flattenStatus(
           parsedEvent.Order.order_info
         );
-        this.queue.push({
+        const nextOrderInfo = this.transformToNextOrderInfo({
           order,
           orderId: parsedEvent.Order.order_info.order_id,
           state: status,
           taker,
         });
+        this.processNextOrder(nextOrderInfo);
       }
     });
   }
 
-  private socket: WebSocket;
-  private queue: {
-    order: OrderData;
-    orderId: string;
-    state: OrderChangeStatus;
-    taker?: string;
-  }[];
+  private transformToNextOrderInfo(
+    orderInfo: OrderInfo
+  ): IncomingOrder | undefined {
+    switch (orderInfo.state) {
+      case "Created":
+        return {
+          order: orderInfo.order,
+          type: OrderInfoStatus.created,
+          orderId: orderInfo.orderId,
+        };
+      case "Archival":
+        return {
+          order: orderInfo.order,
+          type: OrderInfoStatus.archival,
+          orderId: orderInfo.orderId,
+        };
+      case "Fulfilled":
+        return {
+          order: orderInfo.order,
+          type: OrderInfoStatus.fulfilled,
+          orderId: orderInfo.orderId,
+          taker: orderInfo.taker,
+        };
+      case "Cancelled":
+        return {
+          order: orderInfo.order,
+          type: OrderInfoStatus.cancelled,
+          orderId: orderInfo.orderId,
+          taker: orderInfo.taker,
+        };
+      default:
+        return {
+          order: orderInfo.order,
+          type: OrderInfoStatus.other,
+          orderId: orderInfo.orderId,
+        };
+    }
+  }
 
   private wsOfferToOffer(info: WsOrderOffer): Offer {
     return {
@@ -154,7 +176,7 @@ export class WsNextOrder extends GetNextOrder {
       externalCall: undefined,
     };
     const calculatedId = Order.calculateId(order);
-    if (calculatedId != info.order_id)
+    if (calculatedId !== info.order_id)
       throw new Error(
         `OrderId mismatch!\nProbably error during conversions between formats\nexpected id: ${info.order_id}\ncalculated: ${calculatedId}\nReceived order: ${info.order}\nTransformed: ${order}`
       );

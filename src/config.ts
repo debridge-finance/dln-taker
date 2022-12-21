@@ -5,9 +5,9 @@ import {
   TokensBucket,
 } from "@debridge-finance/dln-client";
 
+import { OrderFilterInitializer } from "./filters/order.filter";
 import { GetNextOrder } from "./interfaces";
 import { OrderProcessorInitializer } from "./processors";
-import { OrderValidatorInitializer } from "./validators/order.validator";
 
 type address = string;
 
@@ -66,13 +66,13 @@ export type ChainEnvironment = {
 
   evm?: {
     forwarderContract?: address;
-    evmRebroadcastAdapterOpts?:EvmRebroadcastAdapterOpts;
-  }
+    evmRebroadcastAdapterOpts?: EvmRebroadcastAdapterOpts;
+  };
 
   solana?: {
     debridgeSetting?: string;
-  }
-}
+  };
+};
 
 /**
  * Represents a chain configuration where orders can be fulfilled.
@@ -92,11 +92,16 @@ export interface ChainDefinition {
    */
   chainRpc: string;
 
+  /**
+   * Forcibly disable fulfills in this chain?
+   */
+  disabled?: boolean;
+
   //
   // chain context related
   //
 
-  environment?: ChainEnvironment,
+  environment?: ChainEnvironment;
 
   //
   // taker related
@@ -120,14 +125,14 @@ export interface ChainDefinition {
   unlockAuthorityPrivateKey: address;
 
   /**
-   * Represents a list of validators which filter out orders for fulfillment
+   * Represents a list of filters which filter out orders for fulfillment
    */
-  srcValidators?: OrderValidatorInitializer[];
+  srcFilters?: OrderFilterInitializer[];
 
   /**
-   * Represents a list of validators which filter out orders for fulfillment
+   * Represents a list of filters which filter out orders for fulfillment
    */
-  dstValidators?: OrderValidatorInitializer[];
+  dstFilters?: OrderFilterInitializer[];
 
   /**
    * Defines an order processor that implements the fulfillment strategy
@@ -137,9 +142,9 @@ export interface ChainDefinition {
 
 export interface ExecutorLaunchConfig {
   /**
-   * Represents a list of validators which filter out orders for fulfillment
+   * Represents a list of filters which filter out orders for fulfillment
    */
-  validators?: OrderValidatorInitializer[];
+  filters?: OrderFilterInitializer[];
 
   /**
    * Defines an order processor that implements the fulfillment strategy
