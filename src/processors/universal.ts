@@ -217,6 +217,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     if (!isProfitable) {
       logger.info("order is not profitable, postponing it to the mempool");
       this.mempoolService.addOrder({ orderInfo, context });
+      return;
     }
 
     const fees = await this.getFee(order, context);
@@ -253,21 +254,21 @@ class UniversalProcessor extends BaseOrderProcessor {
     await this.waitIsOrderFulfilled(orderId, order, context, logger);
 
     // unlocking
-    const beneficiary = context.giveChain.beneficiary;
-    const unlockTx = await this.createOrderUnlockTx(
-      orderId,
-      order,
-      beneficiary,
-      executionFeeAmount,
-      fees,
-      context,
-      logger
-    );
-    const txUnlock =
-      await this.context.takeChain.unlockProvider.sendTransaction(unlockTx, {
-        logger,
-      });
-    logger.info(`unlock transaction ${txUnlock} is completed`);
+    // const beneficiary = context.giveChain.beneficiary;
+    // const unlockTx = await this.createOrderUnlockTx(
+    //   orderId,
+    //   order,
+    //   beneficiary,
+    //   executionFeeAmount,
+    //   fees,
+    //   context,
+    //   logger
+    // );
+    // const txUnlock =
+    //   await this.context.takeChain.unlockProvider.sendTransaction(unlockTx, {
+    //     logger,
+    //   });
+    // logger.info(`unlock transaction ${txUnlock} is completed`);
   }
 
   private async createOrderUnlockTx(

@@ -256,20 +256,23 @@ export class Executor implements IExecutor {
 
   async execute(nextOrderInfo?: IncomingOrder) {
     if (!this.isInitialized) throw new Error("executor is not initialized");
-    try {
-      this.logger.info(
-        `execute nextOrderInfo ${JSON.stringify(nextOrderInfo)}`
-      );
-      if (nextOrderInfo) {
-        const orderId = nextOrderInfo.orderId;
-        const logger = this.logger.child({ orderId });
-        logger.info(`execute ${orderId} processing is started`);
+    this.logger.info(
+      `executor received incoming order: ${JSON.stringify(nextOrderInfo)}`
+    );
+    if (nextOrderInfo && nextOrderInfo.order && nextOrderInfo.orderId) {
+      const orderId = nextOrderInfo.orderId;
+      const logger = this.logger.child({ orderId });
+      logger.info(`start processing`);
+      try {
         await this.processing(nextOrderInfo, logger);
-        logger.info(`execute ${orderId} processing is finished`);
+        logger.info(`successfully processed`);
+      } catch (e) {
+        logger.error(`received error while processing order: ${e}`, e);
+        console.error(e);
       }
-    } catch (e) {
-      this.logger.error(`Error in execution ${e}`);
-      console.error(e);
+    }
+    else {
+      this.logger.debug('message is empty, skipping')
     }
   }
 
