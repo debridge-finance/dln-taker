@@ -1,8 +1,8 @@
 import { CachePriceFeed, ChainId, CoingeckoPriceFeed, TokensBucket } from "@debridge-finance/dln-client";
-import { ExecutorLaunchConfig } from "./src/config";
-import * as processors from "./src/processors";
-import { CURRENT_ENVIRONMENT, CURRENT_ENVIRONMENT as environment } from "./src/environments";
-import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
+import { ExecutorLaunchConfig } from "../src/config";
+import * as processors from "../src/processors";
+import { CURRENT_ENVIRONMENT, CURRENT_ENVIRONMENT as environment } from "../src/environments";
+import { WsNextOrder } from "../src/orderFeeds/ws.order.feed";
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(
