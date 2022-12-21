@@ -1,3 +1,4 @@
+import * as filters from "../filters"
 import {
   ChainId,
   CoingeckoPriceFeed,
@@ -87,11 +88,9 @@ export class Executor implements IExecutor {
 
     this.buckets = config.buckets;
 
-    const supportedChains = process.env.ENABLED_CHAINS || "";
     const clients: { [key in number]: any } = {};
     await Promise.all(
       config.chains
-        .filter((chain) => supportedChains.includes(chain.chain.toString()))
         .map(async (chain) => {
           this.logger.info(`initializing ${ChainId[chain.chain]}...`);
 
@@ -201,9 +200,14 @@ export class Executor implements IExecutor {
             logger: this.logger,
           });
 
+          const dstFiltersInitializers = chain.dstFilters || [];
+          if (chain.disabled) {
+            dstFiltersInitializers.push(filters.disableFulfill())
+          }
+
           // append global filters to the list of dstFilters
           const dstFilters = await Promise.all(
-            [...(chain.dstFilters || []), ...(config.filters || [])].map(
+            [...dstFiltersInitializers, ...(config.filters || [])].map(
               (filter) =>
                 filter(chain.chain, {
                   chain: initializingChain,

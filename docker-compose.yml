@@ -4,8 +4,6 @@ services:
     image: debridgefinance/dln-executor
     container_name: dln-executor${DOCKER_ID}
     restart: unless-stopped
-    volumes:
-      - ./config:/app/config
     environment:
       - LOG_LEVEL=${LOG_LEVEL}
       - WS_API_KEY=${WS_API_KEY}

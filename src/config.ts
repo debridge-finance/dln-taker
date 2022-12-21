@@ -78,6 +78,8 @@ export type ChainEnvironment = {
  * Represents a chain configuration where orders can be fulfilled.
  */
 export interface ChainDefinition {
+  disabled?: boolean;
+
   //
   // network related
   //
