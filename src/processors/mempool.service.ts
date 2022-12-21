@@ -1,10 +1,10 @@
 import { Logger } from "pino";
 
-import { ProcessOrder, IncomingOrderContext } from "../interfaces";
+import { IncomingOrderContext, ProcessOrder } from "../interfaces";
 
 export class MempoolService {
   private readonly logger: Logger;
-  private readonly orderParams: IncomingOrderContext[] = [];
+  private readonly orderParams = new Map<string, IncomingOrderContext>();
   private isLocked: boolean = false; // for lock process while current processing is working
   constructor(
     logger: Logger,
@@ -19,7 +19,7 @@ export class MempoolService {
 
   addOrder(params: IncomingOrderContext) {
     const orderId = params.orderInfo.orderId;
-    this.orderParams.push(params);
+    this.orderParams.set(orderId, params);
     this.logger.info(`Order ${orderId} is added to mempool`);
   }
 
@@ -29,16 +29,19 @@ export class MempoolService {
       return;
     }
     this.isLocked = true;
-    const ordersCountBeforeProcessing = this.orderParams.length;
+    const ordersCountBeforeProcessing = this.orderParams.size;
     this.logger.info(
       `Mempool contains ${ordersCountBeforeProcessing} before processing`
     );
-    let param = this.orderParams.shift();
-    while (param) {
-      this.processOrderFunction(param);
-      param = this.orderParams.shift();
-    }
+    this.orderParams.forEach((value) => {
+      this.processOrderFunction(value);
+    });
+    this.orderParams.clear();
 
     this.isLocked = false;
+  }
+
+  delete(orderId: string) {
+    this.orderParams.delete(orderId);
   }
 }

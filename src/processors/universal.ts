@@ -2,11 +2,10 @@ import {
   calculateExpectedTakeAmount,
   ChainId,
   evm,
-  optimisticSlippageBps,
   OrderData,
   tokenAddressToString,
 } from "@debridge-finance/dln-client";
-import { Logger, P } from "pino";
+import { Logger } from "pino";
 import Web3 from "web3";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
@@ -15,19 +14,19 @@ import { createClientLogger } from "../logger";
 import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
-import { MempoolService } from "./mempool.service";
 import {
   BaseOrderProcessor,
   OrderProcessorContext,
   OrderProcessorInitContext,
   OrderProcessorInitializer,
 } from "./base";
+import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
 
 export type UniversalProcessorParams = {
-  minProfitabilityBps: number
-  mempoolInterval: number
-}
+  minProfitabilityBps: number;
+  mempoolInterval: number;
+};
 
 class UniversalProcessor extends BaseOrderProcessor {
   private mempoolService: MempoolService;
@@ -38,8 +37,8 @@ class UniversalProcessor extends BaseOrderProcessor {
   private isLocked: boolean = false;
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
-    mempoolInterval: 60 // every 60s
-  }
+    mempoolInterval: 60, // every 60s
+  };
 
   constructor(params?: Partial<UniversalProcessorParams>) {
     super();
@@ -110,13 +109,16 @@ class UniversalProcessor extends BaseOrderProcessor {
         this.queue.delete(orderId);
         this.priorityQueue.delete(orderId);
         this.ordersMap.delete(orderId);
+        this.mempoolService.delete(orderId);
         context.logger.debug(`Order ${orderId} is deleted from queues`);
         return;
       }
 
       case OrderInfoStatus.other:
       default: {
-        context.logger.error(`OrderInfo status=${OrderInfoStatus[type]} not implemented, skipping`)
+        context.logger.error(
+          `OrderInfo status=${OrderInfoStatus[type]} not implemented, skipping`
+        );
         return;
       }
     }
@@ -124,11 +126,15 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   private async tryProcess(params: IncomingOrderContext): Promise<void> {
     const { context, orderInfo } = params;
-    const { orderId, type } = orderInfo;
+    const { orderId } = orderInfo;
 
     // already processing an order
     if (this.isLocked) {
-      context.logger.debug(`Processor is currently processing an order, enqueuing order to ${OrderInfoStatus[params.orderInfo.type]} queue`)
+      context.logger.debug(
+        `Processor is currently processing an order, enqueuing order to ${
+          OrderInfoStatus[params.orderInfo.type]
+        } queue`
+      );
 
       switch (params.orderInfo.type) {
         case OrderInfoStatus.archival: {
@@ -139,7 +145,12 @@ class UniversalProcessor extends BaseOrderProcessor {
           this.priorityQueue.add(orderId);
           break;
         }
-        default: throw new Error(`Unexpected case ${OrderInfoStatus[params.orderInfo.type]} in tryProcess`)
+        default:
+          throw new Error(
+            `Unexpected case ${
+              OrderInfoStatus[params.orderInfo.type]
+            } in tryProcess`
+          );
       }
       this.ordersMap.set(orderId, params);
       return;
@@ -156,7 +167,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     // forward to the next order
     // TODO try to get rid of recursion here. Use setInterval?
-    const nextOrder = this.pickNextOrder()
+    const nextOrder = this.pickNextOrder();
     if (nextOrder) {
       this.process(nextOrder);
     }
@@ -174,17 +185,22 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.queue.delete(nextOrderId);
       this.ordersMap.delete(nextOrderId);
 
-      return order
+      return order;
     }
   }
 
-  private async processOrder(params: IncomingOrderContext): Promise<void | never> {
+  private async processOrder(
+    params: IncomingOrderContext
+  ): Promise<void | never> {
     const { orderInfo, context } = params;
     const { orderId, order } = orderInfo;
-    const logger = context.logger.child({ processor: "universalProcessor", orderId: orderId });
+    const logger = context.logger.child({
+      processor: "universalProcessor",
+      orderId,
+    });
 
     if (!order || !orderId) {
-      logger.error("order is empty, should not happen")
+      logger.error("order is empty, should not happen");
       throw new Error("order is empty, should not happen");
     }
 
@@ -194,24 +210,30 @@ class UniversalProcessor extends BaseOrderProcessor {
         bucket.findFirstToken(order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
-      throw new Error("no token bucket effectively covering both chains. Seems like no reserve tokens are configured to fulfill orders");
+      throw new Error(
+        "no token bucket effectively covering both chains. Seems like no reserve tokens are configured to fulfill orders"
+      );
     }
 
-    const { reserveDstToken, requiredReserveDstAmount, isProfitable, reserveToTakeSlippageBps } =
-      await calculateExpectedTakeAmount(
-        order,
-        this.params.minProfitabilityBps,
-        {
-          client: context.config.client,
-          giveConnection: context.giveChain.fulfullProvider.connection as Web3,
-          takeConnection: this.context.takeChain.fulfullProvider
-            .connection as Web3,
-          priceTokenService: context.config.tokenPriceService,
-          buckets: context.config.buckets,
-          swapConnector: context.config.swapConnector,
-          logger: createClientLogger(logger),
-        }
-      );
+    const {
+      reserveDstToken,
+      requiredReserveDstAmount,
+      isProfitable,
+      reserveToTakeSlippageBps,
+    } = await calculateExpectedTakeAmount(
+      order,
+      this.params.minProfitabilityBps,
+      {
+        client: context.config.client,
+        giveConnection: context.giveChain.fulfullProvider.connection as Web3,
+        takeConnection: this.context.takeChain.fulfullProvider
+          .connection as Web3,
+        priceTokenService: context.config.tokenPriceService,
+        buckets: context.config.buckets,
+        swapConnector: context.config.swapConnector,
+        logger: createClientLogger(logger),
+      }
+    );
 
     if (!isProfitable) {
       logger.info("order is not profitable, postponing it to the mempool");
@@ -246,7 +268,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         );
       logger.info(`fulfill transaction ${txFulfill} is completed`);
     } catch (e) {
-      logger.error(`fulfill transaction failed: ${e}`)
+      logger.error(`fulfill transaction failed: ${e}`);
       this.mempoolService.addOrder({ orderInfo, context });
       return;
     }
@@ -368,7 +390,9 @@ class UniversalProcessor extends BaseOrderProcessor {
   }
 }
 
-export const universalProcessor = (params?: Partial<UniversalProcessorParams>): OrderProcessorInitializer => {
+export const universalProcessor = (
+  params?: Partial<UniversalProcessorParams>
+): OrderProcessorInitializer => {
   return async (chainId: ChainId, context: OrderProcessorInitContext) => {
     const processor = new UniversalProcessor(params);
     await processor.init(chainId, context);
