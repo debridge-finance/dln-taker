@@ -6,8 +6,7 @@ WORKDIR /build
 
 COPY package.json /build
 COPY package-lock.json /build
-RUN mkdir /root/.ssh && chmod 700 /root/.ssh && echo $SSH_KEY|base64 -d > /root/.ssh/id_rsa && chmod 600 /root/.ssh/id_rsa
-RUN cat /root/.ssh/id_rsa
+RUN mkdir /root/.ssh && chmod 700 /root/.ssh && echo $SSH_KEY | base64 -d > /root/.ssh/id_rsa && chmod 600 /root/.ssh/id_rsa
 RUN npm install
 RUN rm /root/.ssh/id_rsa
 
@@ -29,6 +28,6 @@ COPY --from=builder /build/tsconfig.base.json /app
 COPY --from=builder /build/tsconfig.cjs.json /app
 COPY --from=builder /build/tsconfig.esm.json /app
 COPY --from=builder /build/src  /app/src
-COPY . debridge.config.ts
+COPY debridge.config.ts /app
 
 CMD npm run executor debridge.config.ts
