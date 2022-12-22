@@ -102,28 +102,6 @@ class UniversalProcessor extends BaseOrderProcessor {
     switch (type) {
       case OrderInfoStatus.archival:
       case OrderInfoStatus.created: {
-        const client = context.config.client;
-        // validate that order is not fullfilled
-        const takeOrderStatus = await client.getTakeOrderStatus(
-          orderId,
-          params.orderInfo.order!.take.chainId,
-          { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
-        );
-        if (takeOrderStatus?.status !== OrderState.NotSet) {
-          context.logger.warn("Order is fulfilled");
-          return;
-        }
-
-        // validate that order is created
-        const giveOrderStatus = await client.getGiveOrderStatus(
-          params.orderInfo.orderId,
-          params.orderInfo.order!.give.chainId,
-          { web3: context.giveChain.fulfullProvider.connection as Web3 }
-        );
-        if (giveOrderStatus?.status !== OrderState.Created) {
-          context.logger.warn("Order is not created");
-          return;
-        }
         return this.tryProcess(params);
       }
 
@@ -238,6 +216,27 @@ class UniversalProcessor extends BaseOrderProcessor {
       throw new Error(
         "no token bucket effectively covering both chains. Seems like no reserve tokens are configured to fulfill orders"
       );
+    }
+
+    const client = context.config.client;
+    // validate that order is not fullfilled
+    const takeOrderStatus = await client.getTakeOrderStatus(
+      orderId,
+      params.orderInfo.order!.take.chainId,
+      { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
+    );
+    if (takeOrderStatus?.status !== OrderState.NotSet) {
+      throw new Error("Order is fulfilled");
+    }
+
+    // validate that order is created
+    const giveOrderStatus = await client.getGiveOrderStatus(
+      params.orderInfo.orderId,
+      params.orderInfo.order!.give.chainId,
+      { web3: context.giveChain.fulfullProvider.connection as Web3 }
+    );
+    if (giveOrderStatus?.status !== OrderState.Created) {
+      throw new Error("Order is not created");
     }
 
     const {
