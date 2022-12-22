@@ -102,6 +102,28 @@ class UniversalProcessor extends BaseOrderProcessor {
     switch (type) {
       case OrderInfoStatus.archival:
       case OrderInfoStatus.created: {
+        const client = context.config.client;
+        // validate that order is not fullfilled
+        const takeOrderStatus = await client.getTakeOrderStatus(
+          orderId,
+          params.orderInfo.order!.take.chainId,
+          { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
+        );
+        if (takeOrderStatus?.status !== OrderState.NotSet) {
+          context.logger.warn("Order is fulfilled");
+          return;
+        }
+
+        // validate that order is created
+        const giveOrderStatus = await client.getGiveOrderStatus(
+          params.orderInfo.orderId,
+          params.orderInfo.order!.give.chainId,
+          { web3: context.giveChain.fulfullProvider.connection as Web3 }
+        );
+        if (giveOrderStatus?.status !== OrderState.Created) {
+          context.logger.warn("Order is not created");
+          return;
+        }
         return this.tryProcess(params);
       }
 
@@ -162,27 +184,6 @@ class UniversalProcessor extends BaseOrderProcessor {
     // process this order
     this.isLocked = true;
     try {
-      const client = context.config.client;
-      // validate that order is not fullfilled
-      const takeOrderStatus = await client.getTakeOrderStatus(
-        orderId,
-        params.orderInfo.order!.take.chainId,
-        { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
-      );
-      if (takeOrderStatus?.status !== OrderState.NotSet) {
-        throw new Error("Order is fulffiled");
-      }
-
-      // validate that order is created
-      const giveOrderStatus = await client.getGiveOrderStatus(
-        params.orderInfo.orderId,
-        params.orderInfo.order!.give.chainId,
-        { web3: context.giveChain.fulfullProvider.connection as Web3 }
-      );
-      if (giveOrderStatus?.status !== OrderState.Created) {
-        throw new Error("Order is not created");
-      }
-
       await this.processOrder(params);
     } catch (e) {
       context.logger.error(`processing ${orderId} failed with error: ${e}`, e);
