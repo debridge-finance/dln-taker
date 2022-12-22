@@ -150,7 +150,7 @@ export class Executor implements IExecutor {
 
         const web3Fulfill = createWeb3WithPrivateKey(
           chain.chainRpc,
-          chain.unlockAuthorityPrivateKey
+          chain.takerPrivateKey
         );
         fulfullProvider = new EvmRebroadcastAdapterProviderAdapter(
           web3Fulfill,
@@ -336,8 +336,7 @@ export class Executor implements IExecutor {
         logger.info("order has been filtered off, dropping");
         return false;
       }
-    }
-    else {
+    } else {
       logger.info("accepting order as is");
     }
 
