@@ -3,7 +3,7 @@ import client, { Connection as MQConnection } from "amqplib";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { eventToOrderData, timeDiff, U256 } from "../helpers";
-import { OrderProcessorFunc, GetNextOrder, IncomingOrder } from "../interfaces";
+import { GetNextOrder, IncomingOrder, OrderProcessorFunc } from "../interfaces";
 import { PmmEvent } from "../pmm_common";
 
 type RabbitMqConfig = {
