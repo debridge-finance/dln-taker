@@ -3,6 +3,7 @@ import {
   ChainId,
   evm,
   OrderData,
+  OrderState,
   tokenAddressToString,
 } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
@@ -141,19 +142,17 @@ class UniversalProcessor extends BaseOrderProcessor {
       switch (params.orderInfo.type) {
         case OrderInfoStatus.archival: {
           this.queue.add(orderId);
-          context.logger.debug(`postponed to secondary queue`)
+          context.logger.debug(`postponed to secondary queue`);
           break;
         }
         case OrderInfoStatus.created: {
           this.priorityQueue.add(orderId);
-          context.logger.debug(`postponed to primary queue`)
+          context.logger.debug(`postponed to primary queue`);
           break;
         }
         default:
           throw new Error(
-            `Unexpected order status: ${
-              OrderInfoStatus[params.orderInfo.type]
-            }`
+            `Unexpected order status: ${OrderInfoStatus[params.orderInfo.type]}`
           );
       }
       this.ordersMap.set(orderId, params);
@@ -217,6 +216,27 @@ class UniversalProcessor extends BaseOrderProcessor {
       throw new Error(
         "no token bucket effectively covering both chains. Seems like no reserve tokens are configured to fulfill orders"
       );
+    }
+
+    const client = context.config.client;
+    // validate that order is not fullfilled
+    const takeOrderStatus = await client.getTakeOrderStatus(
+      orderId,
+      params.orderInfo.order!.take.chainId,
+      { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
+    );
+    if (takeOrderStatus?.status !== OrderState.NotSet) {
+      throw new Error("Order is fulfilled");
+    }
+
+    // validate that order is created
+    const giveOrderStatus = await client.getGiveOrderStatus(
+      params.orderInfo.orderId,
+      params.orderInfo.order!.give.chainId,
+      { web3: context.giveChain.fulfullProvider.connection as Web3 }
+    );
+    if (giveOrderStatus?.status !== OrderState.Created) {
+      throw new Error("Order is not created");
     }
 
     const {
