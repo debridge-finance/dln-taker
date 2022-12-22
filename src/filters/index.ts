@@ -8,6 +8,7 @@ import { whitelistedGiveToken } from "./white.listed.give.token";
 import { whitelistedMaker } from "./white.listed.marker";
 import { whitelistedReceiver } from "./white.listed.receiver";
 import { whitelistedTakeToken } from "./white.listed.take.token";
+import { whitelistedOrderId  } from "./white.listed.orderid";
 
 export {
   blacklistedGiveToken,
@@ -20,4 +21,5 @@ export {
   whitelistedMaker,
   whitelistedTakeToken,
   whitelistedReceiver,
+  whitelistedOrderId
 };

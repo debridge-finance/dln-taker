@@ -110,14 +110,14 @@ class UniversalProcessor extends BaseOrderProcessor {
         this.priorityQueue.delete(orderId);
         this.ordersMap.delete(orderId);
         this.mempoolService.delete(orderId);
-        context.logger.debug(`Order ${orderId} is deleted from queues`);
+        context.logger.debug(`deleted from queues`);
         return;
       }
 
       case OrderInfoStatus.other:
       default: {
         context.logger.error(
-          `OrderInfo status=${OrderInfoStatus[type]} not implemented, skipping`
+          `status=${OrderInfoStatus[type]} not implemented, skipping`
         );
         return;
       }
@@ -127,29 +127,33 @@ class UniversalProcessor extends BaseOrderProcessor {
   private async tryProcess(params: IncomingOrderContext): Promise<void> {
     const { context, orderInfo } = params;
     const { orderId } = orderInfo;
+    params.context.logger = context.logger.child({
+      processor: "universalProcessor",
+      orderId,
+    });
 
     // already processing an order
     if (this.isLocked) {
       context.logger.debug(
-        `Processor is currently processing an order, enqueuing order to ${
-          OrderInfoStatus[params.orderInfo.type]
-        } queue`
+        `Processor is currently processing an order, postponing`
       );
 
       switch (params.orderInfo.type) {
         case OrderInfoStatus.archival: {
           this.queue.add(orderId);
+          context.logger.debug(`postponed to secondary queue`)
           break;
         }
         case OrderInfoStatus.created: {
           this.priorityQueue.add(orderId);
+          context.logger.debug(`postponed to primary queue`)
           break;
         }
         default:
           throw new Error(
-            `Unexpected case ${
+            `Unexpected order status: ${
               OrderInfoStatus[params.orderInfo.type]
-            } in tryProcess`
+            }`
           );
       }
       this.ordersMap.set(orderId, params);

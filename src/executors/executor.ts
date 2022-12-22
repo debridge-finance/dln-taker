@@ -268,7 +268,6 @@ export class Executor implements IExecutor {
         logger.info(`execution finished`);
       } catch (e) {
         logger.error(`received error while execution: ${e}`, e);
-        console.error(e);
       }
     } else {
       this.logger.debug("message is empty, skipping");
@@ -338,8 +337,9 @@ export class Executor implements IExecutor {
         return false;
       }
     }
-
-    logger.info("order has been filtered out, accepting");
+    else {
+      logger.info("accepting order as is");
+    }
 
     //
     // run processor
