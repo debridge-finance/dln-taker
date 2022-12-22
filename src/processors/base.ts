@@ -9,9 +9,9 @@ import { Logger } from "pino";
 import Web3 from "web3";
 
 import {
-  IExecutor,
   ExecutorInitializingChain,
   ExecutorSupportedChain,
+  IExecutor,
 } from "../executors/executor";
 import { IncomingOrderContext } from "../interfaces";
 import { createClientLogger } from "../logger";
