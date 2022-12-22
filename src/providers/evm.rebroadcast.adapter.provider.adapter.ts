@@ -61,18 +61,29 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
       let pollingInterval: NodeJS.Timer;
       let timeout: NodeJS.Timer;
 
-      const clear = () => {
+      const clearTimers = () => {
         clearInterval(rebroadcastInterval);
         clearInterval(pollingInterval);
         clearTimeout(timeout);
       };
 
-      const fail = (message: string) => {
-        this.staleTx = currentTx;
-        clear();
+      const success = (v: any) => {
+        this.staleTx = undefined;
+        clearTimers();
+        resolve(v)
+      }
+
+      const failWithUndeterminedBehavior = (message: string) => {
         logger.error(
           `Cannot confirm tx ${currentTxHash}, marking it as stale for future replacement. Reason: ${message}`
         );
+        this.staleTx = currentTx;
+        clearTimers();
+        reject(message);
+      }
+
+      const fail = (message: string) => {
+        clearTimers();
         reject(message);
       };
 
@@ -93,18 +104,14 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
             if (transactionReceiptResult?.status === true) {
               pollingLogger.debug(`succeeded`);
 
-              this.staleTx = undefined;
-              clear();
-              resolve(currentTxHash);
+              success(currentTxHash);
             } else if (transactionReceiptResult?.status === false) {
               pollingLogger.debug(`tx reverted`);
 
               fail(`tx ${currentTxHash} reverted`);
             }
           } catch (e) {
-            pollingLogger.error(
-              `poller raised an error: ${e}`
-            );
+            pollingLogger.error(`poller raised an error: ${e}`);
             // todo discuss should we throw here
           }
         }, this.rebroadcast.pollingInterval);
@@ -118,12 +125,10 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
               this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast
             ) {
               pollingLogger.debug(
-                `rebroadcasting aborted, no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts})`
+                `no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts})`
               );
 
-              fail(
-                `rebroadcasting aborted, no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts}`
-              );
+              failWithUndeterminedBehavior(`rebroadcasting aborted`);
             }
 
             // pick gas price for bumping
@@ -140,7 +145,6 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
             );
 
             // check bumped gas price
-            currentTx.gasPrice = nextGasPrice;
             if (
               this.rebroadcast.rebroadcastMaxBumpedGasPriceWei &&
               new BigNumber(nextGasPrice).gt(
@@ -148,14 +152,13 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
               )
             ) {
               pollingLogger.debug(
-                `rebroadcasting aborted, picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`
+                `picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`
               );
-              fail(
-                `rebroadcasting aborted, picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`
-              );
+              failWithUndeterminedBehavior(`rebroadcasting aborted`);
             }
 
             // run re-broadcast
+            currentTx.gasPrice = nextGasPrice;
             attemptsRebroadcast++;
             const rebroadcastedTxHash = await this.sendTx(
               currentTx,
@@ -177,7 +180,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
           pollingLogger.error(
             `poller reached timeout of ${this.rebroadcast.pollingTimeframe}ms`
           );
-          fail("poller reached timeout");
+          failWithUndeterminedBehavior("poller reached timeout");
         }, this.rebroadcast.pollingTimeframe);
       } catch (e) {
         logger.error(`[EVM] sending tx failed: ${e}`, e);
