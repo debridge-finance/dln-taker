@@ -99,6 +99,11 @@ class UniversalProcessor extends BaseOrderProcessor {
     const { context, orderInfo } = params;
     const { orderId, type } = orderInfo;
 
+    params.context.logger = context.logger.child({
+      processor: "universalProcessor",
+      orderId,
+    });
+
     switch (type) {
       case OrderInfoStatus.archival:
       case OrderInfoStatus.created: {
@@ -128,10 +133,6 @@ class UniversalProcessor extends BaseOrderProcessor {
   private async tryProcess(params: IncomingOrderContext): Promise<void> {
     const { context, orderInfo } = params;
     const { orderId } = orderInfo;
-    params.context.logger = context.logger.child({
-      processor: "universalProcessor",
-      orderId,
-    });
 
     // already processing an order
     if (this.isLocked) {
@@ -172,7 +173,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     // TODO try to get rid of recursion here. Use setInterval?
     const nextOrder = this.pickNextOrder();
     if (nextOrder) {
-      this.process(nextOrder);
+      this.tryProcess(nextOrder);
     }
   }
 
@@ -197,10 +198,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   ): Promise<void | never> {
     const { orderInfo, context } = params;
     const { orderId, order } = orderInfo;
-    const logger = context.logger.child({
-      processor: "universalProcessor",
-      orderId,
-    });
+    const logger = params.context.logger;
 
     if (!order || !orderId) {
       logger.error("order is empty, should not happen");
