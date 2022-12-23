@@ -98,6 +98,11 @@ class UniversalProcessor extends BaseOrderProcessor {
     const { context, orderInfo } = params;
     const { orderId, type } = orderInfo;
 
+    params.context.logger = context.logger.child({
+      processor: "universalProcessor",
+      orderId,
+    });
+
     switch (type) {
       case OrderInfoStatus.archival:
       case OrderInfoStatus.created: {
@@ -127,10 +132,6 @@ class UniversalProcessor extends BaseOrderProcessor {
   private async tryProcess(params: IncomingOrderContext): Promise<void> {
     const { context, orderInfo } = params;
     const { orderId } = orderInfo;
-    params.context.logger = context.logger.child({
-      processor: "universalProcessor",
-      orderId,
-    });
 
     // already processing an order
     if (this.isLocked) {
@@ -141,19 +142,17 @@ class UniversalProcessor extends BaseOrderProcessor {
       switch (params.orderInfo.type) {
         case OrderInfoStatus.archival: {
           this.queue.add(orderId);
-          context.logger.debug(`postponed to secondary queue`)
+          context.logger.debug(`postponed to secondary queue`);
           break;
         }
         case OrderInfoStatus.created: {
           this.priorityQueue.add(orderId);
-          context.logger.debug(`postponed to primary queue`)
+          context.logger.debug(`postponed to primary queue`);
           break;
         }
         default:
           throw new Error(
-            `Unexpected order status: ${
-              OrderInfoStatus[params.orderInfo.type]
-            }`
+            `Unexpected order status: ${OrderInfoStatus[params.orderInfo.type]}`
           );
       }
       this.ordersMap.set(orderId, params);
@@ -173,7 +172,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     // TODO try to get rid of recursion here. Use setInterval?
     const nextOrder = this.pickNextOrder();
     if (nextOrder) {
-      this.process(nextOrder);
+      this.tryProcess(nextOrder);
     }
   }
 
@@ -198,10 +197,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   ): Promise<void | never> {
     const { orderInfo, context } = params;
     const { orderId, order } = orderInfo;
-    const logger = context.logger.child({
-      processor: "universalProcessor",
-      orderId,
-    });
+    const logger = params.context.logger;
 
     if (!order || !orderId) {
       logger.error("order is empty, should not happen");
