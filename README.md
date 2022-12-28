@@ -23,7 +23,7 @@ This package is intended to automate the process of order execution: it listens 
 Download the source code from Github, picking the specific version:
 
 ```sh
-git clone --depth 1 --single-branch --branch v0.2.1 git@github.com:debridge-finance/dln-executor.git
+git clone --depth 1 --single-branch --branch v0.3.0-prod git@github.com:debridge-finance/dln-executor.git
 ```
 
 `cd` to the directory and install necessary production dependencies:
@@ -86,11 +86,18 @@ For every EVM chain you would like to support (currently: only BNB and Polygon):
 - Register the beneficiary address (its public key (address) must be as a `beneficiary`). This address will be used to retrieve funds unblocked from the orders you successfully fulfill. Orders created through our API would have only stablecoins locked as we are going to swap arbitrary input tokens to select stable coins.
 - Set up allowances by approving two contracts (`DlnDestination` and `CrosschainForwarder`) to spend reserve tokens on behalf of the reserves-keeping address. This is a temporary requirement, as the next version of dln-executor will perform this operation automatically. The addresses of these contracts within the LIMA environment are:
     - Polygon
-        - `0xceD226Cbc7B4473c7578E3b392427d09448f24Ae`
-        - `0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd`
+        - DlnDestination `0xceD226Cbc7B4473c7578E3b392427d09448f24Ae`
+        - CrosschainForwarder `0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd`
     - BNB
-        - `0xceD226Cbc7B4473c7578E3b392427d09448f24Ae`
-        - `0xce1705632Ced3A1d18Ed2b87ECe5B74526f59b8A`
+        - DlnDestination `0xceD226Cbc7B4473c7578E3b392427d09448f24Ae`
+        - CrosschainForwarder `0xce1705632Ced3A1d18Ed2b87ECe5B74526f59b8A`
+	
+Prod contracts for chains ETH, BNB, POLYGON, FANTOM, ARBITRUM, AVALANCHE are:
+
+    - DlnSource 0xeF4fB24aD0916217251F553c0596F8Edc630EB66
+    - DlnDestination 0xE7351Fd770A37282b91D153Ee690B63579D6dd7f
+    - CrosschainForwarder 0xc31fc94F3Fd088eE53ac915D6e8a14fF25a23C47
+
 
 For Solana chain:
 - Register the reserves-keeping address (its private key must be set as a `takerPrivateKey` in the configuration file) and load it with small amount of reserve tokens to be used for fulfillment (e.g., 100 USDC) and a small amount of native blockchain currency (e.g., 1 SOL) to pay gas for fulfillment transactions. `dln-executor` will attempt to atomically swap minimum necessary amount of reserve token with the requested token using the best market route picked by Jupiter router during order fulfillment
