@@ -56,14 +56,13 @@ const PRODUCTION: Env = {
       forwarderContract: "0xc31fc94F3Fd088eE53ac915D6e8a14fF25a23C47",
     },
   },
-
   chains: {
     [ChainId.Solana]: {
-      deBridgeContract: "Lima82j8YvHFYe8qa4kGgb3fvPFEnR3PoV6UyGUpHLq",
+      deBridgeContract: "DEbrdGj3HsRsAzx6uH4MKyREKxVAfBydijLUF3ygsFfh",
       pmmSrc: "src5qyZHqTqecJV4aY6Cb6zDZLMDzrDKKezs22MPHr4",
       pmmDst: "dst5MGcFPoBeREFAA5E3tU5ij8m5uVYwkzkSAbsLbNo",
       solana: {
-        debridgeSetting: "settFZVDbqC9zBmV2ZCBfNMCtTzia2R7mVeR6ccK2nN",
+        debridgeSetting: "DeSetTwWhjZq6Pz9Kfdo1KoS5NqtsM6G8ERbX4SSCSft",
       },
     },
   },

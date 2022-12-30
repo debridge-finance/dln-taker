@@ -46,7 +46,5 @@ export class ExecutorEngine {
       },
       pino.multistream(streams)
     );
-
-    this.logger.error(`Test 30.12.2022`);
   }
 }
