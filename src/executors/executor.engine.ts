@@ -23,7 +23,7 @@ export class ExecutorEngine {
   }
 
   private createLogger() {
-    const prettyStram = pretty({
+    const prettyStream = pretty({
       colorize: true,
       sync: true,
       singleLine: true,
@@ -31,7 +31,7 @@ export class ExecutorEngine {
     const streams: any[] = [
       {
         level: "debug",
-        stream: prettyStram,
+        stream: prettyStream,
       },
     ];
     if (process.env.SENTRY_DSN) {
