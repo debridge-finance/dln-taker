@@ -6,7 +6,6 @@
   "license": "GPL-3.0-only",
   "homepage": "https://debridge.finance",
   "repository": "github:debridge-finance/dln-executor",
-
   "keywords": [
     "deBridge",
     "DLN",
@@ -14,7 +13,6 @@
     "solana",
     "ethereum"
   ],
-
   "main": "dist/cjs/index.js",
   "scripts": {
     "lint:fix": "prettier --write 'src/**/*.{js,ts}' 'tests/**/*.{js,ts}' sample.config.ts && tslint --fix --config tslint.json --project tsconfig.json",
@@ -41,8 +39,7 @@
     "tslint-plugin-prettier": "2.3.0"
   },
   "dependencies": {
-    "ts-node": "10.9.1",
-    "@debridge-finance/dln-client": "github:debridge-finance/pmm-js-client#e6962f81781bd10f09e35615520633eadd88a934",
+    "@debridge-finance/dln-client": "github:debridge-finance/pmm-js-client#1f05e7f1bd88ded4902bd3e926997598a9bc8c03",
     "@debridge-finance/solana-utils": "1.0.2",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",
@@ -53,6 +50,9 @@
     "bs58": "5.0.0",
     "dotenv": "16.0.3",
     "pino": "8.7.0",
+    "pino-pretty": "9.1.1",
+    "pino-sentry": "0.13.0",
+    "ts-node": "10.9.1",
     "web3": "1.8.0",
     "ws": "8.10.0"
   }
