@@ -39,7 +39,7 @@
     "tslint-plugin-prettier": "2.3.0"
   },
   "dependencies": {
-    "@debridge-finance/dln-client": "github:debridge-finance/pmm-js-client#5139ea3677cd70776521bedcf961ed2003fc762f",
+    "@debridge-finance/dln-client": "1.1.1",
     "@debridge-finance/solana-utils": "1.0.2",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",
