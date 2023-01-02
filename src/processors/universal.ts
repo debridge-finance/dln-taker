@@ -223,7 +223,10 @@ class UniversalProcessor extends BaseOrderProcessor {
       params.orderInfo.order!.take.chainId,
       { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
     );
-    if (takeOrderStatus?.status !== OrderState.NotSet) {
+    if (
+      takeOrderStatus?.status !== OrderState.NotSet &&
+      takeOrderStatus?.status !== undefined
+    ) {
       throw new Error("Order is fulfilled");
     }
 
