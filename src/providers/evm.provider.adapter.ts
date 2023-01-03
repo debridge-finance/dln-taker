@@ -1,6 +1,8 @@
+import { ChainId, tokenAddressToString } from "@debridge-finance/dln-client";
 import Web3 from "web3";
 
 import { ProviderAdapter, SendTransactionContext } from "./provider.adapter";
+import { getBalanceEvm } from "./utils/get.balance.evm";
 
 export class EvmAdapterProvider implements ProviderAdapter {
   wallet: never;
@@ -25,5 +27,13 @@ export class EvmAdapterProvider implements ProviderAdapter {
     context.logger.info(`[EVM] Sent tx: ${transactionHash}`);
 
     return transactionHash;
+  }
+
+  getBalance(token: Uint8Array): Promise<string> {
+    return getBalanceEvm(
+      this.connection,
+      tokenAddressToString(ChainId.Ethereum, token), //todo
+      this.address
+    );
   }
 }

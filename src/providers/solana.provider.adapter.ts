@@ -1,7 +1,9 @@
+import { ChainId, tokenAddressToString } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import {
   Connection,
   Keypair,
+  PublicKey,
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";
@@ -13,6 +15,7 @@ export class SolanaProviderAdapter implements ProviderAdapter {
 
   constructor(public connection: Connection, wallet: Keypair) {
     this.wallet = new helpers.Wallet(wallet);
+    this.getBalance(new Uint8Array());
   }
 
   public get address(): string {
@@ -31,5 +34,22 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     );
     context.logger.info(`[Solana] Sent tx: ${txid}`);
     return txid;
+  }
+
+  async getBalance(token: Uint8Array): Promise<string> {
+    const tokenString = tokenAddressToString(ChainId.Solana, token);
+    if (tokenString === "11111111111111111111111111111111") {
+      return (
+        await this.connection.getBalance(this.wallet.publicKey)
+      ).toString();
+    }
+    const response = await this.connection.getParsedTokenAccountsByOwner(
+      this.wallet.publicKey,
+      { mint: new PublicKey(token) }
+    );
+
+    return (
+      response.value[0]?.account?.data?.parsed?.info?.tokenAmount?.amount || 0
+    );
   }
 }

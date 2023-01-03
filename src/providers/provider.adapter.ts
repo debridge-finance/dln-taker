@@ -12,4 +12,5 @@ export interface ProviderAdapter {
     data: unknown,
     context: SendTransactionContext
   ) => Promise<unknown>;
+  getBalance: (token: Uint8Array) => Promise<string>;
 }

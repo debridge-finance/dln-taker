@@ -6,6 +6,7 @@ import {
   OrderState,
   tokenAddressToString,
 } from "@debridge-finance/dln-client";
+import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import Web3 from "web3";
 
@@ -262,6 +263,15 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     if (!isProfitable) {
       logger.info("order is not profitable, postponing it to the mempool");
+      this.mempoolService.addOrder({ orderInfo, context });
+      return;
+    }
+
+    const accountReserveBalance =
+      await this.context.takeChain.fulfullProvider.getBalance(reserveDstToken);
+
+    if (new BigNumber(accountReserveBalance).lt(requiredReserveDstAmount)) {
+      logger.info("taker doesnt have enough reserve token on balance");
       this.mempoolService.addOrder({ orderInfo, context });
       return;
     }

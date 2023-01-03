@@ -1,3 +1,4 @@
+import { ChainId, tokenAddressToString } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import { clearInterval, clearTimeout } from "timers";
@@ -7,6 +8,7 @@ import { EvmRebroadcastAdapterOpts } from "../config";
 
 import { ProviderAdapter, SendTransactionContext } from "./provider.adapter";
 import { Tx } from "./types/tx";
+import { getBalanceEvm } from "./utils/get.balance.evm";
 
 export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
   wallet: never;
@@ -27,7 +29,9 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
   }
 
   async sendTransaction(data: unknown, context: SendTransactionContext) {
-    const logger = context.logger.child({service: 'EvmRebroadcastAdapterProviderAdapter'})
+    const logger = context.logger.child({
+      service: "EvmRebroadcastAdapterProviderAdapter",
+    });
 
     const tx = data as Tx;
     const nonce = await this.connection.eth.getTransactionCount(
@@ -70,8 +74,8 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
       const success = (v: any) => {
         this.staleTx = undefined;
         clearTimers();
-        resolve(v)
-      }
+        resolve(v);
+      };
 
       const failWithUndeterminedBehavior = (message: string) => {
         logger.error(
@@ -80,7 +84,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
         this.staleTx = currentTx;
         clearTimers();
         reject(message);
-      }
+      };
 
       const fail = (message: string) => {
         clearTimers();
@@ -89,7 +93,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
       try {
         currentTxHash = await this.sendTx(currentTx, logger);
-        const pollingLogger = context.logger.child({polling: currentTxHash})
+        const pollingLogger = context.logger.child({ polling: currentTxHash });
 
         pollingInterval = setInterval(async () => {
           try {
@@ -97,7 +101,7 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
             const transactionReceiptResult =
               await this.connection.eth.getTransactionReceipt(currentTxHash);
-              pollingLogger.debug(
+            pollingLogger.debug(
               `poller received tx receipt, status: ${transactionReceiptResult?.status}`
             );
 
@@ -160,18 +164,11 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
             // run re-broadcast
             currentTx.gasPrice = nextGasPrice;
             attemptsRebroadcast++;
-            const rebroadcastedTxHash = await this.sendTx(
-              currentTx,
-              logger
-            );
-            pollingLogger.debug(
-              `rebroadcasted as ${rebroadcastedTxHash}`
-            );
+            const rebroadcastedTxHash = await this.sendTx(currentTx, logger);
+            pollingLogger.debug(`rebroadcasted as ${rebroadcastedTxHash}`);
             currentTxHash = rebroadcastedTxHash;
           } catch (e) {
-            pollingLogger.error(
-              `rebroadcast raised an error: ${e}`
-            );
+            pollingLogger.error(`rebroadcast raised an error: ${e}`);
             // fail(`rebroadcasting ${currentTxHash} raised an error: ${e}`);
           }
         }, this.rebroadcast.rebroadcastInterval);
@@ -195,31 +192,34 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
 
   private async sendTx(tx: Tx, logger: Logger): Promise<string> {
     return new Promise(async (resolve, reject) => {
-        tx.from = this.connection.eth.defaultAccount!;
+      tx.from = this.connection.eth.defaultAccount!;
 
-        let estimatedGas: number = 0;
-        try {
-          estimatedGas = await this.connection.eth.estimateGas(tx);
-        } catch (error) {
-          logger.error(`estimation failed: ${error}, tx: ${JSON.stringify(tx)}`, error);
+      let estimatedGas: number = 0;
+      try {
+        estimatedGas = await this.connection.eth.estimateGas(tx);
+      } catch (error) {
+        logger.error(
+          `estimation failed: ${error}, tx: ${JSON.stringify(tx)}`,
+          error
+        );
+        reject(error);
+      }
+
+      const txForSign = {
+        ...tx,
+        gas: (estimatedGas * 1.1).toFixed(0),
+      };
+      logger.debug(`sending tx: ${JSON.stringify(txForSign)}`);
+      this.connection.eth
+        .sendTransaction(txForSign)
+        .once("transactionHash", (hash: string) => {
+          logger.debug(`tx sent, txHash: ${hash}`);
+          resolve(hash);
+        })
+        .catch((error) => {
+          logger.error("sending failed", error);
           reject(error);
-        }
-
-        const txForSign = {
-          ...tx,
-          gas: (estimatedGas * 1.1).toFixed(0),
-        };
-        logger.debug(`sending tx: ${JSON.stringify(txForSign)}`);
-        this.connection.eth
-          .sendTransaction(txForSign)
-          .once("transactionHash", (hash: string) => {
-            logger.debug(`tx sent, txHash: ${hash}`);
-            resolve(hash);
-          })
-          .catch((error) => {
-            logger.error("sending failed", error);
-            reject(error);
-          });
+        });
     });
   }
 
@@ -250,5 +250,13 @@ export class EvmRebroadcastAdapterProviderAdapter implements ProviderAdapter {
     if (this.rebroadcast.pollingInterval === undefined) {
       this.rebroadcast.pollingInterval = 5_000;
     }
+  }
+
+  getBalance(token: Uint8Array): Promise<string> {
+    return getBalanceEvm(
+      this.connection,
+      tokenAddressToString(ChainId.Ethereum, token), //todo
+      this.address
+    );
   }
 }
