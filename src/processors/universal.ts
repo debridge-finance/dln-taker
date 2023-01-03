@@ -271,7 +271,9 @@ class UniversalProcessor extends BaseOrderProcessor {
       await this.context.takeChain.fulfullProvider.getBalance(reserveDstToken);
 
     if (new BigNumber(accountReserveBalance).lt(requiredReserveDstAmount)) {
-      logger.info("taker doesnt have enough reserve token on balance");
+      logger.info(
+        `taker doesnt have enough reserve token on balance. taker has ${accountReserveBalance} but need ${requiredReserveDstAmount}`
+      );
       this.mempoolService.addOrder({ orderInfo, context });
       return;
     }
