@@ -15,7 +15,6 @@ export class SolanaProviderAdapter implements ProviderAdapter {
 
   constructor(public connection: Connection, wallet: Keypair) {
     this.wallet = new helpers.Wallet(wallet);
-    this.getBalance(new Uint8Array());
   }
 
   public get address(): string {
