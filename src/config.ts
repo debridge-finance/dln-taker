@@ -169,5 +169,8 @@ export interface ExecutorLaunchConfig {
 
   chains: ChainDefinition[];
 
+  /**
+   * Defines buckets of tokens that have equal value and near-zero re-balancing costs across supported chains
+   */
   buckets: TokensBucket[];
 }

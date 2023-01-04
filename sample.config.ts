@@ -9,15 +9,19 @@ import { ExecutorLaunchConfig } from "./src/config";
 import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
+import * as filters from "./src/filters";
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(environment.WSS, {
     headers: {
-      Authorization: `Bearer ${process.env.WS_API_KEY}`,
+      Authorization: process.env.WS_API_KEY ? `Bearer ${process.env.WS_API_KEY}` : undefined,
     },
   } as any),
 
   buckets: [
+    //
+    // Setting the USDC bucket (all tokens are emitted by Circle Inc on every DLN supported chain)
+    //
     new TokensBucket({
       [ChainId.Avalanche]: ["0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"],
       [ChainId.Arbitrum]: ["0xff970a61a04b1ca14834a43f5de4533ebddb5cc8"],
@@ -42,25 +46,47 @@ const config: ExecutorLaunchConfig = {
   chains: [
     {
       chain: ChainId.Solana,
-      chainRpc: `${process.env.RPC_SOLANA}`,
+      chainRpc: `${process.env.SOLANA_RPC}`,
 
+      // if the order is created on Solana and fulfilled on another chain (e.g. Ethereum),
+      // unlocked funds will be sent to this Solana address
       beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
+
+      // if the order is created on another chain (e.g. Ethereum), DLN executor would attempt to fulfill
+      // this order on behalf of this address
+      // Warn! base58 representation of a private key.
+      // Warn! For security reasons, put it to the .env file
       takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
+
+      // Warn! base58 representation of a private key.
+      // Warn! For security reasons, put it to the .env file
+      unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     },
 
     {
       chain: ChainId.Arbitrum,
-      chainRpc: `${process.env.RPC_ARBITRUM}`,
+      chainRpc: `${process.env.ARBITRUM_RPC}`,
 
+      // if the order is created on Ethereum and fulfilled on another chain (e.g. Solana),
+      // unlocked funds will be sent to this Ethereum address
       beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
+
+      // if the order is created on another chain (e.g. Solana), DLN executor would attempt to fulfill
+      // this order on behalf of this address
+      // Warn! base64 representation of a private key.
+      // Warn! For security reasons, put it to the .env file
       takerPrivateKey: `${process.env.ARBITRUM_TAKER_PRIVATE_KEY}`,
+
+      // if the order is created on another chain (e.g. Solana), DLN executor would unlock it
+      // after successful fulfillment on behalf of this address
+      // Warn! base64 representation of a private key.
+      // Warn! For security reasons, put it to the .env file
       unlockAuthorityPrivateKey: `${process.env.ARBITRUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     },
 
     {
       chain: ChainId.Avalanche,
-      chainRpc: `${process.env.RPC_AVALANCHE}`,
+      chainRpc: `${process.env.AVALANCHE_RPC}`,
 
       beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
       takerPrivateKey: `${process.env.AVALANCHE_TAKER_PRIVATE_KEY}`,
@@ -69,7 +95,7 @@ const config: ExecutorLaunchConfig = {
 
     {
       chain: ChainId.BSC,
-      chainRpc: `${process.env.RPC_BNB}`,
+      chainRpc: `${process.env.BNB_RPC}`,
 
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
@@ -78,7 +104,7 @@ const config: ExecutorLaunchConfig = {
 
     {
       chain: ChainId.Ethereum,
-      chainRpc: `${process.env.RPC_ETHEREUM}`,
+      chainRpc: `${process.env.ETHEREUM_RPC}`,
 
       beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
       takerPrivateKey: `${process.env.ETHEREUM_TAKER_PRIVATE_KEY}`,
@@ -87,7 +113,7 @@ const config: ExecutorLaunchConfig = {
 
     {
       chain: ChainId.Polygon,
-      chainRpc: `${process.env.RPC_POLYGON}`,
+      chainRpc: `${process.env.POLYGON_RPC}`,
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
