@@ -13,7 +13,7 @@ import Web3 from "web3";
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { IncomingOrderContext } from "../interfaces";
 import { createClientLogger } from "../logger";
-import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
+import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
 import {
@@ -35,8 +35,11 @@ class UniversalProcessor extends BaseOrderProcessor {
   private priorityQueue = new Set<string>();
   private queue = new Set<string>();
   private ordersMap = new Map<string, IncomingOrderContext>();
-
+  private readonly UNLOCK_BATCH_SIZE = 10;
   private isLocked: boolean = false;
+  private isUnlockBatchLocked: boolean = false;
+  private unlockBatchesOrderIdMap = new Map<string, Set<string>>();
+
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
     mempoolInterval: 60, // every 60s
@@ -70,29 +73,26 @@ class UniversalProcessor extends BaseOrderProcessor {
       });
 
       const client = context.takeChain.client as evm.PmmEvmClient;
-      await Promise.all([
-        ...tokens.map((token) =>
-          approveToken(
+      for (const token of tokens) {
+        await approveToken(
+          chainId,
+          token,
+          client.getContractAddress(
             chainId,
-            token,
-            client.getContractAddress(
-              chainId,
-              evm.ServiceType.CrosschainForwarder
-            ),
-            context.takeChain.fulfullProvider as EvmAdapterProvider,
-            context.logger
-          )
-        ),
-        ...tokens.map((token) =>
-          approveToken(
-            chainId,
-            token,
-            client.getContractAddress(chainId, evm.ServiceType.Destination),
-            context.takeChain.fulfullProvider as EvmAdapterProvider,
-            context.logger
-          )
-        ),
-      ]);
+            evm.ServiceType.CrosschainForwarder
+          ),
+          context.takeChain.fulfullProvider as EvmProviderAdapter,
+          context.logger
+        );
+
+        await approveToken(
+          chainId,
+          token,
+          client.getContractAddress(chainId, evm.ServiceType.Destination),
+          context.takeChain.fulfullProvider as EvmProviderAdapter,
+          context.logger
+        );
+      }
     }
   }
 
@@ -278,14 +278,6 @@ class UniversalProcessor extends BaseOrderProcessor {
       return;
     }
 
-    const fees = await this.getFee(order, context);
-    const executionFeeAmount = await context.config.client.getAmountToSend(
-      order.take.chainId,
-      order.give.chainId,
-      fees.executionFees.total,
-      this.context.takeChain.fulfullProvider.connection as Web3
-    );
-
     // fulfill order
     const fulfillTx = await this.createOrderFullfillTx(
       orderId,
@@ -313,21 +305,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     await this.waitIsOrderFulfilled(orderId, order, context, logger);
 
     // unlocking
-    // const beneficiary = context.giveChain.beneficiary;
-    // const unlockTx = await this.createOrderUnlockTx(
-    //   orderId,
-    //   order,
-    //   beneficiary,
-    //   executionFeeAmount,
-    //   fees,
-    //   context,
-    //   logger
-    // );
-    // const txUnlock =
-    //   await this.context.takeChain.unlockProvider.sendTransaction(unlockTx, {
-    //     logger,
-    //   });
-    // logger.info(`unlock transaction ${txUnlock} is completed`);
+    this.unlockOrder(orderId, order, context);
   }
 
   private async createOrderUnlockTx(
@@ -360,7 +338,7 @@ class UniversalProcessor extends BaseOrderProcessor {
               reward2: "0",
             };
       unlockTxPayload = {
-        web3: (this.context.takeChain.unlockProvider as EvmAdapterProvider)
+        web3: (this.context.takeChain.unlockProvider as EvmProviderAdapter)
           .connection,
         ...rewards,
       };
@@ -380,6 +358,108 @@ class UniversalProcessor extends BaseOrderProcessor {
     );
 
     return unlockTx;
+  }
+
+  private async unlockOrder(
+    orderId: string,
+    order: OrderData,
+    context: OrderProcessorContext
+  ) {
+    if (this.isUnlockBatchLocked) {
+      setTimeout(() => {
+        this.unlockOrder(orderId, order, context);
+      }, 0);
+      return;
+    }
+    const logger = context.logger;
+    this.isUnlockBatchLocked = true;
+    try {
+      logger.info(`Unlocking is started`);
+      const key = `${order.give.chainId}_${order.take.chainId}`;
+      let orderIds = this.unlockBatchesOrderIdMap.get(key);
+      if (!orderIds) {
+        orderIds = new Set();
+      }
+      orderIds.add(orderId);
+      this.unlockBatchesOrderIdMap.set(key, orderIds);
+
+      if (orderIds.size !== this.UNLOCK_BATCH_SIZE) {
+        logger.debug(`Batch for unlock is not full`);
+        return;
+      }
+
+      const fees = await this.getFee(order, context);
+      const executionFeeAmount = await context.config.client.getAmountToSend(
+        order.take.chainId,
+        order.give.chainId,
+        fees.executionFees.total,
+        this.context.takeChain.fulfullProvider.connection as Web3
+      );
+      logger.debug(`executionFeeAmount = ${executionFeeAmount.toString()}`);
+      const beneficiary = context.giveChain.beneficiary;
+      if (
+        order.give.chainId === ChainId.Solana ||
+        order.take.chainId === ChainId.Solana
+      ) {
+        for (const orderId of orderIds) {
+          try {
+            const unlockTx = await this.createOrderUnlockTx(
+              orderId,
+              order,
+              beneficiary,
+              executionFeeAmount,
+              fees,
+              context,
+              logger
+            );
+
+            const txUnlock =
+              await this.context.takeChain.unlockProvider.sendTransaction(
+                unlockTx,
+                {
+                  logger,
+                }
+              );
+            logger.info(`unlock transaction ${txUnlock} is completed`);
+          } catch (e) {
+            logger.error("Error in unlocking");
+          }
+        }
+      } else {
+        const batchUnlockTx = await context.config.client.sendBatchUnlock(
+          Array.from(orderIds),
+          order.give.chainId,
+          order.take.chainId,
+          beneficiary,
+          executionFeeAmount,
+          {
+            web3: (this.context.takeChain.unlockProvider as EvmProviderAdapter)
+              .connection,
+            loggerInstance: createClientLogger(logger),
+            reward1: 0,
+            reward2: 0,
+          }
+        );
+
+        const txUnlock =
+          await this.context.takeChain.unlockProvider.sendTransaction(
+            batchUnlockTx,
+            {
+              logger,
+            }
+          );
+
+        logger.info(
+          `unlock for ${JSON.stringify(
+            orderIds
+          )} orders ${txUnlock} is completed`
+        );
+      }
+      this.unlockBatchesOrderIdMap.set(key, new Set());
+    } catch (e) {
+      logger.error(`Error in execution batch unlock ${e}`);
+    }
+    this.isUnlockBatchLocked = false;
   }
 
   private async createOrderFullfillTx(

@@ -3,7 +3,7 @@ import { helpers } from "@debridge-finance/solana-utils";
 import BigNumber from "bignumber.js";
 
 import { createClientLogger } from "../logger";
-import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
+import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 
 import {
   FilterContext,
@@ -29,8 +29,10 @@ export const takeAmountUsdEquivalentBetween = (
         filter: "takeAmountUsdEquivalentBetween",
       });
       const clientLogger = createClientLogger(logger);
-      const takeWeb3 = (context.takeChain.fulfullProvider as EvmAdapterProvider)
-        .connection;
+      const takeWeb3 = (
+        context.takeChain
+          .fulfullProvider as EvmProviderAdapter
+      ).connection;
       const takeAddress = helpers.bufferToHex(
         Buffer.from(order.take.tokenAddress)
       );
