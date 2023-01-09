@@ -451,7 +451,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
         logger.info(
           `unlock for ${JSON.stringify(
-            orderIds
+            Array.from(orderIds)
           )} orders ${txUnlock} is completed`
         );
       }
