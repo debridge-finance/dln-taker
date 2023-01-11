@@ -83,7 +83,11 @@ export class WsNextOrder extends GetNextOrder {
           },
         })
       );
-      this.socket.send('"GetArchive"');
+      this.socket.send(JSON.stringify(
+        {
+          GetArchive: {},
+        }
+      ));
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
