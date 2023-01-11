@@ -107,7 +107,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   async process(params: IncomingOrderContext): Promise<void> {
     const { context, orderInfo } = params;
-    const { orderId, type } = orderInfo;
+    const { orderId, type, order } = orderInfo;
 
     params.context.logger = context.logger.child({
       processor: "universalProcessor",
@@ -119,7 +119,10 @@ class UniversalProcessor extends BaseOrderProcessor {
       case OrderInfoStatus.created: {
         return this.tryProcess(params);
       }
-
+      case OrderInfoStatus.archive_fulfilled: {
+        this.unlockOrder(orderId, order!, context);
+        return;
+      }
       case OrderInfoStatus.cancelled:
       case OrderInfoStatus.fulfilled: {
         this.queue.delete(orderId);

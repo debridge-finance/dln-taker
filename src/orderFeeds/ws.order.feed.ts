@@ -47,7 +47,8 @@ type OrderChangeStatus =
   | "Fulfilled"
   | "Cancelled"
   | "GiveOfferIncreased"
-  | "TakeOfferDecreased";
+  | "TakeOfferDecreased"
+  | "ArchiveFulfilled";
 
 type WsOrderInfo = {
   order_id: string;
@@ -151,6 +152,12 @@ export class WsNextOrder extends GetNextOrder {
         return {
           order: orderInfo.order,
           type: OrderInfoStatus.archival,
+          orderId: orderInfo.orderId,
+        };
+      case "ArchiveFulfilled":
+        return {
+          order: orderInfo.order,
+          type: OrderInfoStatus.archive_fulfilled,
           orderId: orderInfo.orderId,
         };
       case "Fulfilled":
