@@ -375,7 +375,6 @@ class UniversalProcessor extends BaseOrderProcessor {
     context: OrderProcessorContext
   ) {
     const giveChain = order.give.chainId;
-    this.unlockBatchesLockedStatus.set(giveChain, true);
     // filling batch queue
     let orderIds = this.unlockBatchesOrderIdMap.get(giveChain);
     if (!orderIds) {
@@ -386,10 +385,16 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.ordersDataMap.set(orderId, order);
 
     if (this.unlockBatchesLockedStatus.get(giveChain) === true) {
+      this.context.logger.debug(
+        `batch unlock processing is locked for ${giveChain}`
+      );
       return;
     }
 
-    this.processUnlockBatches(giveChain, context);
+    this.unlockBatchesLockedStatus.set(giveChain, true);
+    if (orderIds.size >= this.params.batchUnlockSize) {
+      this.processUnlockBatches(giveChain, context);
+    }
   }
 
   private async processUnlockBatches(
@@ -398,7 +403,9 @@ class UniversalProcessor extends BaseOrderProcessor {
   ) {
     const logger = this.context.logger.child({
       func: "processUnlockBatches",
+      giveChain,
     });
+    logger.info("Batch unlocking is started");
     const orderIds = Array.from(
       this.unlockBatchesOrderIdMap.get(giveChain)!
     ).slice(0, this.params.batchUnlockSize);
@@ -484,7 +491,12 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.ordersDataMap.delete(id);
     });
 
-    this.processUnlockBatches(giveChain, context);
+    if (
+      this.unlockBatchesOrderIdMap.get(giveChain)!.size >=
+      this.params.batchUnlockSize
+    ) {
+      this.processUnlockBatches(giveChain, context);
+    }
   }
 
   private async createOrderFullfillTx(
