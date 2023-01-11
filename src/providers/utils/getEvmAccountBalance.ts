@@ -22,7 +22,7 @@ const balanceOfABI = [
   },
 ] as any;
 
-export const getBalanceEvm = async (
+export const getEvmAccountBalance = async (
   web3: Web3,
   tokenContract: string,
   address: string

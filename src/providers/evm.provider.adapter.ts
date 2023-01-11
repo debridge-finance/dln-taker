@@ -8,7 +8,7 @@ import { EvmRebroadcastAdapterOpts } from "../config";
 
 import { ProviderAdapter, SendTransactionContext } from "./provider.adapter";
 import { Tx } from "./types/tx";
-import { getBalanceEvm } from "./utils/get.balance.evm";
+import { getEvmAccountBalance } from "./utils/getEvmAccountBalance";
 
 export class EvmProviderAdapter implements ProviderAdapter {
   wallet: never;
@@ -253,7 +253,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
   }
 
   getBalance(token: Uint8Array): Promise<string> {
-    return getBalanceEvm(
+    return getEvmAccountBalance(
       this.connection,
       tokenAddressToString(ChainId.Ethereum, token), //todo
       this.address
