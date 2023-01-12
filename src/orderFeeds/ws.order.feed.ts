@@ -64,40 +64,6 @@ type WsOrderEvent = {
   };
 };
 
-const createConnection = (
-  wsArgs: ConstructorParameters<typeof WebSocket>,
-  logger: Logger
-): Promise<WebSocket> => {
-  return new Promise(async (resolve) => {
-    await setTimeout(5000, "resolved");
-    const socket = new WebSocket(...wsArgs);
-    socket.on("open", () => {
-      logger.debug("🔌 ws opened connection");
-      socket.send(
-        JSON.stringify({
-          Subscription: {
-            live: true,
-          },
-        })
-      );
-    });
-    socket.on("message", (event: Buffer) => {
-      const data = JSON.parse(event.toString("utf-8"));
-      logger.debug(`📨 ws received new message ${JSON.stringify(data)}`);
-      resolve(socket);
-    });
-
-    socket.on("error", (err) => {
-      logger.error(`WsConnection is failed ${err.message}`);
-    });
-
-    socket.on("close", () => {
-      logger.error(`WsConnection is closed`);
-      resolve(createConnection(wsArgs, logger));
-    });
-  });
-};
-
 export class WsNextOrder extends GetNextOrder {
   private wsArgs;
   private socket: WebSocket;
@@ -109,11 +75,25 @@ export class WsNextOrder extends GetNextOrder {
 
   async init(process: OrderProcessorFunc) {
     super.processNextOrder = process;
-    this.socket = await createConnection(this.wsArgs, this.logger);
+    await this.initWs();
     this.socket.send('"GetArchive"');
+  }
+
+  private async initWs() {
+    this.socket = new WebSocket(...this.wsArgs);
+    this.socket.on("open", () => {
+      this.logger.debug("🔌 ws opened connection");
+      this.socket.send(
+        JSON.stringify({
+          Subscription: {
+            live: true,
+          },
+        })
+      );
+    });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
-      this.logger.debug("📨 ws received new message", data);
+      this.logger.debug(`📨 ws received new message ${JSON.stringify(data)}`);
       if ("Order" in data) {
         const parsedEvent = data as WsOrderEvent;
         const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
@@ -130,6 +110,15 @@ export class WsNextOrder extends GetNextOrder {
         });
         this.processNextOrder(nextOrderInfo);
       }
+    });
+
+    this.socket.on("error", (err) => {
+      this.logger.error(`WsConnection is failed ${err.message}`);
+    });
+
+    this.socket.on("close", () => {
+      this.logger.error(`WsConnection is closed`);
+      this.initWs();
     });
   }
 
