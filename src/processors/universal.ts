@@ -39,7 +39,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   private ordersDataMap = new Map<string, OrderData>(); // key orderid
   private isLocked: boolean = false;
   private unlockBatchesOrderIdMap = new Map<ChainId, Set<string>>(); // value unique array of orderid
-  private unlockBatchesLockedStatus = new Map<ChainId, boolean>(); // value is a locked status
+  private isBatchUnlockLocked: boolean = false;
 
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
@@ -387,15 +387,17 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.unlockBatchesOrderIdMap.set(giveChain, orderIds);
     this.ordersDataMap.set(orderId, order);
 
-    if (this.unlockBatchesLockedStatus.get(giveChain) === true) {
+    // check that process is blocked
+    if (this.isBatchUnlockLocked) {
       this.context.logger.debug(
         `batch unlock processing is locked for ${giveChain}`
       );
       return;
     }
 
-    this.unlockBatchesLockedStatus.set(giveChain, true);
+    // execute batch unlock processing for full batch
     if (orderIds.size >= this.params.batchUnlockSize) {
+      if (this.isBatchUnlockLocked) this.isBatchUnlockLocked = true;
       this.processUnlockBatches(giveChain, context);
     }
   }
@@ -409,19 +411,47 @@ class UniversalProcessor extends BaseOrderProcessor {
       giveChain,
     });
     logger.info("Batch unlocking is started");
-    const orderIds = Array.from(
-      this.unlockBatchesOrderIdMap.get(giveChain)!
-    ).slice(0, this.params.batchUnlockSize);
-    if (orderIds.length !== this.params.batchUnlockSize) {
-      this.unlockBatchesLockedStatus.set(giveChain, false);
-      logger.debug("Batch is not full");
-      return;
-    }
 
-    const beneficiary = context.giveChain.beneficiary;
-    if (giveChain === ChainId.Solana || this.chainId === ChainId.Solana) {
-      for (const orderId of orderIds) {
-        const order = this.ordersDataMap.get(orderId)!;
+    try {
+      const orderIds = Array.from(
+        this.unlockBatchesOrderIdMap.get(giveChain)!
+      ).slice(0, this.params.batchUnlockSize);
+
+      const beneficiary = context.giveChain.beneficiary;
+      if (giveChain === ChainId.Solana || this.chainId === ChainId.Solana) {
+        // execute unlock for each order(solana doesnt support batch unlock now)
+        for (const orderId of orderIds) {
+          const order = this.ordersDataMap.get(orderId)!;
+          const fees = await this.getFee(order, context);
+          const executionFeeAmount =
+            await context.config.client.getAmountToSend(
+              this.chainId,
+              giveChain,
+              fees.executionFees.total,
+              this.context.takeChain.fulfullProvider.connection as Web3
+            );
+          logger.debug(`executionFeeAmount = ${executionFeeAmount.toString()}`);
+          const unlockTx = await this.createOrderUnlockTx(
+            orderId,
+            order,
+            beneficiary,
+            executionFeeAmount,
+            fees,
+            context,
+            logger
+          );
+
+          const txUnlock =
+            await this.context.takeChain.unlockProvider.sendTransaction(
+              unlockTx,
+              {
+                logger,
+              }
+            );
+          logger.info(`unlock transaction ${txUnlock} is completed`);
+        }
+      } else {
+        const order = this.ordersDataMap.get(orderIds[0])!;
         const fees = await this.getFee(order, context);
         const executionFeeAmount = await context.config.client.getAmountToSend(
           this.chainId,
@@ -430,75 +460,72 @@ class UniversalProcessor extends BaseOrderProcessor {
           this.context.takeChain.fulfullProvider.connection as Web3
         );
         logger.debug(`executionFeeAmount = ${executionFeeAmount.toString()}`);
-        const unlockTx = await this.createOrderUnlockTx(
-          orderId,
-          order,
+        const batchUnlockTx = await context.config.client.sendBatchUnlock(
+          Array.from(orderIds),
+          giveChain,
+          this.chainId,
           beneficiary,
           executionFeeAmount,
-          fees,
-          context,
-          logger
+          {
+            web3: (this.context.takeChain.unlockProvider as EvmProviderAdapter)
+              .connection,
+            loggerInstance: createClientLogger(logger),
+            reward1: 0,
+            reward2: 0,
+          }
         );
 
         const txUnlock =
           await this.context.takeChain.unlockProvider.sendTransaction(
-            unlockTx,
+            batchUnlockTx,
             {
               logger,
             }
           );
-        logger.info(`unlock transaction ${txUnlock} is completed`);
-      }
-    } else {
-      const order = this.ordersDataMap.get(orderIds[0])!;
-      const fees = await this.getFee(order, context);
-      const executionFeeAmount = await context.config.client.getAmountToSend(
-        this.chainId,
-        giveChain,
-        fees.executionFees.total,
-        this.context.takeChain.fulfullProvider.connection as Web3
-      );
-      logger.debug(`executionFeeAmount = ${executionFeeAmount.toString()}`);
-      const batchUnlockTx = await context.config.client.sendBatchUnlock(
-        Array.from(orderIds),
-        giveChain,
-        this.chainId,
-        beneficiary,
-        executionFeeAmount,
-        {
-          web3: (this.context.takeChain.unlockProvider as EvmProviderAdapter)
-            .connection,
-          loggerInstance: createClientLogger(logger),
-          reward1: 0,
-          reward2: 0,
-        }
-      );
 
-      const txUnlock =
-        await this.context.takeChain.unlockProvider.sendTransaction(
-          batchUnlockTx,
-          {
-            logger,
-          }
+        logger.info(
+          `unlock for ${JSON.stringify(
+            Array.from(orderIds)
+          )} orders ${txUnlock} is completed`
         );
+      }
 
-      logger.info(
-        `unlock for ${JSON.stringify(
-          Array.from(orderIds)
-        )} orders ${txUnlock} is completed`
-      );
-    }
+      // clean executed orders form queue
+      orderIds.forEach((id) => {
+        this.unlockBatchesOrderIdMap.get(giveChain)!.delete(id);
+        this.ordersDataMap.delete(id);
+      });
 
-    orderIds.forEach((id) => {
-      this.unlockBatchesOrderIdMap.get(giveChain)!.delete(id);
-      this.ordersDataMap.delete(id);
-    });
+      // check a full of batch
+      if (
+        this.unlockBatchesOrderIdMap.get(giveChain)!.size >=
+        this.params.batchUnlockSize
+      ) {
+        this.processUnlockBatches(giveChain, context);
+      } else {
+        logger.debug("Batch is not full");
+        let containsFullBatch = false;
+        // finding full batch for unlocking
+        for (const [
+          chainId,
+          orderIds,
+        ] of this.unlockBatchesOrderIdMap.entries()) {
+          if (orderIds.size >= this.params.batchUnlockSize) {
+            containsFullBatch = true;
+            this.processUnlockBatches(chainId, context); // start unlocking for not full batch
+            return;
+          }
+        }
 
-    if (
-      this.unlockBatchesOrderIdMap.get(giveChain)!.size >=
-      this.params.batchUnlockSize
-    ) {
-      this.processUnlockBatches(giveChain, context);
+        // unlock batch process if each chain is not full
+        if (!containsFullBatch) {
+          this.isBatchUnlockLocked = false;
+          logger.debug("All batches is not full");
+          return;
+        }
+      }
+    } catch (e) {
+      logger.error(`Batch unlocking is failed ${e}`);
     }
   }
 
