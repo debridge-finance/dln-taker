@@ -250,7 +250,7 @@ export class Executor implements IExecutor {
     orderFeed.setLogger(this.logger);
     this.orderFeed = orderFeed;
 
-    orderFeed.init(this.execute.bind(this));
+    await orderFeed.init(this.execute.bind(this));
     this.isInitialized = true;
   }
 
