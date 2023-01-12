@@ -1,5 +1,7 @@
 import { Offer, Order, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
+import { Logger } from "pino";
+import { setTimeout } from "timers/promises";
 import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
@@ -62,6 +64,40 @@ type WsOrderEvent = {
   };
 };
 
+const createConnection = (
+  wsArgs: ConstructorParameters<typeof WebSocket>,
+  logger: Logger
+): Promise<WebSocket> => {
+  return new Promise(async (resolve) => {
+    await setTimeout(5000, "resolved");
+    const socket = new WebSocket(...wsArgs);
+    socket.on("open", () => {
+      logger.debug("🔌 ws opened connection");
+      socket.send(
+        JSON.stringify({
+          Subscription: {
+            live: true,
+          },
+        })
+      );
+    });
+    socket.on("message", (event: Buffer) => {
+      const data = JSON.parse(event.toString("utf-8"));
+      logger.debug(`📨 ws received new message ${JSON.stringify(data)}`);
+      resolve(socket);
+    });
+
+    socket.on("error", (err) => {
+      logger.error(`WsConnection is failed ${err.message}`);
+    });
+
+    socket.on("close", () => {
+      logger.error(`WsConnection is closed`);
+      resolve(createConnection(wsArgs, logger));
+    });
+  });
+};
+
 export class WsNextOrder extends GetNextOrder {
   private wsArgs;
   private socket: WebSocket;
@@ -71,20 +107,10 @@ export class WsNextOrder extends GetNextOrder {
     this.wsArgs = args;
   }
 
-  init(process: OrderProcessorFunc): void {
+  async init(process: OrderProcessorFunc) {
     super.processNextOrder = process;
-    this.socket = new WebSocket(...this.wsArgs);
-    this.socket.on("open", () => {
-      this.logger.debug("🔌 ws opened connection");
-      this.socket.send(
-        JSON.stringify({
-          Subscription: {
-            live: true,
-          },
-        })
-      );
-      this.socket.send('"GetArchive"');
-    });
+    this.socket = await createConnection(this.wsArgs, this.logger);
+    this.socket.send('"GetArchive"');
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
       this.logger.debug("📨 ws received new message", data);
