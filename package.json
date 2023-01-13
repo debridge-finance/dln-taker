@@ -39,8 +39,8 @@
     "tslint-plugin-prettier": "2.3.0"
   },
   "dependencies": {
-    "@debridge-finance/dln-client": "1.1.2-beta",
-    "@debridge-finance/solana-utils": "1.0.2",
+    "@debridge-finance/dln-client": "v1.3.0",
+    "@debridge-finance/solana-utils": "2.0.0",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",
     "amqplib": "0.10.3",
