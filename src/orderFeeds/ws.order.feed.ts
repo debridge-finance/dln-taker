@@ -76,7 +76,6 @@ export class WsNextOrder extends GetNextOrder {
   async init(process: OrderProcessorFunc) {
     super.processNextOrder = process;
     await this.initWs();
-    this.socket.send('"GetArchive"');
   }
 
   private async initWs() {
@@ -90,6 +89,7 @@ export class WsNextOrder extends GetNextOrder {
           },
         })
       );
+      this.socket.send('"GetArchive"');
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
@@ -116,8 +116,9 @@ export class WsNextOrder extends GetNextOrder {
       this.logger.error(`WsConnection is failed ${err.message}`);
     });
 
-    this.socket.on("close", () => {
+    this.socket.on("close", async () => {
       this.logger.error(`WsConnection is closed`);
+      await setTimeout(5000);
       this.initWs();
     });
   }
