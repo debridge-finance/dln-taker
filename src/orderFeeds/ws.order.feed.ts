@@ -1,5 +1,7 @@
 import { Offer, Order, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
+import { Logger } from "pino";
+import { setTimeout } from "timers/promises";
 import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
@@ -71,8 +73,12 @@ export class WsNextOrder extends GetNextOrder {
     this.wsArgs = args;
   }
 
-  init(process: OrderProcessorFunc): void {
+  async init(process: OrderProcessorFunc) {
     super.processNextOrder = process;
+    await this.initWs();
+  }
+
+  private async initWs() {
     this.socket = new WebSocket(...this.wsArgs);
     this.socket.on("open", () => {
       this.logger.debug("🔌 ws opened connection");
@@ -87,7 +93,7 @@ export class WsNextOrder extends GetNextOrder {
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
-      this.logger.debug("📨 ws received new message", data);
+      this.logger.debug(`📨 ws received new message ${JSON.stringify(data)}`);
       if ("Order" in data) {
         const parsedEvent = data as WsOrderEvent;
         const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
@@ -104,6 +110,16 @@ export class WsNextOrder extends GetNextOrder {
         });
         this.processNextOrder(nextOrderInfo);
       }
+    });
+
+    this.socket.on("error", (err) => {
+      this.logger.error(`WsConnection is failed ${err.message}`);
+    });
+
+    this.socket.on("close", async () => {
+      this.logger.error(`WsConnection is closed`);
+      await setTimeout(5000);
+      this.initWs();
     });
   }
 
