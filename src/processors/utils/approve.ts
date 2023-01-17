@@ -65,6 +65,9 @@ export const approveToken = async (
   logger.debug(
     `Verifying approval given by ${provider.address} to ${contractAddress} to trade on ${tokenAddress} on ${ChainId[chainId]}`
   );
+  if (tokenAddress == '0x0000000000000000000000000000000000000000') {
+    return Promise.resolve();
+  }
   const tokenIsApproved = await isApproved(
     connection,
     tokenAddress,
