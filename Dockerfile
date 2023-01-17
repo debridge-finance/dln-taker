@@ -1,14 +1,11 @@
 FROM node:18.12.1 as builder
-ARG SSH_KEY
 
 
 WORKDIR /build
 
 COPY package.json /build
 COPY package-lock.json /build
-RUN mkdir /root/.ssh && chmod 700 /root/.ssh && echo $SSH_KEY | base64 -d > /root/.ssh/id_rsa && chmod 600 /root/.ssh/id_rsa
 RUN npm install
-RUN rm /root/.ssh/id_rsa
 
 
 
