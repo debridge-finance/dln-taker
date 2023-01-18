@@ -4,7 +4,12 @@ import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { U256 } from "../helpers";
-import { GetNextOrder, IncomingOrder, OrderProcessorFunc } from "../interfaces";
+import {
+  GetNextOrder,
+  IncomingOrder,
+  OrderProcessorFunc,
+  UnlockAuthority,
+} from "../interfaces";
 
 type OrderInfo = {
   order: OrderData;
@@ -43,12 +48,12 @@ type OrderChangeStatusInternal =
 
 type OrderChangeStatus =
   | "Created"
-  | "Archival"
+  | "ArchivalCreated"
   | "Fulfilled"
   | "Cancelled"
   | "GiveOfferIncreased"
   | "TakeOfferDecreased"
-  | "ArchiveFulfilled";
+  | "ArchivalFulfilled";
 
 type WsOrderInfo = {
   order_id: string;
@@ -84,7 +89,10 @@ export class WsNextOrder extends GetNextOrder {
     this.wsArgs = args;
   }
 
-  async init(process: OrderProcessorFunc) {
+  async init(
+    process: OrderProcessorFunc,
+    unlockAuthorities: UnlockAuthority[]
+  ) {
     super.processNextOrder = process;
     await this.initWs();
   }
@@ -102,7 +110,25 @@ export class WsNextOrder extends GetNextOrder {
           },
         })
       );
-      this.socket.send('"GetArchive"');
+      this.socket.send(JSON.stringify({ GetOrders: { Created: {} } }));
+      unlockAuthorities.forEach((unlockAuthority) => {
+        this.socket.send(
+          JSON.stringify({
+            GetOrders: {
+              Fulfilled: {
+                unlock_authority: unlockAuthority.address,
+                take_filter: {
+                  All: {
+                    chain_id: unlockAuthority.chainId
+                      .toString(16)
+                      .padStart(64, "0"),
+                  },
+                },
+              },
+            },
+          })
+        );
+      });
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
@@ -148,13 +174,13 @@ export class WsNextOrder extends GetNextOrder {
           type: OrderInfoStatus.created,
           orderId: orderInfo.orderId,
         };
-      case "Archival":
+      case "ArchivalCreated":
         return {
           order: orderInfo.order,
           type: OrderInfoStatus.archival,
           orderId: orderInfo.orderId,
         };
-      case "ArchiveFulfilled":
+      case "ArchivalFulfilled":
         return {
           order: orderInfo.order,
           type: OrderInfoStatus.archive_fulfilled,

@@ -255,7 +255,13 @@ export class Executor implements IExecutor {
     orderFeed.setLogger(this.logger);
     this.orderFeed = orderFeed;
 
-    orderFeed.init(this.execute.bind(this));
+    const unlockAuthorities = Object.values(this.chains).map((chain) => {
+      return {
+        chainId: chain.chain,
+        address: chain.unlockProvider.address as string,
+      };
+    });
+    orderFeed.init(this.execute.bind(this), unlockAuthorities);
     this.isInitialized = true;
   }
 

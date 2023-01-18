@@ -39,6 +39,11 @@ export type IncomingOrderContext = {
 
 export type OrderProcessorFunc = (order?: IncomingOrder) => Promise<void>;
 
+export type UnlockAuthority = {
+  chainId: ChainId;
+  address: string;
+};
+
 export abstract class GetNextOrder {
   protected enabledChains: ChainId[];
   protected logger: Logger;
@@ -46,7 +51,10 @@ export abstract class GetNextOrder {
 
   constructor() {}
 
-  abstract init(processNextOrder: OrderProcessorFunc): void;
+  abstract init(
+    processNextOrder: OrderProcessorFunc,
+    UnlockAuthority: UnlockAuthority[]
+  ): void;
 
   setEnabledChains(enabledChains: ChainId[]) {
     this.enabledChains = enabledChains;
