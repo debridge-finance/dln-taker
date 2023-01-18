@@ -397,7 +397,6 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     // execute batch unlock processing for full batch
     if (orderIds.size >= this.params.batchUnlockSize) {
-      if (!this.isBatchUnlockLocked) this.isBatchUnlockLocked = true;
       this.processUnlockBatches(giveChain, context);
     }
   }
