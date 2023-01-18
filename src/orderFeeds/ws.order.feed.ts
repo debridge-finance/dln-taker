@@ -1,7 +1,6 @@
 import { Offer, Order, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
-import { Logger } from "pino";
-import { setTimeout } from "timers/promises";
+import { setTimeout as setTimeoutPromise } from "timers/promises";
 import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
@@ -67,6 +66,17 @@ type WsOrderEvent = {
 export class WsNextOrder extends GetNextOrder {
   private wsArgs;
   private socket: WebSocket;
+  private readonly pingTimeoutMs = 3000;
+  private pingTimer: NodeJS.Timeout;
+
+  private heartbeat() {
+    // this.logger.debug(`Ping is received`);
+    clearTimeout(this.pingTimer);
+
+    this.pingTimer = setTimeout(() => {
+      this.socket.terminate();
+    }, this.pingTimeoutMs);
+  }
 
   constructor(...args: ConstructorParameters<typeof WebSocket>) {
     super();
@@ -80,8 +90,10 @@ export class WsNextOrder extends GetNextOrder {
 
   private async initWs() {
     this.socket = new WebSocket(...this.wsArgs);
+    this.socket.on("ping", this.heartbeat.bind(this));
     this.socket.on("open", () => {
       this.logger.debug("🔌 ws opened connection");
+      this.heartbeat();
       this.socket.send(
         JSON.stringify({
           Subscription: {
@@ -118,7 +130,8 @@ export class WsNextOrder extends GetNextOrder {
 
     this.socket.on("close", async () => {
       this.logger.error(`WsConnection is closed`);
-      await setTimeout(5000);
+      clearTimeout(this.pingTimer);
+      await setTimeoutPromise(5000);
       this.initWs();
     });
   }
