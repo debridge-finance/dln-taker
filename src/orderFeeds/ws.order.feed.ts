@@ -75,6 +75,7 @@ export class WsNextOrder extends GetNextOrder {
 
     this.pingTimer = setTimeout(() => {
       this.socket.terminate();
+      this.initWs();
     }, this.pingTimeoutMs);
   }
 
@@ -124,15 +125,15 @@ export class WsNextOrder extends GetNextOrder {
       }
     });
 
-    this.socket.on("error", (err) => {
+    this.socket.on("error", async (err) => {
       this.logger.error(`WsConnection is failed ${err.message}`);
+      await setTimeoutPromise(this.pingTimeoutMs);
+      this.initWs();
     });
 
-    this.socket.on("close", async () => {
+    this.socket.on("close", () => {
       this.logger.error(`WsConnection is closed`);
       clearTimeout(this.pingTimer);
-      await setTimeoutPromise(5000);
-      this.initWs();
     });
   }
 
