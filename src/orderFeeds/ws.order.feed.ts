@@ -38,13 +38,21 @@ type WsOrder = {
 };
 
 type FulfilledChangeStatus = { Fulfilled: { taker: number[] } };
+type ArchivalFulfilledChangeStatus = {
+  ArchivalFulfilled: { unlock_authority: string };
+};
+type CreatedChangeStatus = { Created: {} };
+type CancelledChangeStatus = { Cancelled: {} };
+type GiveOfferIncreasedChangeStatus = { GiveOfferIncreased: {} };
+type TakeOfferDecreasedChangeStatus = { TakeOfferDecreased: {} };
 
 type OrderChangeStatusInternal =
-  | "Created"
+  | CreatedChangeStatus
   | FulfilledChangeStatus
-  | "Cancelled"
-  | "GiveOfferIncreased"
-  | "TakeOfferDecreased";
+  | ArchivalFulfilledChangeStatus
+  | CancelledChangeStatus
+  | GiveOfferIncreasedChangeStatus
+  | TakeOfferDecreasedChangeStatus;
 
 type OrderChangeStatus =
   | "Created"
@@ -53,7 +61,8 @@ type OrderChangeStatus =
   | "Cancelled"
   | "GiveOfferIncreased"
   | "TakeOfferDecreased"
-  | "ArchivalFulfilled";
+  | "ArchivalFulfilled"
+  | "Other";
 
 type WsOrderInfo = {
   order_id: string;
@@ -249,17 +258,36 @@ export class WsNextOrder extends GetNextOrder {
   private flattenStatus(
     info: WsOrderInfo
   ): [OrderChangeStatus, string | undefined] {
-    const status = info.order_info_status;
-    if (Object.prototype.hasOwnProperty.call(status, "Fulfilled"))
+    const infoStatus = info.order_info_status;
+    const simpleStatuses = [
+      "Created",
+      "ArchivalCreated",
+      "Cancelled",
+      "GiveOfferIncreased",
+      "TakeOfferDecreased",
+    ];
+    for (const status of simpleStatuses) {
+      if (Object.prototype.hasOwnProperty.call(infoStatus, status))
+        return [status as OrderChangeStatus, undefined];
+    }
+
+    if (Object.prototype.hasOwnProperty.call(infoStatus, "ArchivalFulfilled"))
+      return [
+        "ArchivalFulfilled",
+        helpers.bufferToHex(
+          Buffer.from(
+            (infoStatus as ArchivalFulfilledChangeStatus).ArchivalFulfilled
+              .unlock_authority
+          )
+        ),
+      ];
+    else if (Object.prototype.hasOwnProperty.call(infoStatus, "Fulfilled"))
       return [
         "Fulfilled",
         helpers.bufferToHex(
-          Buffer.from((status as FulfilledChangeStatus).Fulfilled.taker)
+          Buffer.from((infoStatus as FulfilledChangeStatus).Fulfilled.taker)
         ),
       ];
-    return [
-      status as Exclude<OrderChangeStatusInternal, FulfilledChangeStatus>,
-      undefined,
-    ];
+    return ["Other", undefined];
   }
 }

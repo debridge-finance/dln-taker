@@ -46,7 +46,7 @@ const PRERELEASE_ENVIRONMENT_CODENAME_LIMA: Env = {
 };
 
 const PRODUCTION: Env = {
-  WSS: "wss://dln-ws.debridge.finance/ws",
+  WSS: "wss://dln-ws-030.debridge.finance/ws",
 
   defaultEvmAddresses: {
     deBridgeContract: "0x43dE2d77BF8027e25dBD179B491e8d64f38398aA",
