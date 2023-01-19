@@ -180,39 +180,39 @@ export class WsNextOrder extends GetNextOrder {
       case "Created":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.created,
+          type: OrderInfoStatus.Created,
           orderId: orderInfo.orderId,
         };
       case "ArchivalCreated":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.archival,
+          type: OrderInfoStatus.ArchivalCreated,
           orderId: orderInfo.orderId,
         };
       case "ArchivalFulfilled":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.archive_fulfilled,
+          type: OrderInfoStatus.ArchivalFulfilled,
           orderId: orderInfo.orderId,
         };
       case "Fulfilled":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.fulfilled,
+          type: OrderInfoStatus.Fulfilled,
           orderId: orderInfo.orderId,
           taker: orderInfo.taker,
         };
       case "Cancelled":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.cancelled,
+          type: OrderInfoStatus.Cancelled,
           orderId: orderInfo.orderId,
           taker: orderInfo.taker,
         };
       default:
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.other,
+          type: OrderInfoStatus.Other,
           orderId: orderInfo.orderId,
         };
     }
