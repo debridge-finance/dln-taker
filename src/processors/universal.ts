@@ -33,12 +33,12 @@ export type UniversalProcessorParams = {
 
 class UniversalProcessor extends BaseOrderProcessor {
   private mempoolService: MempoolService;
-  private priorityQueue = new Set<string>();
-  private queue = new Set<string>();
-  private incomingOrdersMap = new Map<string, IncomingOrderContext>(); // key orderid
-  private ordersDataMap = new Map<string, OrderData>(); // key orderid
+  private priorityQueue = new Set<string>(); // queue of orderid for processing created order
+  private queue = new Set<string>(); // queue of orderid for retry processing order
+  private incomingOrdersMap = new Map<string, IncomingOrderContext>(); // key orderid, contains incoming order from order feed
+  private ordersDataMap = new Map<string, OrderData>(); // key orderid, contains order data(user for batch unlock)
   private isLocked: boolean = false;
-  private unlockBatchesOrderIdMap = new Map<ChainId, Set<string>>(); // value unique array of orderid
+  private unlockBatchesOrderIdMap = new Map<ChainId, Set<string>>(); // contains batch of orderid for unlock
   private isBatchUnlockLocked: boolean = false;
 
   private params: UniversalProcessorParams = {
@@ -115,16 +115,16 @@ class UniversalProcessor extends BaseOrderProcessor {
     });
 
     switch (type) {
-      case OrderInfoStatus.archival:
-      case OrderInfoStatus.created: {
+      case OrderInfoStatus.ArchivalCreated:
+      case OrderInfoStatus.Created: {
         return this.tryProcess(params);
       }
-      case OrderInfoStatus.archive_fulfilled: {
+      case OrderInfoStatus.ArchivalFulfilled: {
         this.unlockOrder(orderId, order!, context);
         return;
       }
-      case OrderInfoStatus.cancelled:
-      case OrderInfoStatus.fulfilled: {
+      case OrderInfoStatus.Cancelled:
+      case OrderInfoStatus.Fulfilled: {
         this.queue.delete(orderId);
         this.priorityQueue.delete(orderId);
         this.incomingOrdersMap.delete(orderId);
@@ -133,7 +133,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         return;
       }
 
-      case OrderInfoStatus.other:
+      case OrderInfoStatus.Other:
       default: {
         context.logger.error(
           `status=${OrderInfoStatus[type]} not implemented, skipping`
@@ -154,12 +154,12 @@ class UniversalProcessor extends BaseOrderProcessor {
       );
 
       switch (params.orderInfo.type) {
-        case OrderInfoStatus.archival: {
+        case OrderInfoStatus.ArchivalCreated: {
           this.queue.add(orderId);
           context.logger.debug(`postponed to secondary queue`);
           break;
         }
-        case OrderInfoStatus.created: {
+        case OrderInfoStatus.Created: {
           this.priorityQueue.add(orderId);
           context.logger.debug(`postponed to primary queue`);
           break;
@@ -389,24 +389,24 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     // check that process is blocked
     if (this.isBatchUnlockLocked) {
-      this.context.logger.debug(
-        `batch unlock processing is locked for ${giveChain}`
-      );
+      this.context.logger.debug("batch unlock processing is locked");
       return;
     }
 
+    this.isBatchUnlockLocked = true; // lock batch unlock locker
+
     // execute batch unlock processing for full batch
     if (orderIds.size >= this.params.batchUnlockSize) {
-      this.processUnlockBatches(giveChain, context);
+      this.performBatchUnlock(giveChain, context);
     }
   }
 
-  private async processUnlockBatches(
+  private async performBatchUnlock(
     giveChain: ChainId,
     context: OrderProcessorContext
   ) {
     const logger = this.context.logger.child({
-      func: "processUnlockBatches",
+      func: "performBatchUnlock",
       giveChain,
     });
     logger.info("Batch unlocking is started");
@@ -496,33 +496,19 @@ class UniversalProcessor extends BaseOrderProcessor {
       });
 
       // check a full of batch
-      if (
-        this.unlockBatchesOrderIdMap.get(giveChain)!.size >=
-        this.params.batchUnlockSize
-      ) {
-        this.processUnlockBatches(giveChain, context);
-      } else {
-        logger.debug("Batch is not full");
-        let containsFullBatch = false;
-        // finding full batch for unlocking
-        for (const [
-          chainId,
-          orderIds,
-        ] of this.unlockBatchesOrderIdMap.entries()) {
-          if (orderIds.size >= this.params.batchUnlockSize) {
-            containsFullBatch = true;
-            this.processUnlockBatches(chainId, context); // start unlocking for not full batch
-            return;
-          }
-        }
-
-        // unlock batch process if each chain is not full
-        if (!containsFullBatch) {
-          this.isBatchUnlockLocked = false;
-          logger.debug("All batches is not full");
+      for (const [
+        chainId,
+        orderIds,
+      ] of this.unlockBatchesOrderIdMap.entries()) {
+        if (orderIds.size >= this.params.batchUnlockSize) {
+          this.performBatchUnlock(chainId, context); // start unlocking for not full batch
           return;
         }
       }
+
+      // unlock batch process if each chain is not full
+      this.isBatchUnlockLocked = false;
+      logger.debug("All batches is not full");
     } catch (e) {
       logger.error(`Batch unlocking is failed ${e}`);
     }
