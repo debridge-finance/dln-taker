@@ -1,6 +1,5 @@
 import { Offer, Order, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
-import { setTimeout as setTimeoutPromise } from "timers/promises";
 import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
@@ -70,10 +69,10 @@ export class WsNextOrder extends GetNextOrder {
   private pingTimer: NodeJS.Timeout;
 
   private heartbeat() {
-    // this.logger.debug(`Ping is received`);
     clearTimeout(this.pingTimer);
 
     this.pingTimer = setTimeout(() => {
+      this.logger.error(`WsConnection appears to be stale, reconnecting`);
       this.socket.terminate();
       this.initWs();
     }, this.pingTimeoutMs);
@@ -126,13 +125,14 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("error", async (err) => {
-      this.logger.error(`WsConnection is failed ${err.message}`);
-      await setTimeoutPromise(this.pingTimeoutMs);
-      this.initWs();
+      this.logger.error(`WsConnection received error: ${err.message}, retrying reconnection in ${this.pingTimeoutMs}ms`);
+      clearTimeout(this.pingTimer)
+      this.socket.terminate()
+      setTimeout(this.initWs.bind(this), this.pingTimeoutMs)
     });
 
     this.socket.on("close", () => {
-      this.logger.error(`WsConnection is closed`);
+      this.logger.debug(`WsConnection has been closed`);
       clearTimeout(this.pingTimer);
     });
   }
