@@ -416,6 +416,50 @@ class UniversalProcessor extends BaseOrderProcessor {
         this.unlockBatchesOrderIdMap.get(giveChain)!
       ).slice(0, this.params.batchUnlockSize);
 
+      const { result, unlockedOrders } = await this.tryUnlockBatch(
+        giveChain,
+        orderIds,
+        context
+      );
+
+      // clean executed orders form queue
+      unlockedOrders.forEach((id) => {
+        this.unlockBatchesOrderIdMap.get(giveChain)!.delete(id);
+        this.ordersDataMap.delete(id);
+      });
+
+      // check a full of batch
+      if (result) {
+        for (const [
+          chainId,
+          orderIds,
+        ] of this.unlockBatchesOrderIdMap.entries()) {
+          if (orderIds.size >= this.params.batchUnlockSize) {
+            this.performBatchUnlock(chainId, context); // start unlocking for not full batch
+            return;
+          }
+        }
+      }
+
+      // unlock batch process if each chain is not full
+      this.isBatchUnlockLocked = false;
+      logger.debug("All batches is not full");
+    } catch (e) {
+      logger.error(`Batch unlocking is failed ${e}`);
+    }
+  }
+
+  async tryUnlockBatch(
+    giveChain: ChainId,
+    orderIds: string[],
+    context: OrderProcessorContext
+  ): Promise<{ result: boolean; unlockedOrders: string[] }> {
+    const logger = this.context.logger.child({
+      func: "tryUnlockBatch",
+      giveChain,
+    });
+    const unlockedOrders = [];
+    try {
       const beneficiary = context.giveChain.beneficiary;
       if (giveChain === ChainId.Solana || this.chainId === ChainId.Solana) {
         // execute unlock for each order(solana doesnt support batch unlock now)
@@ -447,6 +491,7 @@ class UniversalProcessor extends BaseOrderProcessor {
                 logger,
               }
             );
+          unlockedOrders.push(orderId);
           logger.info(`unlock transaction ${txUnlock} is completed`);
         }
       } else {
@@ -482,36 +527,25 @@ class UniversalProcessor extends BaseOrderProcessor {
             }
           );
 
+        unlockedOrders.push(...orderIds);
+
         logger.info(
           `unlock for ${JSON.stringify(
             Array.from(orderIds)
           )} orders ${txUnlock} is completed`
         );
       }
-
-      // clean executed orders form queue
-      orderIds.forEach((id) => {
-        this.unlockBatchesOrderIdMap.get(giveChain)!.delete(id);
-        this.ordersDataMap.delete(id);
-      });
-
-      // check a full of batch
-      for (const [
-        chainId,
-        orderIds,
-      ] of this.unlockBatchesOrderIdMap.entries()) {
-        if (orderIds.size >= this.params.batchUnlockSize) {
-          this.performBatchUnlock(chainId, context); // start unlocking for not full batch
-          return;
-        }
-      }
-
-      // unlock batch process if each chain is not full
-      this.isBatchUnlockLocked = false;
-      logger.debug("All batches is not full");
     } catch (e) {
-      logger.error(`Batch unlocking is failed ${e}`);
+      logger.error(`Error in tryUnlockBatch: ${e}`);
+      return {
+        result: false,
+        unlockedOrders,
+      };
     }
+    return {
+      result: true,
+      unlockedOrders,
+    };
   }
 
   private async createOrderFullfillTx(

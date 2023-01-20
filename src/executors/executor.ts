@@ -327,7 +327,7 @@ export class Executor implements IExecutor {
     // run filters for create or archival orders
     //
     if (
-      [OrderInfoStatus.created, OrderInfoStatus.archival].includes(
+      [OrderInfoStatus.Created, OrderInfoStatus.ArchivalCreated].includes(
         nextOrderInfo.type
       )
     ) {
