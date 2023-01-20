@@ -1,7 +1,5 @@
 import { Offer, Order, OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
-import { Logger } from "pino";
-import { setTimeout } from "timers/promises";
 import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
@@ -67,6 +65,18 @@ type WsOrderEvent = {
 export class WsNextOrder extends GetNextOrder {
   private wsArgs;
   private socket: WebSocket;
+  private readonly pingTimeoutMs = 3000;
+  private pingTimer: NodeJS.Timeout;
+
+  private heartbeat() {
+    clearTimeout(this.pingTimer);
+
+    this.pingTimer = setTimeout(() => {
+      this.logger.error(`WsConnection appears to be stale, reconnecting`);
+      this.socket.terminate();
+      this.initWs();
+    }, this.pingTimeoutMs);
+  }
 
   constructor(...args: ConstructorParameters<typeof WebSocket>) {
     super();
@@ -80,8 +90,10 @@ export class WsNextOrder extends GetNextOrder {
 
   private async initWs() {
     this.socket = new WebSocket(...this.wsArgs);
+    this.socket.on("ping", this.heartbeat.bind(this));
     this.socket.on("open", () => {
       this.logger.debug("🔌 ws opened connection");
+      this.heartbeat();
       this.socket.send(
         JSON.stringify({
           Subscription: {
@@ -112,14 +124,16 @@ export class WsNextOrder extends GetNextOrder {
       }
     });
 
-    this.socket.on("error", (err) => {
-      this.logger.error(`WsConnection is failed ${err.message}`);
+    this.socket.on("error", async (err) => {
+      this.logger.error(`WsConnection received error: ${err.message}, retrying reconnection in ${this.pingTimeoutMs}ms`);
+      clearTimeout(this.pingTimer)
+      this.socket.terminate()
+      setTimeout(this.initWs.bind(this), this.pingTimeoutMs)
     });
 
-    this.socket.on("close", async () => {
-      this.logger.error(`WsConnection is closed`);
-      await setTimeout(5000);
-      this.initWs();
+    this.socket.on("close", () => {
+      this.logger.debug(`WsConnection has been closed`);
+      clearTimeout(this.pingTimer);
     });
   }
 
