@@ -73,7 +73,7 @@ export class BatchUnlocker {
     });
 
     // check a full of batch
-    if (unlockedOrders.length !== this.batchUnlockSize) {
+    if (unlockedOrders.length === this.batchUnlockSize) {
       for (const [
         chainId,
         orderIds,
