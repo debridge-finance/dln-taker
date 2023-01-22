@@ -64,7 +64,11 @@ class UniversalProcessor extends BaseOrderProcessor {
   ): Promise<void> {
     this.chainId = chainId;
     this.context = context;
-    this.batchUnlocker = new BatchUnlocker(this.chainId, context, this.params);
+    this.batchUnlocker = new BatchUnlocker(
+      this.chainId,
+      context,
+      this.params.batchUnlockSize
+    );
 
     this.mempoolService = new MempoolService(
       context.logger.child({ universalProcessorChain: chainId }),
