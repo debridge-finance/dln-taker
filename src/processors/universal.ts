@@ -22,7 +22,7 @@ import {
   OrderProcessorInitContext,
   OrderProcessorInitializer,
 } from "./base";
-import { BatchUnlocker } from "./batch.unlocker";
+import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
 
@@ -65,7 +65,6 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.chainId = chainId;
     this.context = context;
     this.batchUnlocker = new BatchUnlocker(
-      this.chainId,
       context,
       this.params.batchUnlockSize
     );
@@ -257,6 +256,12 @@ class UniversalProcessor extends BaseOrderProcessor {
       throw new Error("Order is not created");
     }
 
+    const batchSize =
+      order.give.chainId === ChainId.Solana ||
+      order.take.chainId === ChainId.Solana
+        ? null
+        : this.params.batchUnlockSize;
+
     const {
       reserveDstToken,
       requiredReserveDstAmount,
@@ -274,6 +279,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         buckets: context.config.buckets,
         swapConnector: context.config.swapConnector,
         logger: createClientLogger(logger),
+        batchSize,
       }
     );
 
