@@ -39,7 +39,7 @@
     "tslint-plugin-prettier": "2.3.0"
   },
   "dependencies": {
-    "@debridge-finance/dln-client": "2.0.0-dev--costs-and-fees-calculation-revised.1",
+    "@debridge-finance/dln-client": "2.0.0-dev--costs-and-fees-calculation-revised.2",
     "@debridge-finance/solana-utils": "2.0.0",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",

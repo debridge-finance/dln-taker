@@ -1,6 +1,7 @@
 import {
   ChainId,
   OrderData,
+  OrderEstimationStage,
   PMMClient,
   PriceTokenService,
 } from "@debridge-finance/dln-client";
@@ -179,7 +180,7 @@ export class BatchUnlocker {
               .connection,
             takeWeb3: (this.takeChain.unlockProvider as EvmProviderAdapter)
               .connection,
-            orderEstimationStage: 1, //todo
+            orderEstimationStage: OrderEstimationStage.OrderFulfillment,
             loggerInstance: createClientLogger(context.logger),
           }
         );
@@ -270,7 +271,7 @@ export class BatchUnlocker {
             .connection,
           takeWeb3: (this.takeChain.unlockProvider as EvmProviderAdapter)
             .connection,
-          orderEstimationStage: 1,  //todo
+          orderEstimationStage: OrderEstimationStage.OrderFulfillment,
           loggerInstance: createClientLogger(context.logger),
         }
       );
