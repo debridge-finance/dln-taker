@@ -169,7 +169,7 @@ export class BatchUnlocker {
     try {
       const { total: executionFeeAmount } =
         await context.client.getClaimBatchUnlockExecutionFee(
-          this.batchUnlockSize,
+          orderIds.length,
           context.giveChain.chain,
           this.takeChain.chain,
           giveNativePrice,
