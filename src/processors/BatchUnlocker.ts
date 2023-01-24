@@ -129,7 +129,7 @@ export class BatchUnlocker {
       context.priceTokenService.getPrice(context.giveChain.chain, null, {
         logger: clientLogger,
       }),
-      context.priceTokenService.getPrice(context.giveChain.chain, null, {
+      context.priceTokenService.getPrice(this.takeChain.chain, null, {
         logger: clientLogger,
       }),
     ]);
