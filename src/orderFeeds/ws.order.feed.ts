@@ -37,7 +37,7 @@ type WsOrder = {
   external_call: null;
 };
 
-type FulfilledChangeStatus = { Fulfilled: { taker: number[] } };
+type FulfilledChangeStatus = { Fulfilled: { unlock_authority: string } };
 type ArchivalFulfilledChangeStatus = {
   ArchivalFulfilled: { unlock_authority: string };
 };
@@ -274,19 +274,13 @@ export class WsNextOrder extends GetNextOrder {
     if (Object.prototype.hasOwnProperty.call(infoStatus, "ArchivalFulfilled"))
       return [
         "ArchivalFulfilled",
-        helpers.bufferToHex(
-          Buffer.from(
-            (infoStatus as ArchivalFulfilledChangeStatus).ArchivalFulfilled
-              .unlock_authority
-          )
-        ),
+        (infoStatus as ArchivalFulfilledChangeStatus).ArchivalFulfilled
+          .unlock_authority,
       ];
     else if (Object.prototype.hasOwnProperty.call(infoStatus, "Fulfilled"))
       return [
         "Fulfilled",
-        helpers.bufferToHex(
-          Buffer.from((infoStatus as FulfilledChangeStatus).Fulfilled.taker)
-        ),
+        (infoStatus as FulfilledChangeStatus).Fulfilled.unlock_authority,
       ];
     return ["Other", undefined];
   }
