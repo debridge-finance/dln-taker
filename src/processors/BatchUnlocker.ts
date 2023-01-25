@@ -45,6 +45,7 @@ export class BatchUnlocker {
     order: OrderData,
     context: OrderProcessorContext
   ) {
+    context.logger.debug(`Batch unlocker received new order`);
     const giveChain = order.give.chainId;
     // filling batch queue
     let orderIds = this.unlockBatchesOrderIdMap.get(giveChain);
