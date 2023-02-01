@@ -115,6 +115,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     params.context.logger = context.logger.child({
       processor: "universalProcessor",
       orderId,
+      takeChainId: this.chainId,
     });
 
     switch (type) {
@@ -126,8 +127,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         this.batchUnlocker.unlockOrder(orderId, order!, context);
         return;
       }
-      case OrderInfoStatus.Cancelled:
-      case OrderInfoStatus.Fulfilled: {
+      case OrderInfoStatus.Cancelled: {
         this.queue.delete(orderId);
         this.priorityQueue.delete(orderId);
         this.incomingOrdersMap.delete(orderId);
@@ -135,7 +135,15 @@ class UniversalProcessor extends BaseOrderProcessor {
         context.logger.debug(`deleted from queues`);
         return;
       }
-
+      case OrderInfoStatus.Fulfilled: {
+        this.queue.delete(orderId);
+        this.priorityQueue.delete(orderId);
+        this.incomingOrdersMap.delete(orderId);
+        this.mempoolService.delete(orderId);
+        context.logger.debug(`deleted from queues`);
+        await this.batchUnlocker.unlockOrder(orderId, order!, context);
+        return;
+      }
       case OrderInfoStatus.Other:
       default: {
         context.logger.error(
@@ -327,7 +335,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     await this.waitIsOrderFulfilled(orderId, order, context, logger);
 
     // unlocking
-    this.batchUnlocker.unlockOrder(orderId, order, context);
+    await this.batchUnlocker.unlockOrder(orderId, order, context);
   }
 
   private async createOrderFullfillTx(

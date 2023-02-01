@@ -1,11 +1,15 @@
 import {
+  buffersAreEqual,
   ChainId,
   OrderData,
   OrderEstimationStage,
+  OrderState,
   PMMClient,
   PriceTokenService,
+  tokenStringToBuffer,
 } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
+import Web3 from "web3";
 
 import {
   ExecutorInitializingChain,
@@ -31,6 +35,7 @@ export class BatchUnlocker {
   private readonly takeChain: ExecutorInitializingChain;
   private readonly logger: Logger;
   private readonly giveChainsMap = new Map<ChainId, ExecutorSupportedChain>();
+  private readonly unlockAuthority: Uint8Array;
 
   constructor(
     private readonly context: OrderProcessorInitContext,
@@ -38,21 +43,48 @@ export class BatchUnlocker {
   ) {
     this.takeChain = context.takeChain;
     this.logger = context.logger;
+    this.unlockAuthority = tokenStringToBuffer(
+      this.takeChain.chain,
+      context.takeChain.unlockProvider.address
+    );
   }
 
-  unlockOrder(
+  async unlockOrder(
     orderId: string,
     order: OrderData,
     context: OrderProcessorContext
   ) {
     context.logger.debug(`Batch unlocker received new order`);
     const giveChain = order.give.chainId;
+    if (
+      !buffersAreEqual(order.orderAuthorityDstAddress, this.unlockAuthority)
+    ) {
+      context.logger.debug(
+        "orderAuthorityDstAddress is not he same to unlockAuthority"
+      );
+      return;
+    }
+
+    // validate that order is fulfilled
+    const orderState = await context.config.client.getTakeOrderStatus(
+      orderId,
+      order.take.chainId,
+      { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
+    );
+    if (orderState?.status !== OrderState.Fulfilled) {
+      context.logger.debug("Order is not in fulfilled state");
+      return;
+    }
+
     // filling batch queue
     let orderIds = this.unlockBatchesOrderIdMap.get(giveChain);
     if (!orderIds) {
       orderIds = new Set();
     }
     orderIds.add(orderId);
+    this.context.logger.debug(
+      `Queue for unlock in ${giveChain} contains ${orderIds.size}`
+    );
     this.unlockBatchesOrderIdMap.set(giveChain, orderIds);
     this.ordersDataMap.set(orderId, order);
 
@@ -70,7 +102,7 @@ export class BatchUnlocker {
         func: "performBatchUnlock",
         giveChain,
       });
-      this.performBatchUnlock({
+      await this.performBatchUnlock({
         logger,
         priceTokenService: context.config.tokenPriceService,
         client: context.config.client,
@@ -107,7 +139,7 @@ export class BatchUnlocker {
             func: "performBatchUnlock",
             giveChain: chainId,
           });
-          this.performBatchUnlock({
+          await this.performBatchUnlock({
             ...context,
             logger,
             giveChain: currentChain,
@@ -203,13 +235,12 @@ export class BatchUnlocker {
         }
       );
 
-      const txUnlock =
-        await this.context.takeChain.unlockProvider.sendTransaction(
-          batchUnlockTx,
-          {
-            logger: context.logger,
-          }
-        );
+      const txUnlock = await this.takeChain.unlockProvider.sendTransaction(
+        batchUnlockTx,
+        {
+          logger: context.logger,
+        }
+      );
 
       context.logger.info(
         `unlock for ${JSON.stringify(
@@ -289,10 +320,12 @@ export class BatchUnlocker {
       context.logger
     );
 
-    const txUnlock =
-      await this.context.takeChain.unlockProvider.sendTransaction(unlockTx, {
+    const txUnlock = await this.takeChain.unlockProvider.sendTransaction(
+      unlockTx,
+      {
         logger: context.logger,
-      });
+      }
+    );
     context.logger.info(`unlock transaction ${txUnlock} is completed`);
   }
 

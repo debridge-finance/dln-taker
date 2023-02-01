@@ -31,6 +31,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
   async sendTransaction(data: unknown, context: SendTransactionContext) {
     const logger = context.logger.child({
       service: "EvmProviderAdapter",
+      currentChainId: await this.connection.eth.getChainId(),
     });
 
     const tx = data as Tx;
@@ -93,7 +94,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
       try {
         currentTxHash = await this.sendTx(currentTx, logger);
-        const pollingLogger = context.logger.child({ polling: currentTxHash });
+        const pollingLogger = context.logger.child({
+          polling: currentTxHash,
+          currentChainId: await this.connection.eth.getChainId(),
+        });
 
         pollingInterval = setInterval(async () => {
           try {
@@ -255,7 +259,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
   getBalance(token: Uint8Array): Promise<string> {
     return getEvmAccountBalance(
       this.connection,
-      tokenAddressToString(ChainId.Ethereum, token), //todo
+      tokenAddressToString(ChainId.Ethereum, token), // todo
       this.address
     );
   }
