@@ -124,7 +124,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         return this.tryProcess(params);
       }
       case OrderInfoStatus.ArchivalFulfilled: {
-        this.batchUnlocker.unlockOrder(orderId, order!, context);
+        await this.batchUnlocker.unlockOrder(orderId, order!, context);
         return;
       }
       case OrderInfoStatus.Cancelled: {
