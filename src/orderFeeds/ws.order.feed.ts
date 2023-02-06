@@ -82,6 +82,7 @@ export class WsNextOrder extends GetNextOrder {
   private socket: WebSocket;
   private readonly pingTimeoutMs = 3000;
   private pingTimer: NodeJS.Timeout;
+  private unlockAuthorities: UnlockAuthority[];
 
   private heartbeat() {
     clearTimeout(this.pingTimer);
@@ -103,6 +104,7 @@ export class WsNextOrder extends GetNextOrder {
     unlockAuthorities: UnlockAuthority[]
   ) {
     super.processNextOrder = process;
+    this.unlockAuthorities = unlockAuthorities;
     await this.initWs();
   }
 
@@ -120,7 +122,7 @@ export class WsNextOrder extends GetNextOrder {
         })
       );
       this.socket.send(JSON.stringify({ GetOrders: { Created: {} } }));
-      unlockAuthorities.forEach((unlockAuthority) => {
+      this.unlockAuthorities.forEach((unlockAuthority) => {
         this.socket.send(
           JSON.stringify({
             GetOrders: {

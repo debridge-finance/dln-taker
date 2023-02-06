@@ -267,18 +267,17 @@ export class Executor implements IExecutor {
 
   async execute(nextOrderInfo?: IncomingOrder) {
     if (!this.isInitialized) throw new Error("executor is not initialized");
-    this.logger.info(
-      `executor received incoming order: ${JSON.stringify(nextOrderInfo)}`
-    );
+    this.logger.info(`executor received incoming order`);
+    this.logger.debug(nextOrderInfo);
+
     if (nextOrderInfo && nextOrderInfo.order && nextOrderInfo.orderId) {
       const orderId = nextOrderInfo.orderId;
       const logger = this.logger.child({ orderId });
-      logger.info(`executing order...`);
       try {
         await this.executeOrder(nextOrderInfo, logger);
-        logger.info(`execution finished`);
       } catch (e) {
-        logger.error(`received error while execution: ${e}`, e);
+        logger.error(`received error while order execution: ${e}`);
+        logger.error(e);
       }
     } else {
       this.logger.debug("message is empty, skipping");
@@ -331,7 +330,7 @@ export class Executor implements IExecutor {
         nextOrderInfo.type
       )
     ) {
-      logger.info("running filters against the order");
+      logger.debug("running filters against the order");
       const orderFilters = await Promise.all(
         listOrderFilters.map((filter) =>
           filter(order, {
@@ -348,13 +347,13 @@ export class Executor implements IExecutor {
         return false;
       }
     } else {
-      logger.info("accepting order as is");
+      logger.debug("accepting order as is");
     }
 
     //
     // run processor
     //
-    logger.info(`passing the order to the processor`);
+    logger.debug(`passing the order to the processor`);
     takeChain.orderProcessor.process({
       orderInfo: nextOrderInfo,
       context: {

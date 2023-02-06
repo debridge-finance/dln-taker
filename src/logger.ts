@@ -2,23 +2,23 @@ import { Logger as ClientLogger, LogLevel } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
 export const createClientLogger = (logger: Logger) => {
-  return new ClientLogger((level: LogLevel, ...args) => {
-    // args = args[0];
-    // const message = JSON.stringify(args);
+  return new ClientLogger((level: LogLevel, args) => {
+    // concat args so they appear as a first string in pino
+    const message = Object.values(args).join(' ');
     switch (level) {
       case LogLevel.LOG: {
-        logger.info(...args);
+        logger.info(message);
         break;
       }
 
       case LogLevel.VERBOSE: {
-        logger.debug(...args);
+        logger.debug(message);
         break;
       }
 
       case LogLevel.ERROR:
       default: {
-        logger.error(...args);
+        logger.error(message);
         break;
       }
     }
