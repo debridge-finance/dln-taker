@@ -19,7 +19,7 @@ import { createClientLogger } from "../logger";
 import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
-import { OrderProcessorContext, OrderProcessorInitContext } from "./base";
+import { OrderProcessorContext } from "./base";
 
 export class BatchUnlocker {
   private ordersDataMap = new Map<string, OrderData>(); // orderId => orderData
@@ -36,7 +36,7 @@ export class BatchUnlocker {
     this.logger = logger.child({
       service: "batchUnlock",
       takeChainId: this.takeChain.chain,
-      batchUnlockSize
+      batchUnlockSize,
     });
   }
 
@@ -55,15 +55,28 @@ export class BatchUnlocker {
     );
     // order must be in the FULFILLED state
     if (orderState?.status !== OrderState.Fulfilled) {
-      context.logger.debug(`current state is ${ orderState?.status }, however OrderState.Fulfilled is expected; not adding to the batch unlock pool`);
+      context.logger.debug(
+        `current state is ${orderState?.status}, however OrderState.Fulfilled is expected; not adding to the batch unlock pool`
+      );
       return;
     }
     // a FULFILLED order must have ours takerAddress to ensure successful unlock
-    const takerAddress = tokenStringToBuffer(this.takeChain.chain, orderState.takerAddress);
-    const unlockAuthority = tokenStringToBuffer(this.takeChain.chain, this.executor.chains[this.takeChain.chain]!.unlockProvider.address);
+    const takerAddress = tokenStringToBuffer(
+      this.takeChain.chain,
+      orderState.takerAddress
+    );
+    const unlockAuthority = tokenStringToBuffer(
+      this.takeChain.chain,
+      this.executor.chains[this.takeChain.chain]!.unlockProvider.address
+    );
     if (!buffersAreEqual(takerAddress, unlockAuthority)) {
       context.logger.debug(
-        `orderState.takerAddress (${orderState.takerAddress}) does not match expected unlockAuthority (${tokenAddressToString(this.takeChain.chain, unlockAuthority)}), not adding to the batch unlock pool`
+        `orderState.takerAddress (${
+          orderState.takerAddress
+        }) does not match expected unlockAuthority (${tokenAddressToString(
+          this.takeChain.chain,
+          unlockAuthority
+        )}), not adding to the batch unlock pool`
       );
       return;
     }
@@ -76,7 +89,11 @@ export class BatchUnlocker {
     this.ordersDataMap.set(orderId, order);
 
     context.logger.debug(`added to the batch unlock queue`);
-    this.logger.debug(`batch unlock queue size for the giveChain=${ChainId[order.give.chainId]} ${this.unlockBatchesOrderIdMap.get(order.give.chainId)!.size} order(s)`);
+    this.logger.debug(
+      `batch unlock queue size for the giveChain=${
+        ChainId[order.give.chainId]
+      } ${this.unlockBatchesOrderIdMap.get(order.give.chainId)!.size} order(s)`
+    );
 
     return this.tryUnlock(order.give.chainId);
   }
@@ -84,24 +101,29 @@ export class BatchUnlocker {
   async tryUnlock(giveChainId: ChainId) {
     // check that process is blocked
     if (this.isBatchUnlockLocked) {
-      this.logger.debug("batch unlock processing is locked, not performing unlock procedures");
+      this.logger.debug(
+        "batch unlock processing is locked, not performing unlock procedures"
+      );
       return;
     }
 
     const currentSize = this.unlockBatchesOrderIdMap.get(giveChainId)!.size;
     if (currentSize < this.batchUnlockSize) {
-      this.logger.debug("batch is not fulled yet, not performing unlock procedures")
+      this.logger.debug(
+        "batch is not fulled yet, not performing unlock procedures"
+      );
       return;
     }
 
     this.isBatchUnlockLocked = true;
-    this.logger.debug(`trying to send batch unlock to ${ChainId[giveChainId]}`)
+    this.logger.debug(`trying to send batch unlock to ${ChainId[giveChainId]}`);
     const batchSucceeded = await this.performBatchUnlock(giveChainId);
     if (batchSucceeded) {
-      this.logger.debug(`succeeded sending batch to ${ChainId[giveChainId]}, checking other directions`)
+      this.logger.debug(
+        `succeeded sending batch to ${ChainId[giveChainId]}, checking other directions`
+      );
       await this.unlockAny();
-    }
-    else {
+    } else {
       this.logger.error("batch unlock failed, stopping unlock procedures");
     }
     this.isBatchUnlockLocked = false;
@@ -109,8 +131,10 @@ export class BatchUnlocker {
 
   private async unlockAny() {
     let giveChainId: ChainId | undefined;
-    while (giveChainId = this.peekNextBatch()) {
-      this.logger.debug(`trying to send batch unlock to ${ChainId[giveChainId]}`)
+    while ((giveChainId = this.peekNextBatch())) {
+      this.logger.debug(
+        `trying to send batch unlock to ${ChainId[giveChainId]}`
+      );
       const batchSucceeded = await this.performBatchUnlock(giveChainId);
       if (!batchSucceeded) {
         this.logger.error("batch unlock failed, stopping");
@@ -120,12 +144,9 @@ export class BatchUnlocker {
   }
 
   private peekNextBatch() {
-    for (const [
-      chainId,
-      orderIds,
-    ] of this.unlockBatchesOrderIdMap.entries()) {
+    for (const [chainId, orderIds] of this.unlockBatchesOrderIdMap.entries()) {
       if (orderIds.size >= this.batchUnlockSize) {
-        return chainId
+        return chainId;
       }
     }
   }
@@ -143,12 +164,12 @@ export class BatchUnlocker {
       this.ordersDataMap.delete(id);
     });
 
-    return unlockedOrders.length === this.batchUnlockSize
+    return unlockedOrders.length === this.batchUnlockSize;
   }
 
   private async unlockOrders(
     giveChainId: ChainId,
-    orderIds: string[],
+    orderIds: string[]
   ): Promise<string[]> {
     const unlockedOrders = [];
     const logger = this.logger.child({
@@ -159,7 +180,8 @@ export class BatchUnlocker {
     logger.debug(orderIds.join(","));
 
     const giveChain = this.executor.chains[giveChainId];
-    if (!giveChain) throw new Error(`Give chain not set: ${ChainId[giveChainId]}`);
+    if (!giveChain)
+      throw new Error(`Give chain not set: ${ChainId[giveChainId]}`);
 
     const [giveNativePrice, takeNativePrice] = await Promise.all([
       this.executor.tokenPriceService.getPrice(giveChainId, null, {
@@ -239,18 +261,15 @@ export class BatchUnlocker {
         }
       );
 
-      await this.takeChain.unlockProvider.sendTransaction(
-        batchUnlockTx,
-        {
-          logger,
-        }
-      );
+      await this.takeChain.unlockProvider.sendTransaction(batchUnlockTx, {
+        logger,
+      });
 
       logger.info(`unlocked orders: ${orderIds.join(",")}`);
       return orderIds;
     } catch (e) {
       logger.error(`failed to unlock ${orderIds.length} order(s): ${e}`);
-      logger.error(`failed batch contained: ${orderIds.join(",")}`)
+      logger.error(`failed batch contained: ${orderIds.join(",")}`);
       logger.error(e);
       return [];
     }
@@ -300,8 +319,7 @@ export class BatchUnlocker {
         giveNativePrice,
         takeNativePrice,
         {
-          giveWeb3: (giveChain.unlockProvider as EvmProviderAdapter)
-            .connection,
+          giveWeb3: (giveChain.unlockProvider as EvmProviderAdapter).connection,
           takeWeb3: (this.takeChain.unlockProvider as EvmProviderAdapter)
             .connection,
           orderEstimationStage: OrderEstimationStage.OrderFulfillment,
@@ -317,12 +335,9 @@ export class BatchUnlocker {
       logger
     );
 
-    await this.takeChain.unlockProvider.sendTransaction(
-      unlockTx,
-      {
-        logger
-      }
-    );
+    await this.takeChain.unlockProvider.sendTransaction(unlockTx, {
+      logger,
+    });
     logger.info(`unlocked order: ${orderId}`);
   }
 
@@ -337,9 +352,8 @@ export class BatchUnlocker {
     // todo fix any
     let unlockTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (
-        this.takeChain.unlockProvider as SolanaProviderAdapter
-      ).wallet.publicKey;
+      const wallet = (this.takeChain.unlockProvider as SolanaProviderAdapter)
+        .wallet.publicKey;
       unlockTxPayload = {
         unlocker: wallet,
       };
@@ -355,8 +369,7 @@ export class BatchUnlocker {
               reward2: "0",
             };
       unlockTxPayload = {
-        web3: (this.takeChain.unlockProvider as EvmProviderAdapter)
-          .connection,
+        web3: (this.takeChain.unlockProvider as EvmProviderAdapter).connection,
         ...rewardsParams,
       };
     }

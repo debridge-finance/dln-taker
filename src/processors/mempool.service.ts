@@ -22,10 +22,12 @@ export class MempoolService {
     this.orderParams.set(orderId, params);
 
     // logging from the order's context
-    params.context.logger.debug("added to mempool")
+    params.context.logger.debug("added to mempool");
 
     // logging from the service's context
-    this.logger.debug(`current mempool size: ${this.orderParams.size} order(s)`);
+    this.logger.debug(
+      `current mempool size: ${this.orderParams.size} order(s)`
+    );
   }
 
   async process() {

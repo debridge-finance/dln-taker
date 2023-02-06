@@ -67,8 +67,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     const logger = context.logger.child({
       processor: "universal",
-      takeChainId: chainId
-    })
+      takeChainId: chainId,
+    });
 
     this.batchUnlocker = new BatchUnlocker(
       logger,
@@ -242,7 +242,12 @@ class UniversalProcessor extends BaseOrderProcessor {
         bucket.findFirstToken(order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
-      logger.info(`no bucket found to cover order's give token: ${tokenAddressToString(order.give.chainId, order.give.tokenAddress)}, skipping`)
+      logger.info(
+        `no bucket found to cover order's give token: ${tokenAddressToString(
+          order.give.chainId,
+          order.give.tokenAddress
+        )}, skipping`
+      );
       return;
     }
 
@@ -256,7 +261,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       takeOrderStatus?.status !== OrderState.NotSet &&
       takeOrderStatus?.status !== undefined
     ) {
-      logger.info("order is already handled on the give chain, skipping")
+      logger.info("order is already handled on the give chain, skipping");
       return;
     }
 
@@ -267,14 +272,13 @@ class UniversalProcessor extends BaseOrderProcessor {
       { web3: context.giveChain.fulfullProvider.connection as Web3 }
     );
     if (giveOrderStatus?.status !== OrderState.Created) {
-      logger.info("inexistent order, skipping")
+      logger.info("inexistent order, skipping");
       return;
     }
 
-    const batchSize = (
-           order.give.chainId === ChainId.Solana
-        || order.take.chainId === ChainId.Solana
-      )
+    const batchSize =
+      order.give.chainId === ChainId.Solana ||
+      order.take.chainId === ChainId.Solana
         ? null
         : this.params.batchUnlockSize;
 
@@ -289,8 +293,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       {
         client: context.config.client,
         giveConnection: context.giveChain.fulfullProvider.connection as Web3,
-        takeConnection: this.takeChain.fulfullProvider
-          .connection as Web3,
+        takeConnection: this.takeChain.fulfullProvider.connection as Web3,
         priceTokenService: context.config.tokenPriceService,
         buckets: context.config.buckets,
         swapConnector: context.config.swapConnector,
@@ -328,11 +331,10 @@ class UniversalProcessor extends BaseOrderProcessor {
     );
 
     try {
-      const txFulfill =
-        await this.takeChain.fulfullProvider.sendTransaction(
-          fulfillTx.tx,
-          { logger }
-        );
+      const txFulfill = await this.takeChain.fulfullProvider.sendTransaction(
+        fulfillTx.tx,
+        { logger }
+      );
       logger.info(`fulfill transaction ${txFulfill} is completed`);
     } catch (e) {
       logger.error(`fulfill transaction failed: ${e}`);
@@ -358,9 +360,8 @@ class UniversalProcessor extends BaseOrderProcessor {
   ) {
     let fullFillTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (
-        this.takeChain.fulfullProvider as SolanaProviderAdapter
-      ).wallet.publicKey;
+      const wallet = (this.takeChain.fulfullProvider as SolanaProviderAdapter)
+        .wallet.publicKey;
       fullFillTxPayload = {
         taker: wallet,
       };

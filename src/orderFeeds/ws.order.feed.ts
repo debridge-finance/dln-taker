@@ -163,10 +163,12 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("error", async (err) => {
-      this.logger.error(`WsConnection received error: ${err.message}, retrying reconnection in ${this.pingTimeoutMs}ms`);
-      clearTimeout(this.pingTimer)
-      this.socket.terminate()
-      setTimeout(this.initWs.bind(this), this.pingTimeoutMs)
+      this.logger.error(
+        `WsConnection received error: ${err.message}, retrying reconnection in ${this.pingTimeoutMs}ms`
+      );
+      clearTimeout(this.pingTimer);
+      this.socket.terminate();
+      setTimeout(this.initWs.bind(this), this.pingTimeoutMs);
     });
 
     this.socket.on("close", () => {
