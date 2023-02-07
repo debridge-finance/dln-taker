@@ -27,8 +27,26 @@ import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
 
 export type UniversalProcessorParams = {
+  /**
+   * desired profitability. Setting a higher value would prevent executor from fulfilling most orders because
+   * the deBridge app and the API suggest users placing orders with as much margin as 4bps
+   */
   minProfitabilityBps: number;
+  /**
+   * how often to re-evaluate orders that were not fulfilled for a reason
+   */
   mempoolInterval: number;
+  /**
+   * Number of orders (per every chain where orders are coming from and to) to accumulate to unlock them in batches
+   *     Min: 1; max: 10, default: 10.
+   *     This means that the executor would accumulate orders (that were fulfilled successfully) rather then unlock
+   *     them on the go, and would send a batch of unlock commands every time enough orders were fulfilled, dramatically
+   *     reducing the cost of the unlock command execution.
+   *     You can set a lesser value to unlock orders more frequently, however please note that this value directly
+   *     affects order profitability because the deBridge app and the API reserves the cost of unlock in the order's margin,
+   *     assuming that the order would be unlocked in a batch of size=10. Reducing the batch size to a lower value increases
+   *     your unlock costs and thus reduces order profitability, making them unprofitable most of the time.
+   */
   batchUnlockSize: number;
 };
 
