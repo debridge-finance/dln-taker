@@ -134,6 +134,8 @@ export class Executor implements IExecutor {
           solanaDebridge,
           solanaDebridgeSetting
         );
+        await client.destination.debridge.init();
+
         // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
         const altInitTx = await client.initForFulfillPreswap(
           new PublicKey(chain.beneficiary),

@@ -7,6 +7,7 @@ import {
   tokenAddressToString,
   tokenStringToBuffer,
 } from "@debridge-finance/dln-client";
+import { Transaction } from "@solana/web3.js";
 import { Logger } from "pino";
 import Web3 from "web3";
 
@@ -98,7 +99,7 @@ export class BatchUnlocker {
     return this.tryUnlock(order.give.chainId);
   }
 
-  async tryUnlock(giveChainId: ChainId) {
+  async tryUnlock(giveChainId: ChainId): Promise<void> {
     // check that process is blocked
     if (this.isBatchUnlockLocked) {
       this.logger.debug(
@@ -129,7 +130,7 @@ export class BatchUnlocker {
     this.isBatchUnlockLocked = false;
   }
 
-  private async unlockAny() {
+  private async unlockAny(): Promise<void> {
     let giveChainId: ChainId | undefined;
     while ((giveChainId = this.peekNextBatch())) {
       this.logger.debug(
@@ -143,7 +144,7 @@ export class BatchUnlocker {
     }
   }
 
-  private peekNextBatch() {
+  private peekNextBatch(): ChainId | undefined {
     for (const [chainId, orderIds] of this.unlockBatchesOrderIdMap.entries()) {
       if (orderIds.size >= this.batchUnlockSize) {
         return chainId;
@@ -151,7 +152,10 @@ export class BatchUnlocker {
     }
   }
 
-  private async performBatchUnlock(chainId: ChainId) {
+  /**
+   * returns true if batch unlock succeeded (e.g. all orders were successfully unlocked)
+   */
+  private async performBatchUnlock(chainId: ChainId): Promise<boolean> {
     const orderIds = Array.from(
       this.unlockBatchesOrderIdMap.get(chainId)!
     ).slice(0, this.batchUnlockSize);
@@ -225,7 +229,7 @@ export class BatchUnlocker {
     giveChain: ExecutorSupportedChain,
     orderIds: string[],
     logger: Logger
-  ) {
+  ): Promise<string[]> {
     const beneficiary = giveChain.beneficiary;
 
     try {
@@ -308,7 +312,7 @@ export class BatchUnlocker {
     giveChain: ExecutorSupportedChain,
     orderId: string,
     logger: Logger
-  ) {
+  ): Promise<void> {
     const beneficiary = giveChain.beneficiary;
     const order = this.ordersDataMap.get(orderId)!;
 
@@ -348,7 +352,7 @@ export class BatchUnlocker {
     executionFeeAmount: bigint,
     rewards: bigint[],
     logger: Logger
-  ) {
+  ): Promise<Transaction> {
     // todo fix any
     let unlockTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
@@ -375,7 +379,7 @@ export class BatchUnlocker {
     }
     unlockTxPayload.loggerInstance = createClientLogger(logger);
 
-    await this.executor.client.sendUnlockOrder<ChainId.Solana>(
+    return this.executor.client.sendUnlockOrder<ChainId.Solana>(
       order,
       orderId,
       beneficiary,
