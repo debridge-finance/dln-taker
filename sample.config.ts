@@ -31,6 +31,13 @@ const config: ExecutorLaunchConfig = {
       [ChainId.Polygon]: ["0x2791bca1f2de4661ed88a30c99a7a9449aa84174"],
       [ChainId.Solana]: ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
     }),
+    //
+    // Setting the ETH bucket
+    //
+    new TokensBucket({
+      [ChainId.Arbitrum]: ['0x0000000000000000000000000000000000000000'],
+      [ChainId.Ethereum]: ['0x0000000000000000000000000000000000000000']
+    }),
   ],
 
   tokenPriceService: new CachePriceFeed(

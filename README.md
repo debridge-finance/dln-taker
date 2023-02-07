@@ -128,15 +128,18 @@ The DLN executor is designed to match reserve funds against orders' locked give 
 
 ![deBridge emulator schema](./assets/DlnPrincipalScheme.png)
 
-Currently, deBridge supports only one bucket of tokens: the USDC token emitted by Circle Inc. on every DLN supported chain (this bucket is explicitly defined in the sample configuration file [here](./sample.config.ts)), so you as a taker is required to **load your address with enough USDC on every chain you are willing to fulfill orders on**.
+As for now, deBridge uses two buckets of tokens for asset routing:
+1. the USDC token, emitted by Circle Inc. on every DLN supported chain, and
+2. the ETH coin, on Ethereum and Arbitrum
 
-> In the future we may introduce more buckets to optimize asset re-balancing: e.g., the ETH bucket across Ethereum and Arbitrum.
+Both buckets are explicitly defined in the sample configuration file [here](./sample.config.ts)), so every taker is required to **load theirs address with enough USDC and ETH on every chain you are willing to fulfill orders on**.
 
 ### Deploying reserve funds
 
 For every chain you would like to support:
 - Register the reserves-keeping address (its private key must be set as a `takerPrivateKey` in the configuration file) and load it with:
-  - a given amount of USDC tokens (e.g., 10000 USDC),
+  - a given amount of USDC tokens (e.g., 100,000 USDC),
+  - a given amount of ETH (e.g. 60 ETH) on Ethereum and Arbitrum
   - a reasonable amount of native blockchain currency (e.g., 1 ETH on Ethereum) to pay gas for fulfillment transactions.
 - Register the unlock authority address (its private key must be set as an `unlockAuthorityPrivateKey` in the configuration file) and load it with:
   - a reasonable amount of native blockchain currency (e.g. 1 ETH on Ethereum) to pay gas for order unlocking transactions
