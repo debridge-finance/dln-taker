@@ -23,7 +23,7 @@
     "executor": "node -r ts-node/register ./src/index.ts"
   },
   "devDependencies": {
-    "@types/amqplib": "0.8.2",
+    "@types/amqplib": "0.10.1",
     "@types/chai": "4.3.3",
     "@types/mocha": "9.1.1",
     "@types/node": "18.11.9",
@@ -39,7 +39,7 @@
     "tslint-plugin-prettier": "2.3.0"
   },
   "dependencies": {
-    "@debridge-finance/dln-client": "v1.3.0",
+    "@debridge-finance/dln-client": "2.0.0-dev--costs-and-fees-calculation-revised.5",
     "@debridge-finance/solana-utils": "2.0.0",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",

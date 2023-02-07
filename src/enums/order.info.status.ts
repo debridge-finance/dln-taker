@@ -1,7 +1,8 @@
 export enum OrderInfoStatus {
-  created = "created",
-  archival = "archival",
-  fulfilled = "fulfilled",
-  cancelled = "cancelled",
-  other = "other",
+  Created,
+  ArchivalCreated,
+  ArchivalFulfilled,
+  Fulfilled,
+  Cancelled,
+  Other,
 }

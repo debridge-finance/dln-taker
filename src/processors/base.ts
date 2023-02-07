@@ -43,7 +43,7 @@ export interface IOrderProcessor {
  */
 export abstract class BaseOrderProcessor implements IOrderProcessor {
   protected chainId: ChainId;
-  protected context: OrderProcessorInitContext;
+  protected takeChain: ExecutorInitializingChain;
 
   abstract init(
     chainId: ChainId,
@@ -61,7 +61,7 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
       let state = await context.config.client.getTakeOrderStatus(
         orderId,
         order.take.chainId,
-        { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
+        { web3: this.takeChain.fulfullProvider.connection as Web3 }
       );
       const limit = 10;
       let iteration = 0;
@@ -79,28 +79,5 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
         iteration += 1;
       }
     }
-  }
-
-  protected async getFee(order: OrderData, context: OrderProcessorContext) {
-    const clientLogger = createClientLogger(context.logger);
-    const [giveNativePrice, takeNativePrice] = await Promise.all([
-      context.config.tokenPriceService.getPrice(order.give.chainId, null, {
-        logger: clientLogger,
-      }),
-      context.config.tokenPriceService.getPrice(order.take.chainId, null, {
-        logger: clientLogger,
-      }),
-    ]);
-    const fees = await context.config.client.getTakerFlowCost(
-      order,
-      giveNativePrice,
-      takeNativePrice,
-      {
-        giveWeb3: context.giveChain.fulfullProvider.connection as Web3,
-        takeWeb3: this.context.takeChain.fulfullProvider.connection as Web3,
-      }
-    );
-    context.logger.debug(`fees=${JSON.stringify(fees)}`);
-    return fees;
   }
 }

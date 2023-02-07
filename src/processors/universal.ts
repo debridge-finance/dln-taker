@@ -6,13 +6,14 @@ import {
   OrderState,
   tokenAddressToString,
 } from "@debridge-finance/dln-client";
+import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import Web3 from "web3";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { IncomingOrderContext } from "../interfaces";
 import { createClientLogger } from "../logger";
-import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
+import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
 import {
@@ -21,28 +22,57 @@ import {
   OrderProcessorInitContext,
   OrderProcessorInitializer,
 } from "./base";
+import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
 
 export type UniversalProcessorParams = {
+  /**
+   * desired profitability. Setting a higher value would prevent executor from fulfilling most orders because
+   * the deBridge app and the API suggest users placing orders with as much margin as 4bps
+   */
   minProfitabilityBps: number;
+  /**
+   * how often to re-evaluate orders that were not fulfilled for a reason
+   */
   mempoolInterval: number;
+  /**
+   * Number of orders (per every chain where orders are coming from and to) to accumulate to unlock them in batches
+   *     Min: 1; max: 10, default: 10.
+   *     This means that the executor would accumulate orders (that were fulfilled successfully) rather then unlock
+   *     them on the go, and would send a batch of unlock commands every time enough orders were fulfilled, dramatically
+   *     reducing the cost of the unlock command execution.
+   *     You can set a lesser value to unlock orders more frequently, however please note that this value directly
+   *     affects order profitability because the deBridge app and the API reserves the cost of unlock in the order's margin,
+   *     assuming that the order would be unlocked in a batch of size=10. Reducing the batch size to a lower value increases
+   *     your unlock costs and thus reduces order profitability, making them unprofitable most of the time.
+   */
+  batchUnlockSize: number;
 };
 
 class UniversalProcessor extends BaseOrderProcessor {
   private mempoolService: MempoolService;
-  private priorityQueue = new Set<string>();
-  private queue = new Set<string>();
-  private ordersMap = new Map<string, IncomingOrderContext>();
-
+  private priorityQueue = new Set<string>(); // queue of orderid for processing created order
+  private queue = new Set<string>(); // queue of orderid for retry processing order
+  private incomingOrdersMap = new Map<string, IncomingOrderContext>(); // key orderid, contains incoming order from order feed
   private isLocked: boolean = false;
+  private batchUnlocker: BatchUnlocker;
+
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
     mempoolInterval: 60, // every 60s
+    batchUnlockSize: 10,
   };
 
   constructor(params?: Partial<UniversalProcessorParams>) {
     super();
+    const batchUnlockSize = params?.batchUnlockSize;
+    if (
+      batchUnlockSize !== undefined &&
+      (batchUnlockSize > 10 || batchUnlockSize < 1)
+    ) {
+      throw new Error("batchUnlockSize should be in [1, 10]");
+    }
     Object.assign(this.params, params || {});
   }
 
@@ -51,10 +81,21 @@ class UniversalProcessor extends BaseOrderProcessor {
     context: OrderProcessorInitContext
   ): Promise<void> {
     this.chainId = chainId;
-    this.context = context;
+    this.takeChain = context.takeChain;
+
+    const logger = context.logger.child({
+      processor: "universal",
+      takeChainId: chainId,
+    });
+
+    this.batchUnlocker = new BatchUnlocker(
+      logger,
+      this.takeChain,
+      this.params.batchUnlockSize
+    );
 
     this.mempoolService = new MempoolService(
-      context.logger.child({ universalProcessorChain: chainId }),
+      logger.child({ takeChainId: chainId }),
       this.process.bind(this),
       this.params.mempoolInterval
     );
@@ -68,59 +109,66 @@ class UniversalProcessor extends BaseOrderProcessor {
         });
       });
 
-      const client = context.takeChain.client as evm.PmmEvmClient;
-      await Promise.all([
-        ...tokens.map((token) =>
-          approveToken(
+      const client = this.takeChain.client as evm.PmmEvmClient;
+      for (const token of tokens) {
+        await approveToken(
+          chainId,
+          token,
+          client.getContractAddress(
             chainId,
-            token,
-            client.getContractAddress(
-              chainId,
-              evm.ServiceType.CrosschainForwarder
-            ),
-            context.takeChain.fulfullProvider as EvmAdapterProvider,
-            context.logger
-          )
-        ),
-        ...tokens.map((token) =>
-          approveToken(
-            chainId,
-            token,
-            client.getContractAddress(chainId, evm.ServiceType.Destination),
-            context.takeChain.fulfullProvider as EvmAdapterProvider,
-            context.logger
-          )
-        ),
-      ]);
+            evm.ServiceType.CrosschainForwarder
+          ),
+          this.takeChain.fulfullProvider as EvmProviderAdapter,
+          logger
+        );
+
+        await approveToken(
+          chainId,
+          token,
+          client.getContractAddress(chainId, evm.ServiceType.Destination),
+          this.takeChain.fulfullProvider as EvmProviderAdapter,
+          logger
+        );
+      }
     }
   }
 
   async process(params: IncomingOrderContext): Promise<void> {
     const { context, orderInfo } = params;
-    const { orderId, type } = orderInfo;
+    const { orderId, type, order } = orderInfo;
 
     params.context.logger = context.logger.child({
-      processor: "universalProcessor",
+      processor: "universal",
       orderId,
     });
 
     switch (type) {
-      case OrderInfoStatus.archival:
-      case OrderInfoStatus.created: {
+      case OrderInfoStatus.ArchivalCreated:
+      case OrderInfoStatus.Created: {
         return this.tryProcess(params);
       }
-
-      case OrderInfoStatus.cancelled:
-      case OrderInfoStatus.fulfilled: {
+      case OrderInfoStatus.ArchivalFulfilled: {
+        this.batchUnlocker.unlockOrder(orderId, order!, context);
+        return;
+      }
+      case OrderInfoStatus.Cancelled: {
         this.queue.delete(orderId);
         this.priorityQueue.delete(orderId);
-        this.ordersMap.delete(orderId);
+        this.incomingOrdersMap.delete(orderId);
         this.mempoolService.delete(orderId);
         context.logger.debug(`deleted from queues`);
         return;
       }
-
-      case OrderInfoStatus.other:
+      case OrderInfoStatus.Fulfilled: {
+        this.queue.delete(orderId);
+        this.priorityQueue.delete(orderId);
+        this.incomingOrdersMap.delete(orderId);
+        this.mempoolService.delete(orderId);
+        context.logger.debug(`deleted from queues`);
+        this.batchUnlocker.unlockOrder(orderId, order!, context);
+        return;
+      }
+      case OrderInfoStatus.Other:
       default: {
         context.logger.error(
           `status=${OrderInfoStatus[type]} not implemented, skipping`
@@ -141,12 +189,12 @@ class UniversalProcessor extends BaseOrderProcessor {
       );
 
       switch (params.orderInfo.type) {
-        case OrderInfoStatus.archival: {
+        case OrderInfoStatus.ArchivalCreated: {
           this.queue.add(orderId);
           context.logger.debug(`postponed to secondary queue`);
           break;
         }
-        case OrderInfoStatus.created: {
+        case OrderInfoStatus.Created: {
           this.priorityQueue.add(orderId);
           context.logger.debug(`postponed to primary queue`);
           break;
@@ -156,7 +204,7 @@ class UniversalProcessor extends BaseOrderProcessor {
             `Unexpected order status: ${OrderInfoStatus[params.orderInfo.type]}`
           );
       }
-      this.ordersMap.set(orderId, params);
+      this.incomingOrdersMap.set(orderId, params);
       return;
     }
 
@@ -165,7 +213,8 @@ class UniversalProcessor extends BaseOrderProcessor {
     try {
       await this.processOrder(params);
     } catch (e) {
-      context.logger.error(`processing ${orderId} failed with error: ${e}`, e);
+      context.logger.error(`processing order failed with error: ${e}`);
+      context.logger.error(e);
     }
     this.isLocked = false;
 
@@ -183,11 +232,11 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.queue.values().next().value;
 
     if (nextOrderId) {
-      const order = this.ordersMap.get(nextOrderId);
+      const order = this.incomingOrdersMap.get(nextOrderId);
 
       this.priorityQueue.delete(nextOrderId);
       this.queue.delete(nextOrderId);
-      this.ordersMap.delete(nextOrderId);
+      this.incomingOrdersMap.delete(nextOrderId);
 
       return order;
     }
@@ -202,43 +251,54 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     if (!order || !orderId) {
       logger.error("order is empty, should not happen");
-      throw new Error("order is empty, should not happen");
+      return;
     }
 
     const bucket = context.config.buckets.find(
       (bucket) =>
-        bucket.findFirstToken(order.give.chainId) !== undefined &&
+        bucket.isOneOf(order.give.chainId, order.give.tokenAddress) &&
         bucket.findFirstToken(order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
-      throw new Error(
-        "no token bucket effectively covering both chains. Seems like no reserve tokens are configured to fulfill orders"
+      logger.info(
+        `no bucket found to cover order's give token: ${tokenAddressToString(
+          order.give.chainId,
+          order.give.tokenAddress
+        )}, skipping`
       );
+      return;
     }
 
-    const client = context.config.client;
     // validate that order is not fullfilled
-    const takeOrderStatus = await client.getTakeOrderStatus(
+    const takeOrderStatus = await context.config.client.getTakeOrderStatus(
       orderId,
       params.orderInfo.order!.take.chainId,
-      { web3: this.context.takeChain.fulfullProvider.connection as Web3 }
+      { web3: this.takeChain.fulfullProvider.connection as Web3 }
     );
     if (
       takeOrderStatus?.status !== OrderState.NotSet &&
       takeOrderStatus?.status !== undefined
     ) {
-      throw new Error("Order is fulfilled");
+      logger.info("order is already handled on the give chain, skipping");
+      return;
     }
 
     // validate that order is created
-    const giveOrderStatus = await client.getGiveOrderStatus(
+    const giveOrderStatus = await context.config.client.getGiveOrderStatus(
       params.orderInfo.orderId,
       params.orderInfo.order!.give.chainId,
       { web3: context.giveChain.fulfullProvider.connection as Web3 }
     );
     if (giveOrderStatus?.status !== OrderState.Created) {
-      throw new Error("Order is not created");
+      logger.info("inexistent order, skipping");
+      return;
     }
+
+    const batchSize =
+      order.give.chainId === ChainId.Solana ||
+      order.take.chainId === ChainId.Solana
+        ? null
+        : this.params.batchUnlockSize;
 
     const {
       reserveDstToken,
@@ -251,12 +311,12 @@ class UniversalProcessor extends BaseOrderProcessor {
       {
         client: context.config.client,
         giveConnection: context.giveChain.fulfullProvider.connection as Web3,
-        takeConnection: this.context.takeChain.fulfullProvider
-          .connection as Web3,
+        takeConnection: this.takeChain.fulfullProvider.connection as Web3,
         priceTokenService: context.config.tokenPriceService,
         buckets: context.config.buckets,
         swapConnector: context.config.swapConnector,
         logger: createClientLogger(logger),
+        batchSize,
       }
     );
 
@@ -266,13 +326,16 @@ class UniversalProcessor extends BaseOrderProcessor {
       return;
     }
 
-    const fees = await this.getFee(order, context);
-    const executionFeeAmount = await context.config.client.getAmountToSend(
-      order.take.chainId,
-      order.give.chainId,
-      fees.executionFees.total,
-      this.context.takeChain.fulfullProvider.connection as Web3
-    );
+    const accountReserveBalance =
+      await this.takeChain.fulfullProvider.getBalance(reserveDstToken);
+
+    if (new BigNumber(accountReserveBalance).lt(requiredReserveDstAmount)) {
+      logger.info(
+        `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${requiredReserveDstAmount}; postponing it to the mempool`
+      );
+      this.mempoolService.addOrder({ orderInfo, context });
+      return;
+    }
 
     // fulfill order
     const fulfillTx = await this.createOrderFullfillTx(
@@ -286,14 +349,14 @@ class UniversalProcessor extends BaseOrderProcessor {
     );
 
     try {
-      const txFulfill =
-        await this.context.takeChain.fulfullProvider.sendTransaction(
-          fulfillTx.tx,
-          { logger }
-        );
+      const txFulfill = await this.takeChain.fulfullProvider.sendTransaction(
+        fulfillTx.tx,
+        { logger }
+      );
       logger.info(`fulfill transaction ${txFulfill} is completed`);
     } catch (e) {
       logger.error(`fulfill transaction failed: ${e}`);
+      logger.error(e);
       this.mempoolService.addOrder({ orderInfo, context });
       return;
     }
@@ -301,73 +364,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     await this.waitIsOrderFulfilled(orderId, order, context, logger);
 
     // unlocking
-    // const beneficiary = context.giveChain.beneficiary;
-    // const unlockTx = await this.createOrderUnlockTx(
-    //   orderId,
-    //   order,
-    //   beneficiary,
-    //   executionFeeAmount,
-    //   fees,
-    //   context,
-    //   logger
-    // );
-    // const txUnlock =
-    //   await this.context.takeChain.unlockProvider.sendTransaction(unlockTx, {
-    //     logger,
-    //   });
-    // logger.info(`unlock transaction ${txUnlock} is completed`);
-  }
-
-  private async createOrderUnlockTx(
-    orderId: string,
-    order: OrderData,
-    beneficiary: string,
-    executionFeeAmount: bigint,
-    fees: any,
-    context: OrderProcessorContext,
-    logger: Logger
-  ) {
-    // todo fix any
-    let unlockTxPayload: any;
-    if (order.take.chainId === ChainId.Solana) {
-      const wallet = (
-        this.context.takeChain.unlockProvider as SolanaProviderAdapter
-      ).wallet.publicKey;
-      unlockTxPayload = {
-        unlocker: wallet,
-      };
-    } else {
-      const rewards =
-        order.give.chainId === ChainId.Solana
-          ? {
-              reward1: fees.executionFees.rewards[0].toString(),
-              reward2: fees.executionFees.rewards[1].toString(),
-            }
-          : {
-              reward1: "0",
-              reward2: "0",
-            };
-      unlockTxPayload = {
-        web3: (this.context.takeChain.unlockProvider as EvmAdapterProvider)
-          .connection,
-        ...rewards,
-      };
-    }
-    unlockTxPayload.loggerInstance = createClientLogger(logger);
-
-    const unlockTx =
-      await context.config.client.sendUnlockOrder<ChainId.Solana>(
-        order,
-        orderId,
-        beneficiary,
-        executionFeeAmount,
-        unlockTxPayload
-      );
-    logger.debug(
-      `unlockTx is created in ${order.take.chainId} ${JSON.stringify(unlockTx)}`
-    );
-
-    return unlockTx;
+    this.batchUnlocker.unlockOrder(orderId, order, context);
   }
 
   private async createOrderFullfillTx(
@@ -381,18 +378,17 @@ class UniversalProcessor extends BaseOrderProcessor {
   ) {
     let fullFillTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (
-        this.context.takeChain.fulfullProvider as SolanaProviderAdapter
-      ).wallet.publicKey;
+      const wallet = (this.takeChain.fulfullProvider as SolanaProviderAdapter)
+        .wallet.publicKey;
       fullFillTxPayload = {
         taker: wallet,
       };
     } else {
       fullFillTxPayload = {
-        web3: this.context.takeChain.fulfullProvider.connection,
+        web3: this.takeChain.fulfullProvider.connection,
         permit: "0x",
-        takerAddress: this.context.takeChain.fulfullProvider.address,
-        unlockAuthority: this.context.takeChain.unlockProvider.address,
+        takerAddress: this.takeChain.fulfullProvider.address,
+        unlockAuthority: this.takeChain.unlockProvider.address,
       };
     }
     fullFillTxPayload.swapConnector = context.config.swapConnector;
@@ -405,12 +401,8 @@ class UniversalProcessor extends BaseOrderProcessor {
       reserveDstToken,
       fullFillTxPayload
     );
-    logger.debug(
-      `fulfillTx is created in ${order.take.chainId} ${JSON.stringify(
-        fulfillTx
-      )}`
-    );
-
+    logger.debug(`fulfillTx is created`);
+    logger.debug(fulfillTx);
     return fulfillTx;
   }
 }

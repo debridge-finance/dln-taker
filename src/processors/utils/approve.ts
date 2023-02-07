@@ -3,37 +3,25 @@ import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import Web3 from "web3";
 
-import { EvmAdapterProvider } from "../../providers/evm.provider.adapter";
+import { EvmProviderAdapter } from "../../providers/evm.provider.adapter";
 
 import IERC20 from "./ierc20.json";
 
 const APPROVE_VALUE =
   "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 
-export const approve = async (
+export const approve = (
   web3: Web3,
   tokenAddress: string,
   contractAddress: string
 ) => {
   if (contractAddress === ZERO_EVM_ADDRESS) return;
   const contract = new web3.eth.Contract(IERC20.abi as any, tokenAddress);
-  const from = web3.eth.defaultAccount;
-  const gasPrice = await web3.eth.getGasPrice();
-  const gas = await contract.methods
-    .approve(contractAddress, APPROVE_VALUE)
-    .estimateGas({
-      from,
-      value: 0,
-    });
 
-  const params = {
-    from,
+  return {
     to: tokenAddress,
-    gasPrice,
-    gas,
+    data: contract.methods.approve(contractAddress, APPROVE_VALUE).encodeABI(),
   };
-
-  return contract.methods.approve(contractAddress, APPROVE_VALUE).send(params);
 };
 
 export const isApproved = async (
@@ -57,7 +45,7 @@ export const approveToken = async (
   chainId: ChainId,
   tokenAddress: string,
   contractAddress: string,
-  provider: EvmAdapterProvider,
+  provider: EvmProviderAdapter,
   logger: Logger
 ): Promise<void> => {
   if (chainId === ChainId.Solana) return Promise.resolve();
@@ -75,7 +63,8 @@ export const approveToken = async (
   );
   if (!tokenIsApproved) {
     logger.debug(`Approving ${tokenAddress} on ${ChainId[chainId]}`);
-    const tx = await approve(connection, tokenAddress, contractAddress);
+    const data = approve(connection, tokenAddress, contractAddress);
+    await provider.sendTransaction(data, { logger });
     logger.debug(
       `Setting approval for ${tokenAddress} on ${ChainId[chainId]} succeeded`
     );

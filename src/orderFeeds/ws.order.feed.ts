@@ -4,7 +4,12 @@ import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { U256 } from "../helpers";
-import { GetNextOrder, IncomingOrder, OrderProcessorFunc } from "../interfaces";
+import {
+  GetNextOrder,
+  IncomingOrder,
+  OrderProcessorFunc,
+  UnlockAuthority,
+} from "../interfaces";
 
 type OrderInfo = {
   order: OrderData;
@@ -32,22 +37,32 @@ type WsOrder = {
   external_call: null;
 };
 
-type FulfilledChangeStatus = { Fulfilled: { taker: number[] } };
+type FulfilledChangeStatus = { Fulfilled: { unlock_authority: string } };
+type ArchivalFulfilledChangeStatus = {
+  ArchivalFulfilled: { unlock_authority: string };
+};
+type CreatedChangeStatus = { Created: {} };
+type CancelledChangeStatus = { Cancelled: {} };
+type GiveOfferIncreasedChangeStatus = { GiveOfferIncreased: {} };
+type TakeOfferDecreasedChangeStatus = { TakeOfferDecreased: {} };
 
 type OrderChangeStatusInternal =
-  | "Created"
+  | CreatedChangeStatus
   | FulfilledChangeStatus
-  | "Cancelled"
-  | "GiveOfferIncreased"
-  | "TakeOfferDecreased";
+  | ArchivalFulfilledChangeStatus
+  | CancelledChangeStatus
+  | GiveOfferIncreasedChangeStatus
+  | TakeOfferDecreasedChangeStatus;
 
 type OrderChangeStatus =
   | "Created"
-  | "Archival"
+  | "ArchivalCreated"
   | "Fulfilled"
   | "Cancelled"
   | "GiveOfferIncreased"
-  | "TakeOfferDecreased";
+  | "TakeOfferDecreased"
+  | "ArchivalFulfilled"
+  | "Other";
 
 type WsOrderInfo = {
   order_id: string;
@@ -67,6 +82,7 @@ export class WsNextOrder extends GetNextOrder {
   private socket: WebSocket;
   private readonly pingTimeoutMs = 3000;
   private pingTimer: NodeJS.Timeout;
+  private unlockAuthorities: UnlockAuthority[];
 
   private heartbeat() {
     clearTimeout(this.pingTimer);
@@ -83,8 +99,12 @@ export class WsNextOrder extends GetNextOrder {
     this.wsArgs = args;
   }
 
-  async init(process: OrderProcessorFunc) {
+  async init(
+    process: OrderProcessorFunc,
+    unlockAuthorities: UnlockAuthority[]
+  ) {
     super.processNextOrder = process;
+    this.unlockAuthorities = unlockAuthorities;
     await this.initWs();
   }
 
@@ -101,7 +121,25 @@ export class WsNextOrder extends GetNextOrder {
           },
         })
       );
-      this.socket.send('"GetArchive"');
+      this.socket.send(JSON.stringify({ GetOrders: { Created: {} } }));
+      this.unlockAuthorities.forEach((unlockAuthority) => {
+        this.socket.send(
+          JSON.stringify({
+            GetOrders: {
+              Fulfilled: {
+                unlock_authority: unlockAuthority.address,
+                take_filter: {
+                  All: {
+                    chain_id: unlockAuthority.chainId
+                      .toString(16)
+                      .padStart(64, "0"),
+                  },
+                },
+              },
+            },
+          })
+        );
+      });
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
@@ -125,10 +163,12 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("error", async (err) => {
-      this.logger.error(`WsConnection received error: ${err.message}, retrying reconnection in ${this.pingTimeoutMs}ms`);
-      clearTimeout(this.pingTimer)
-      this.socket.terminate()
-      setTimeout(this.initWs.bind(this), this.pingTimeoutMs)
+      this.logger.error(
+        `WsConnection received error: ${err.message}, retrying reconnection in ${this.pingTimeoutMs}ms`
+      );
+      clearTimeout(this.pingTimer);
+      this.socket.terminate();
+      setTimeout(this.initWs.bind(this), this.pingTimeoutMs);
     });
 
     this.socket.on("close", () => {
@@ -144,33 +184,39 @@ export class WsNextOrder extends GetNextOrder {
       case "Created":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.created,
+          type: OrderInfoStatus.Created,
           orderId: orderInfo.orderId,
         };
-      case "Archival":
+      case "ArchivalCreated":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.archival,
+          type: OrderInfoStatus.ArchivalCreated,
+          orderId: orderInfo.orderId,
+        };
+      case "ArchivalFulfilled":
+        return {
+          order: orderInfo.order,
+          type: OrderInfoStatus.ArchivalFulfilled,
           orderId: orderInfo.orderId,
         };
       case "Fulfilled":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.fulfilled,
+          type: OrderInfoStatus.Fulfilled,
           orderId: orderInfo.orderId,
           taker: orderInfo.taker,
         };
       case "Cancelled":
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.cancelled,
+          type: OrderInfoStatus.Cancelled,
           orderId: orderInfo.orderId,
           taker: orderInfo.taker,
         };
       default:
         return {
           order: orderInfo.order,
-          type: OrderInfoStatus.other,
+          type: OrderInfoStatus.Other,
           orderId: orderInfo.orderId,
         };
     }
@@ -216,17 +262,30 @@ export class WsNextOrder extends GetNextOrder {
   private flattenStatus(
     info: WsOrderInfo
   ): [OrderChangeStatus, string | undefined] {
-    const status = info.order_info_status;
-    if (Object.prototype.hasOwnProperty.call(status, "Fulfilled"))
+    const infoStatus = info.order_info_status;
+    const simpleStatuses = [
+      "Created",
+      "ArchivalCreated",
+      "Cancelled",
+      "GiveOfferIncreased",
+      "TakeOfferDecreased",
+    ];
+    for (const status of simpleStatuses) {
+      if (Object.prototype.hasOwnProperty.call(infoStatus, status))
+        return [status as OrderChangeStatus, undefined];
+    }
+
+    if (Object.prototype.hasOwnProperty.call(infoStatus, "ArchivalFulfilled"))
+      return [
+        "ArchivalFulfilled",
+        (infoStatus as ArchivalFulfilledChangeStatus).ArchivalFulfilled
+          .unlock_authority,
+      ];
+    else if (Object.prototype.hasOwnProperty.call(infoStatus, "Fulfilled"))
       return [
         "Fulfilled",
-        helpers.bufferToHex(
-          Buffer.from((status as FulfilledChangeStatus).Fulfilled.taker)
-        ),
+        (infoStatus as FulfilledChangeStatus).Fulfilled.unlock_authority,
       ];
-    return [
-      status as Exclude<OrderChangeStatusInternal, FulfilledChangeStatus>,
-      undefined,
-    ];
+    return ["Other", undefined];
   }
 }

@@ -25,8 +25,7 @@ import { GetNextOrder, IncomingOrder } from "../interfaces";
 import { WsNextOrder } from "../orderFeeds/ws.order.feed";
 import * as processors from "../processors";
 import { createWeb3WithPrivateKey } from "../processors/utils/create.web3.with.private.key";
-import { EvmAdapterProvider } from "../providers/evm.provider.adapter";
-import { EvmRebroadcastAdapterProviderAdapter } from "../providers/evm.rebroadcast.adapter.provider.adapter";
+import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
@@ -135,6 +134,8 @@ export class Executor implements IExecutor {
           solanaDebridge,
           solanaDebridgeSetting
         );
+        await client.destination.debridge.init();
+
         // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
         const altInitTx = await client.initForFulfillPreswap(
           new PublicKey(chain.beneficiary),
@@ -152,13 +153,13 @@ export class Executor implements IExecutor {
           chain.chainRpc,
           chain.unlockAuthorityPrivateKey
         );
-        unlockProvider = new EvmAdapterProvider(web3UnlockAuthority);
+        unlockProvider = new EvmProviderAdapter(web3UnlockAuthority);
 
         const web3Fulfill = createWeb3WithPrivateKey(
           chain.chainRpc,
           chain.takerPrivateKey
         );
-        fulfullProvider = new EvmRebroadcastAdapterProviderAdapter(
+        fulfullProvider = new EvmProviderAdapter(
           web3Fulfill,
           chain.environment?.evm?.evmRebroadcastAdapterOpts
         );
@@ -256,24 +257,29 @@ export class Executor implements IExecutor {
     orderFeed.setLogger(this.logger);
     this.orderFeed = orderFeed;
 
-    orderFeed.init(this.execute.bind(this));
+    const unlockAuthorities = Object.values(this.chains).map((chain) => {
+      return {
+        chainId: chain.chain,
+        address: chain.unlockProvider.address as string,
+      };
+    });
+    orderFeed.init(this.execute.bind(this), unlockAuthorities);
     this.isInitialized = true;
   }
 
   async execute(nextOrderInfo?: IncomingOrder) {
     if (!this.isInitialized) throw new Error("executor is not initialized");
-    this.logger.info(
-      `executor received incoming order: ${JSON.stringify(nextOrderInfo)}`
-    );
+    this.logger.info(`executor received incoming order`);
+    this.logger.debug(nextOrderInfo);
+
     if (nextOrderInfo && nextOrderInfo.order && nextOrderInfo.orderId) {
       const orderId = nextOrderInfo.orderId;
       const logger = this.logger.child({ orderId });
-      logger.info(`executing order...`);
       try {
         await this.executeOrder(nextOrderInfo, logger);
-        logger.info(`execution finished`);
       } catch (e) {
-        logger.error(`received error while execution: ${e}`, e);
+        logger.error(`received error while order execution: ${e}`);
+        logger.error(e);
       }
     } else {
       this.logger.debug("message is empty, skipping");
@@ -322,11 +328,11 @@ export class Executor implements IExecutor {
     // run filters for create or archival orders
     //
     if (
-      [OrderInfoStatus.created, OrderInfoStatus.archival].includes(
+      [OrderInfoStatus.Created, OrderInfoStatus.ArchivalCreated].includes(
         nextOrderInfo.type
       )
     ) {
-      logger.info("running filters against the order");
+      logger.debug("running filters against the order");
       const orderFilters = await Promise.all(
         listOrderFilters.map((filter) =>
           filter(order, {
@@ -343,13 +349,13 @@ export class Executor implements IExecutor {
         return false;
       }
     } else {
-      logger.info("accepting order as is");
+      logger.debug("accepting order as is");
     }
 
     //
     // run processor
     //
-    logger.info(`passing the order to the processor`);
+    logger.debug(`passing the order to the processor`);
     takeChain.orderProcessor.process({
       orderInfo: nextOrderInfo,
       context: {

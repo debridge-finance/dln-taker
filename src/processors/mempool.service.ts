@@ -20,18 +20,25 @@ export class MempoolService {
   addOrder(params: IncomingOrderContext) {
     const orderId = params.orderInfo.orderId;
     this.orderParams.set(orderId, params);
-    this.logger.info(`Order ${orderId} is added to mempool`);
+
+    // logging from the order's context
+    params.context.logger.debug("added to mempool");
+
+    // logging from the service's context
+    this.logger.debug(
+      `current mempool size: ${this.orderParams.size} order(s)`
+    );
   }
 
   async process() {
     if (this.isLocked) {
-      this.logger.info("MempoolService is working");
+      this.logger.debug("MempoolService is already working");
       return;
     }
     this.isLocked = true;
     const ordersCountBeforeProcessing = this.orderParams.size;
     this.logger.info(
-      `Mempool contains ${ordersCountBeforeProcessing} before processing`
+      `sending ${ordersCountBeforeProcessing} orders to the processing`
     );
     this.orderParams.forEach((value) => {
       this.processOrderFunction(value);
