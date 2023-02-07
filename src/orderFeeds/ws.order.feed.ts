@@ -4,6 +4,7 @@ import WebSocket from "ws";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { U256 } from "../helpers";
+import { HooksEngine } from "../hooks/HooksEngine";
 import {
   GetNextOrder,
   IncomingOrder,
@@ -83,6 +84,8 @@ export class WsNextOrder extends GetNextOrder {
   private readonly pingTimeoutMs = 3000;
   private pingTimer: NodeJS.Timeout;
   private unlockAuthorities: UnlockAuthority[];
+  private hooksEngine: HooksEngine;
+  private timeLastDisconnect: Date;
 
   private heartbeat() {
     clearTimeout(this.pingTimer);
@@ -101,9 +104,11 @@ export class WsNextOrder extends GetNextOrder {
 
   async init(
     process: OrderProcessorFunc,
-    unlockAuthorities: UnlockAuthority[]
+    unlockAuthorities: UnlockAuthority[],
+    hooksEngine: HooksEngine
   ) {
     super.processNextOrder = process;
+    this.hooksEngine = hooksEngine;
     this.unlockAuthorities = unlockAuthorities;
     await this.initWs();
   }
@@ -112,6 +117,14 @@ export class WsNextOrder extends GetNextOrder {
     this.socket = new WebSocket(...this.wsArgs);
     this.socket.on("ping", this.heartbeat.bind(this));
     this.socket.on("open", () => {
+      let timeSinceLastDisconnect;
+      if (this.timeLastDisconnect) {
+        timeSinceLastDisconnect =
+          new Date().getTime() - this.timeLastDisconnect.getTime();
+      }
+      this.hooksEngine.handleOrderFeedConnected({
+        timeSinceLastDisconnect,
+      });
       this.logger.debug("🔌 ws opened connection");
       this.heartbeat();
       this.socket.send(
@@ -172,6 +185,7 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("close", () => {
+      this.hooksEngine.handleOrderFeedDisconnected();
       this.logger.debug(`WsConnection has been closed`);
       clearTimeout(this.pingTimer);
     });

@@ -2,6 +2,7 @@ import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
 import { OrderInfoStatus } from "./enums/order.info.status";
+import { HooksEngine } from "./hooks/HooksEngine";
 import { OrderProcessorContext } from "./processors/base";
 
 export type ChainConfig = {
@@ -53,7 +54,8 @@ export abstract class GetNextOrder {
 
   abstract init(
     processNextOrder: OrderProcessorFunc,
-    UnlockAuthority: UnlockAuthority[]
+    unlockAuthority: UnlockAuthority[],
+    hooksEngine: HooksEngine
   ): void;
 
   setEnabledChains(enabledChains: ChainId[]) {
