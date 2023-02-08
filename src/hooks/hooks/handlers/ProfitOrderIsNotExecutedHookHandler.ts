@@ -2,7 +2,6 @@ import { OrderState } from "@debridge-finance/dln-client";
 import Web3 from "web3";
 
 import { Notification } from "../../notification/Notification";
-import { TelegramNotificationParams } from "../../notification/params/TelegramNotificationParams";
 import { TelegramNotification } from "../../notification/TelegramNotification";
 import { OrderEstimatedParams } from "../../types/params/OrderEstimatedParams";
 import { Hook } from "../Hook";
@@ -20,10 +19,10 @@ export const hookHandlerProfitOrderIsNotExecuted = (
 };
 
 class ProfitOrderIsNotExecutedHookHandler extends Hook<OrderEstimatedParams> {
-  private readonly telegramNotification: Notification<TelegramNotificationParams>;
+  private readonly telegramNotification: Notification;
   constructor(
-    private readonly tgKey: string,
-    private readonly tgChatIds: string[],
+    tgKey: string,
+    tgChatIds: string[],
     private readonly maxDelayInSec: number
   ) {
     super();

@@ -1,7 +1,6 @@
 import { Notification } from "./Notification";
-import { TelegramNotificationParams } from "./params/TelegramNotificationParams";
 
-export class TelegramNotification extends Notification<TelegramNotificationParams> {
+export class TelegramNotification extends Notification {
   constructor(
     private readonly tgKey: string,
     private readonly tgChatIds: string[]

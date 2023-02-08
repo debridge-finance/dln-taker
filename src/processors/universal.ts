@@ -4,7 +4,7 @@ import {
   evm,
   OrderData,
   OrderState,
-  tokenAddressToString
+  tokenAddressToString,
 } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
@@ -22,7 +22,7 @@ import {
   BaseOrderProcessor,
   OrderProcessorContext,
   OrderProcessorInitContext,
-  OrderProcessorInitializer
+  OrderProcessorInitializer,
 } from "./base";
 import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
@@ -148,8 +148,12 @@ class UniversalProcessor extends BaseOrderProcessor {
     });
 
     switch (type) {
-      case OrderInfoStatus.ArchivalCreated:
+      case OrderInfoStatus.ArchivalCreated: {
+        if (params.isLive === undefined) params.isLive = false;
+        return this.tryProcess(params);
+      }
       case OrderInfoStatus.Created: {
+        if (params.isLive === undefined) params.isLive = true;
         return this.tryProcess(params);
       }
       case OrderInfoStatus.ArchivalFulfilled: {
@@ -251,6 +255,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     params: IncomingOrderContext
   ): Promise<void | never> {
     const { orderInfo, context } = params;
+    const isLive = params.isLive!;
     const { orderId, order } = orderInfo;
     const logger = params.context.logger;
 
@@ -267,7 +272,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     if (bucket === undefined) {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        isLive: true, // todo
+        isLive,
         reason: RejectionReasonEnum.UNEXEPECTED_GIVE_TOKEN,
       });
       logger.info(
@@ -291,7 +296,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     ) {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        isLive: true, // todo
+        isLive,
         reason: RejectionReasonEnum.ALREADY_FULFILLED,
       });
       logger.info("order is already handled on the give chain, skipping");
@@ -308,7 +313,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       logger.info("order is not exists in give chain");
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        isLive: true, // todo
+        isLive,
         reason: RejectionReasonEnum.ALERT_GIVE_MISSING,
       });
       return;
@@ -318,7 +323,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       logger.info("order has wrong status");
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        isLive: true, // todo
+        isLive,
         reason: RejectionReasonEnum.WRONG_GIVE_STATUS,
       });
       return;
@@ -352,7 +357,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         estimation: undefined,
         context,
-        isLive: true, // todo
+        isLive,
         reason: PostponingReasonEnum.ESTIMATION_FAILED,
         message: error.message,
       });
@@ -379,20 +384,20 @@ class UniversalProcessor extends BaseOrderProcessor {
       order: orderInfo,
       estimation: hookEstimation,
       context,
-      isLive: true, // todo
+      isLive,
     });
 
-    if (!isProfitable) { //todo
+    if (!isProfitable) {
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         estimation: hookEstimation,
         context,
-        isLive: true, // todo
+        isLive,
         reason: PostponingReasonEnum.NON_PROFITABLE,
         message: "",
       });
       logger.info("order is not profitable, postponing it to the mempool");
-      this.mempoolService.addOrder({ orderInfo, context });
+      this.mempoolService.addOrder({ orderInfo, context, isLive });
       return;
     }
 
@@ -404,14 +409,14 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         estimation: hookEstimation,
         context,
-        isLive: true, // todo
+        isLive,
         reason: PostponingReasonEnum.NOT_ENOUGH_BALANCE,
         message: "",
       });
       logger.info(
         `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${requiredReserveDstAmount}; postponing it to the mempool`
       );
-      this.mempoolService.addOrder({ orderInfo, context });
+      this.mempoolService.addOrder({ orderInfo, context, isLive });
       return;
     }
 
@@ -450,7 +455,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       });
       logger.error(`fulfill transaction failed: ${e}`);
       logger.error(e);
-      this.mempoolService.addOrder({ orderInfo, context });
+      this.mempoolService.addOrder({ orderInfo, context, isLive });
       return;
     }
 

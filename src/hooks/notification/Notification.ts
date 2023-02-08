@@ -1,3 +1,3 @@
-export abstract class Notification<T> {
-  abstract notify(message: string, params?: T): Promise<void>;
+export abstract class Notification {
+  abstract notify(message: string): Promise<void>;
 }

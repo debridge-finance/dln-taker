@@ -28,6 +28,9 @@ export class MempoolService {
     this.logger.debug(
       `current mempool size: ${this.orderParams.size} order(s)`
     );
+
+    // mark order as old
+    params.isLive = false;
   }
 
   async process() {

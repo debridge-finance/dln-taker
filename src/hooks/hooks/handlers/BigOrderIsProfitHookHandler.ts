@@ -3,28 +3,42 @@ import Web3 from "web3";
 
 import { createClientLogger } from "../../../logger";
 import { Notification } from "../../notification/Notification";
-import { TelegramNotificationParams } from "../../notification/params/TelegramNotificationParams";
-import { TelegramNotification } from "../../notification/TelegramNotification";
+import { TwitterNotification } from "../../notification/TwitterNotification";
 import { OrderEstimatedParams } from "../../types/params/OrderEstimatedParams";
 import { Hook } from "../Hook";
 
 export const hookHandlerBigOrderIsProfit = (
-  tgKey: string,
-  tgChatIds: string[],
+  consumerKey: string,
+  consumerSecret: string,
+  accessTokenKey: string,
+  accessTokenSecret: string,
   minUsdAmount: number
 ): Hook<OrderEstimatedParams> => {
-  return new BigOrderIsProfitHookHandler(tgKey, tgChatIds, minUsdAmount);
+  return new BigOrderIsProfitHookHandler(
+    consumerKey,
+    consumerSecret,
+    accessTokenKey,
+    accessTokenSecret,
+    minUsdAmount
+  );
 };
 
 class BigOrderIsProfitHookHandler extends Hook<OrderEstimatedParams> {
-  private readonly telegramNotification: Notification<TelegramNotificationParams>;
+  private readonly twitterNotification: Notification;
   constructor(
-    private readonly tgKey: string,
-    private readonly tgChatIds: string[],
+    consumerKey: string,
+    consumerSecret: string,
+    accessTokenKey: string,
+    accessTokenSecret: string,
     private readonly minUsdAmount: number
   ) {
     super();
-    this.telegramNotification = new TelegramNotification(tgKey, tgChatIds);
+    this.twitterNotification = new TwitterNotification(
+      consumerKey,
+      consumerSecret,
+      accessTokenKey,
+      accessTokenSecret
+    );
   }
 
   async execute(arg: OrderEstimatedParams): Promise<void> {
@@ -109,7 +123,7 @@ class BigOrderIsProfitHookHandler extends Hook<OrderEstimatedParams> {
           giveAmountWithoutDecimals - reservedAmountWithoutDecimals
         } ${reservedTokenSymbol}`;
 
-        this.telegramNotification.notify(message);
+        this.twitterNotification.notify(message);
       }
     }
   }

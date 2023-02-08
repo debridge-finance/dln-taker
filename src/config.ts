@@ -6,6 +6,9 @@ import {
 } from "@debridge-finance/dln-client";
 
 import { OrderFilterInitializer } from "./filters/order.filter";
+import { Hook } from "./hooks/hooks/Hook";
+import { HooksEnum } from "./hooks/HooksEnum";
+import { HookParams } from "./hooks/types/params/HookParams";
 import { GetNextOrder } from "./interfaces";
 import { OrderProcessorInitializer } from "./processors";
 
@@ -150,6 +153,13 @@ export interface ExecutorLaunchConfig {
    * Defines an order processor that implements the fulfillment strategy
    */
   orderProcessor?: OrderProcessorInitializer;
+
+  /**
+   * Hook handlers
+   */
+  hookHandlers?: {
+    [key in HooksEnum]?: Hook<HookParams>[];
+  };
 
   /**
    * Token price provider

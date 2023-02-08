@@ -1,5 +1,4 @@
 import { Notification } from "../../notification/Notification";
-import { TelegramNotificationParams } from "../../notification/params/TelegramNotificationParams";
 import { TelegramNotification } from "../../notification/TelegramNotification";
 import { PostponingReasonEnum } from "../../PostponingReasonEnum";
 import { OrderPostponedParams } from "../../types/params/OrderPostponedParams";
@@ -13,13 +12,10 @@ export const hookHandlerOrderPostponed = (
 };
 
 class OrderPostponedHookHandler extends Hook<OrderPostponedParams> {
-  private readonly telegramNotification: Notification<TelegramNotificationParams>;
-  constructor(
-    private readonly tgKey: string,
-    private readonly tgChatIds: string[]
-  ) {
+  private readonly telegramNotification: Notification;
+  constructor(tgKey: string, tgChatIds: string[]) {
     super();
-    this.telegramNotification = new TelegramNotification(tgKey);
+    this.telegramNotification = new TelegramNotification(tgKey, tgChatIds);
   }
 
   async execute(arg: OrderPostponedParams): Promise<void> {
@@ -27,8 +23,6 @@ class OrderPostponedHookHandler extends Hook<OrderPostponedParams> {
       return;
     }
     const message = `Order #${arg.order.orderId} has been postponed, reason: ${arg.reason} message: ${arg.message}`;
-    await this.telegramNotification.notify(message, {
-      chatIds: this.tgChatIds,
-    });
+    await this.telegramNotification.notify(message);
   }
 }

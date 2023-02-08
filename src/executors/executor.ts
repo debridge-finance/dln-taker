@@ -88,6 +88,7 @@ export class Executor implements IExecutor {
     );
 
     this.buckets = config.buckets;
+    const hooksEngine = new HooksEngine(config.hookHandlers || {});
 
     const clients: { [key in number]: any } = {};
     for (const chain of config.chains) {
@@ -207,7 +208,7 @@ export class Executor implements IExecutor {
         takeChain: initializingChain,
         buckets: config.buckets,
         logger: this.logger,
-        hooksEngine: new HooksEngine({}),
+        hooksEngine,
       });
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -267,7 +268,7 @@ export class Executor implements IExecutor {
         address: chain.unlockProvider.address as string,
       };
     });
-    orderFeed.init(this.execute.bind(this), unlockAuthorities, new HooksEngine({}));
+    orderFeed.init(this.execute.bind(this), unlockAuthorities, hooksEngine);
     this.isInitialized = true;
   }
 

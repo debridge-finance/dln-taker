@@ -36,6 +36,7 @@ export type ProcessOrder = (params: IncomingOrderContext) => Promise<void>;
 export type IncomingOrderContext = {
   orderInfo: IncomingOrder;
   context: OrderProcessorContext;
+  isLive?: boolean;
 };
 
 export type OrderProcessorFunc = (order?: IncomingOrder) => Promise<void>;

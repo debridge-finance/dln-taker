@@ -4,7 +4,7 @@ import { Logger } from "pino";
 export const createClientLogger = (logger: Logger) => {
   return new ClientLogger((level: LogLevel, args) => {
     // concat args so they appear as a first string in pino
-    const message = Object.values(args).join(' ');
+    const message = Object.values(args).join(" ");
     switch (level) {
       case LogLevel.LOG: {
         logger.info(message);
