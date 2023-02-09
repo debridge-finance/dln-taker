@@ -1,4 +1,5 @@
 import { OrderState } from "@debridge-finance/dln-client";
+import { setTimeout } from "timers/promises";
 import Web3 from "web3";
 
 import { Notification } from "../../notification/Notification";
@@ -31,28 +32,27 @@ class ProfitOrderIsNotExecutedHookHandler extends Hook<OrderEstimatedParams> {
 
   async execute(arg: OrderEstimatedParams): Promise<void> {
     if (arg.isLive && arg.estimation.isProfitable) {
-      setTimeout(async () => {
-        const takeChainId = arg.order.order!.take!.chainId;
-        const giveConnection =
-          arg.context.config.chains[takeChainId]!.fulfullProvider.connection;
+      await setTimeout(this.maxDelayInSec);
+      const takeChainId = arg.order.order!.take!.chainId;
+      const giveConnection =
+        arg.context.config.chains[takeChainId]!.fulfullProvider.connection;
 
-        const takeStatus = await arg.context.config.client.getTakeOrderStatus(
-          arg.order.orderId,
-          takeChainId,
-          {
-            web3: giveConnection as Web3,
-          }
-        );
-        if (
-          takeStatus?.status === null ||
-          takeStatus?.status === undefined ||
-          takeStatus?.status === OrderState.NotSet
-        ) {
-          this.telegramNotification.notify(
-            `Order is not fulfilled more then ${this.maxDelayInSec}`
-          );
+      const takeStatus = await arg.context.config.client.getTakeOrderStatus(
+        arg.order.orderId,
+        takeChainId,
+        {
+          web3: giveConnection as Web3,
         }
-      }, this.maxDelayInSec);
+      );
+      if (
+        takeStatus?.status === null ||
+        takeStatus?.status === undefined ||
+        takeStatus?.status === OrderState.NotSet
+      ) {
+        this.telegramNotification.notify(
+          `Order is not fulfilled more then ${this.maxDelayInSec}`
+        );
+      }
     }
   }
 }
