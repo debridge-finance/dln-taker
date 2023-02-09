@@ -1,6 +1,6 @@
 import Twitter from "twitter";
 
-import { Notification } from "./Notification";
+import { Notification, NotificationContext } from "./Notification";
 
 export class TwitterNotification implements Notification {
   private readonly client: Twitter;
@@ -19,15 +19,21 @@ export class TwitterNotification implements Notification {
     });
   }
 
-  async notify(message: string): Promise<void> {
+  async notify(message: string, context: NotificationContext) {
+    const params = {
+      status: message,
+    };
+    const logger = context.logger.child({
+      notification: TwitterNotification.name,
+    });
+
     try {
-      const params = {
-        status: message,
-      };
       const response = await this.client.post("statuses/update", params);
-    } catch (error) {
-      console.error(error);
+      logger.debug(`Response ${JSON.stringify(response)}`);
+    } catch (e) {
+      logger.error(`Error in sending ${e}`);
+      logger.error(e);
+      throw e;
     }
-    return Promise.resolve(undefined);
   }
 }

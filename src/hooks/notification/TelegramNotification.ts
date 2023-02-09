@@ -1,4 +1,4 @@
-import { Notification } from "./Notification";
+import { Notification, NotificationContext } from "./Notification";
 
 export class TelegramNotification extends Notification {
   constructor(
@@ -8,17 +8,19 @@ export class TelegramNotification extends Notification {
     super();
   }
 
-  async notify(message: string): Promise<void> {
-    await Promise.all(
-      this.tgChatIds.map((chatId) => {
-        return fetch(`https://api.telegram.org/bot${this.tgKey}/sendMessage`, {
-          method: "POST",
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: message,
-          }),
-        });
-      })
-    );
+  async notify(message: string, context: NotificationContext): Promise<void> {
+    const logger = context.logger.child({
+      notification: TelegramNotification.name,
+    });
+    for (const chatId of this.tgChatIds) {
+      await fetch(`https://api.telegram.org/bot${this.tgKey}/sendMessage`, {
+        method: "POST",
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+        }),
+      });
+      logger.debug(`Notification ${message} is sent`);
+    }
   }
 }

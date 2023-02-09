@@ -274,6 +274,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         isLive,
         reason: RejectionReasonEnum.UNEXEPECTED_GIVE_TOKEN,
+        context,
       });
       logger.info(
         `no bucket found to cover order's give token: ${tokenAddressToString(
@@ -298,6 +299,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         isLive,
         reason: RejectionReasonEnum.ALREADY_FULFILLED,
+        context,
       });
       logger.info("order is already handled on the give chain, skipping");
       return;
@@ -315,6 +317,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         isLive,
         reason: RejectionReasonEnum.ALERT_GIVE_MISSING,
+        context,
       });
       return;
     }
@@ -325,6 +328,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         isLive,
         reason: RejectionReasonEnum.WRONG_GIVE_STATUS,
+        context,
       });
       return;
     }

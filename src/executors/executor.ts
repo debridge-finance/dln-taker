@@ -88,7 +88,7 @@ export class Executor implements IExecutor {
     );
 
     this.buckets = config.buckets;
-    const hooksEngine = new HooksEngine(config.hookHandlers || {});
+    const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
 
     const clients: { [key in number]: any } = {};
     for (const chain of config.chains) {

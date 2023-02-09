@@ -32,6 +32,9 @@ class ProfitOrderIsNotExecutedHookHandler extends Hook<OrderEstimatedParams> {
 
   async execute(arg: OrderEstimatedParams): Promise<void> {
     if (arg.isLive && arg.estimation.isProfitable) {
+      const logger = arg.context.logger.child({
+        hook: ProfitOrderIsNotExecutedHookHandler.name,
+      });
       await setTimeout(this.maxDelayInSec);
       const takeChainId = arg.order.order!.take!.chainId;
       const giveConnection =
@@ -49,8 +52,9 @@ class ProfitOrderIsNotExecutedHookHandler extends Hook<OrderEstimatedParams> {
         takeStatus?.status === undefined ||
         takeStatus?.status === OrderState.NotSet
       ) {
-        this.telegramNotification.notify(
-          `Order is not fulfilled more then ${this.maxDelayInSec}`
+        await this.telegramNotification.notify(
+          `Order is not fulfilled more then ${this.maxDelayInSec}`,
+          { logger }
         );
       }
     }

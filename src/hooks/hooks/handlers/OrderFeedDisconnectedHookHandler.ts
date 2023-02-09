@@ -1,7 +1,7 @@
 import { Notification } from "../../notification/Notification";
 import { TelegramNotification } from "../../notification/TelegramNotification";
 import { HookParams } from "../../types/params/HookParams";
-import { Hook } from "../Hook";
+import { Hook, HookContext } from "../Hook";
 
 export const hookHandlerOrderFeedDisconnected = (
   tgKey: string,
@@ -17,8 +17,11 @@ class HookHandlerOrderFeedDisconnected extends Hook<HookParams> {
     this.telegramNotification = new TelegramNotification(tgKey, tgChatIds);
   }
 
-  async execute(arg: HookParams): Promise<void> {
+  async execute(arg: HookParams, context: HookContext): Promise<void> {
+    const logger = context.logger.child({
+      hook: HookHandlerOrderFeedDisconnected.name,
+    });
     const message = `Websocket connection is lost!`;
-    await this.telegramNotification.notify(message);
+    await this.telegramNotification.notify(message, { logger });
   }
 }

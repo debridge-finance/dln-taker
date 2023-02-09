@@ -1,3 +1,5 @@
+import { Logger } from "pino";
+
 import { Hook } from "./hooks/Hook";
 import { HooksEnum } from "./HooksEnum";
 import { HookParams } from "./types/params/HookParams";
@@ -13,7 +15,8 @@ export class HooksEngine {
   constructor(
     private readonly hookHandlers: {
       [key in HooksEnum]?: Hook<HookParams>[];
-    }
+    },
+    private readonly logger: Logger
   ) {}
 
   handleOrderFeedConnected(params: OrderFeedConnectedParams) {
@@ -58,7 +61,8 @@ export class HooksEngine {
       try {
         await handler.execute(params);
       } catch (e) {
-        console.error(e);
+        this.logger.error(`Error in execution hook handler in ${hookEnum}`);
+        this.logger.error(e);
       }
     }
   }

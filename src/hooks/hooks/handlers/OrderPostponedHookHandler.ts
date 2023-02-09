@@ -19,10 +19,14 @@ class OrderPostponedHookHandler extends Hook<OrderPostponedParams> {
   }
 
   async execute(arg: OrderPostponedParams): Promise<void> {
+    const logger = arg.context.logger.child({
+      hook: OrderPostponedHookHandler.name,
+    });
     if (arg.reason === PostponingReasonEnum.NON_PROFITABLE && !arg.isLive) {
       return;
     }
+
     const message = `Order #${arg.order.orderId} has been postponed, reason: ${arg.reason} message: ${arg.message}`;
-    await this.telegramNotification.notify(message);
+    await this.telegramNotification.notify(message, { logger });
   }
 }

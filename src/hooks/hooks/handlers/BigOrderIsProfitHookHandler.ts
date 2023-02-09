@@ -43,6 +43,11 @@ class BigOrderIsProfitHookHandler extends Hook<OrderEstimatedParams> {
 
   async execute(arg: OrderEstimatedParams): Promise<void> {
     if (arg.isLive && arg.estimation.isProfitable) {
+      const logger = arg.context.logger.child({
+        hook: BigOrderIsProfitHookHandler.name,
+      });
+
+      logger.debug(`Execution is started`);
       const order = arg.order.order;
       const config = arg.context.config;
       const giveChainId = order!.give!.chainId;
@@ -60,12 +65,16 @@ class BigOrderIsProfitHookHandler extends Hook<OrderEstimatedParams> {
           giveConnection as Web3
         ),
       ]);
+
       const giveUsdAmount = new BigNumber(order!.give.amount.toString())
         .multipliedBy(giveUsdPrice)
         .div(new BigNumber(10, giveDecimals))
         .toNumber();
 
       if (giveUsdAmount > this.minUsdAmount) {
+        logger.debug(
+          `Order give amount is big than set value(${giveUsdAmount} > ${this.minUsdAmount})`
+        );
         const takeChainId = order!.take!.chainId;
         const takeConnection =
           config.chains[takeChainId]!.fulfullProvider.connection;
@@ -123,7 +132,7 @@ class BigOrderIsProfitHookHandler extends Hook<OrderEstimatedParams> {
           giveAmountWithoutDecimals - reservedAmountWithoutDecimals
         } ${reservedTokenSymbol}`;
 
-        this.twitterNotification.notify(message);
+        await this.twitterNotification.notify(message, { logger });
       }
     }
   }

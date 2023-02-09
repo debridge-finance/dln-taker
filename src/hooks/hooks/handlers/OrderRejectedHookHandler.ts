@@ -18,7 +18,10 @@ class HookHandlerOrderRejected extends Hook<OrderRejectedParams> {
   }
 
   async execute(arg: OrderRejectedParams): Promise<void> {
+    const logger = arg.context.logger.child({
+      hook: HookHandlerOrderRejected.name,
+    });
     const message = `Order #${arg.order.orderId} has been rejected, reason: ${arg.reason}`;
-    await this.telegramNotification.notify(message);
+    await this.telegramNotification.notify(message, { logger });
   }
 }
