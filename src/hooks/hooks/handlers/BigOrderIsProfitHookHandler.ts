@@ -45,7 +45,7 @@ class BigOrderIsProfitHookHandler extends Hook<OrderEstimatedParams> {
     if (arg.isLive && arg.estimation.isProfitable) {
       const order = arg.order.order;
       const config = arg.context.config;
-      const giveChainId = order!.take!.chainId;
+      const giveChainId = order!.give!.chainId;
       const giveConnection =
         config.chains[giveChainId]!.fulfullProvider.connection;
       const [giveUsdPrice, giveDecimals] = await Promise.all([
