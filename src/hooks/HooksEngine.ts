@@ -59,7 +59,7 @@ export class HooksEngine {
     if (!handlers) return;
     for (const handler of handlers) {
       try {
-        await handler.execute(params);
+        await handler.execute(params, { logger: this.logger });
       } catch (e) {
         this.logger.error(`Error in execution hook handler in ${hookEnum}`);
         this.logger.error(e);
