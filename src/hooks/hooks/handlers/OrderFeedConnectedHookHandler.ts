@@ -24,7 +24,10 @@ class HookHandlerOrderFeedConnected extends Hook<OrderFeedConnectedParams> {
     const logger = context.logger.child({
       hook: HookHandlerOrderFeedConnected.name,
     });
-    const message = `Websocket connected after ${arg.timeSinceLastDisconnect} seconds`;
+    let message = `Websocket connected`;
+    if (arg.timeSinceLastDisconnect) {
+      message = `Websocket connected after ${arg.timeSinceLastDisconnect} seconds`;
+    }
     await this.telegramNotification.notify(message, { logger });
   }
 }
