@@ -172,8 +172,11 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("close", () => {
-      this.logger.debug(`WsConnection has been closed`);
+      this.logger.debug(`WsConnection has been closed, retrying reconnection in ${this.pingTimeoutMs}ms`
+      );
       clearTimeout(this.pingTimer);
+      this.socket.terminate();
+      setTimeout(this.initWs.bind(this), this.pingTimeoutMs);
     });
   }
 
