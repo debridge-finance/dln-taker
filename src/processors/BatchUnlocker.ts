@@ -178,6 +178,7 @@ export class BatchUnlocker {
     const unlockedOrders = [];
     const logger = this.logger.child({
       giveChainId,
+      orderIds
     });
 
     logger.info(`picked ${orderIds.length} orders to unlock`);

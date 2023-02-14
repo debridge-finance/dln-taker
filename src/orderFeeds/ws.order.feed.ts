@@ -143,11 +143,11 @@ export class WsNextOrder extends GetNextOrder {
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
-      this.logger.debug(`📨 ws received new message ${JSON.stringify(data)}`);
+      this.logger.info(`📨 ws received new message`);
+      this.logger.debug(data);
       if ("Order" in data) {
         const parsedEvent = data as WsOrderEvent;
         const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
-        this.logger.debug("ws parsed order", order);
 
         const [status, taker] = this.flattenStatus(
           parsedEvent.Order.order_info

@@ -269,12 +269,12 @@ export class Executor implements IExecutor {
 
   async execute(nextOrderInfo?: IncomingOrder) {
     if (!this.isInitialized) throw new Error("executor is not initialized");
-    this.logger.info(`executor received incoming order`);
-    this.logger.debug(nextOrderInfo);
 
     if (nextOrderInfo && nextOrderInfo.order && nextOrderInfo.orderId) {
       const orderId = nextOrderInfo.orderId;
       const logger = this.logger.child({ orderId });
+      logger.info(`new order received, type: ${OrderInfoStatus[nextOrderInfo.type]}`)
+      logger.debug(nextOrderInfo);
       try {
         await this.executeOrder(nextOrderInfo, logger);
       } catch (e) {
@@ -283,6 +283,7 @@ export class Executor implements IExecutor {
       }
     } else {
       this.logger.debug("message is empty, skipping");
+      this.logger.debug(nextOrderInfo);
     }
   }
 

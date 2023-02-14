@@ -94,9 +94,9 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
       try {
         currentTxHash = await this.sendTx(currentTx, logger);
-        const pollingLogger = context.logger.child({
-          polling: currentTxHash,
-          currentChainId: await this.connection.eth.getChainId(),
+        let pollingLogger = logger.child({
+          service: "evm poller",
+          txHash: currentTxHash,
         });
 
         pollingInterval = setInterval(async () => {
@@ -110,7 +110,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
             );
 
             if (transactionReceiptResult?.status === true) {
-              pollingLogger.debug(`succeeded`);
+              pollingLogger.debug(`tx confirmed`);
 
               success(currentTxHash);
             } else if (transactionReceiptResult?.status === false) {
@@ -170,9 +170,13 @@ export class EvmProviderAdapter implements ProviderAdapter {
             attemptsRebroadcast++;
             const rebroadcastedTxHash = await this.sendTx(currentTx, logger);
             pollingLogger.debug(`rebroadcasted as ${rebroadcastedTxHash}`);
+            pollingLogger = pollingLogger.child({
+              txHash: rebroadcastedTxHash
+            })
             currentTxHash = rebroadcastedTxHash;
           } catch (e) {
             pollingLogger.error(`rebroadcast raised an error: ${e}`);
+            pollingLogger.error(e)
             // fail(`rebroadcasting ${currentTxHash} raised an error: ${e}`);
           }
         }, this.rebroadcast.rebroadcastInterval);
@@ -184,12 +188,13 @@ export class EvmProviderAdapter implements ProviderAdapter {
           failWithUndeterminedBehavior("poller reached timeout");
         }, this.rebroadcast.pollingTimeframe);
       } catch (e) {
-        logger.error(`[EVM] sending tx failed: ${e}`, e);
+        logger.error(`sending tx failed: ${e}`);
+        logger.error(e);
         fail(`sending tx failed`);
       }
     });
 
-    logger.info(`[EVM ${transactionHash}] transaction confirmed`);
+    logger.info(`tx confirmed: ${transactionHash}`);
 
     return transactionHash;
   }
@@ -221,7 +226,8 @@ export class EvmProviderAdapter implements ProviderAdapter {
           resolve(hash);
         })
         .catch((error) => {
-          logger.error("sending failed", error);
+          logger.error("sending failed");
+          logger.error(error);
           reject(error);
         });
     });
