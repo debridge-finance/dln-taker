@@ -4,6 +4,6 @@ export type NotificationContext = {
   logger: Logger;
 };
 
-export abstract class Notification {
+export abstract class Notifier {
   abstract notify(message: string, context: NotificationContext): Promise<void>;
 }

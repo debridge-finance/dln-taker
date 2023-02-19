@@ -2,40 +2,22 @@ import { OrderState } from "@debridge-finance/dln-client";
 import { setTimeout } from "timers/promises";
 import Web3 from "web3";
 
-import { Notification } from "../../notification/Notification";
-import { TelegramNotification } from "../../notification/TelegramNotification";
+import { Hooks } from "../../Hooks";
+import { Notifier } from "../../notification/Notifier";
 import { OrderEstimatedParams } from "../../types/params/OrderEstimatedParams";
-import { Hook } from "../Hook";
+import { HookHandler } from "../HookHandler";
 
-export const hookHandlerProfitOrderIsNotExecuted = (
-  tgKey: string,
-  tgChatIds: string[],
+export const orderNotExecutedWithinTimeframe = (
+  notifier: Notifier,
   maxDelayInSec: number
-): Hook<OrderEstimatedParams> => {
-  return new ProfitOrderIsNotExecutedHookHandler(
-    tgKey,
-    tgChatIds,
-    maxDelayInSec
-  );
-};
-
-class ProfitOrderIsNotExecutedHookHandler extends Hook<OrderEstimatedParams> {
-  private readonly telegramNotification: Notification;
-  constructor(
-    tgKey: string,
-    tgChatIds: string[],
-    private readonly maxDelayInSec: number
-  ) {
-    super();
-    this.telegramNotification = new TelegramNotification(tgKey, tgChatIds);
-  }
-
-  async execute(arg: OrderEstimatedParams): Promise<void> {
+): HookHandler<Hooks.OrderEstimated> => {
+  return async (args) => {
+    const arg = args as OrderEstimatedParams;
     if (arg.isLive && arg.estimation.isProfitable) {
       const logger = arg.context.logger.child({
-        hook: ProfitOrderIsNotExecutedHookHandler.name,
+        hook: "hookHandlerProfitableOrderNotExecutedWithinTimeframe",
       });
-      await setTimeout(this.maxDelayInSec);
+      await setTimeout(maxDelayInSec);
       const takeChainId = arg.order.order!.take!.chainId;
       const giveConnection =
         arg.context.config.chains[takeChainId]!.fulfullProvider.connection;
@@ -52,11 +34,11 @@ class ProfitOrderIsNotExecutedHookHandler extends Hook<OrderEstimatedParams> {
         takeStatus?.status === undefined ||
         takeStatus?.status === OrderState.NotSet
       ) {
-        await this.telegramNotification.notify(
-          `Order is not fulfilled more then ${this.maxDelayInSec}`,
+        await notifier.notify(
+          `Order is not fulfilled more then ${maxDelayInSec}`,
           { logger }
         );
       }
     }
-  }
-}
+  };
+};

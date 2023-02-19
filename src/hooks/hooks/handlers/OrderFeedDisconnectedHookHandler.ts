@@ -1,27 +1,19 @@
-import { Notification } from "../../notification/Notification";
-import { TelegramNotification } from "../../notification/TelegramNotification";
+import { Hooks } from "../../Hooks";
+import { Notifier } from "../../notification/Notifier";
 import { HookParams } from "../../types/params/HookParams";
-import { Hook, HookContext } from "../Hook";
+import { HookContext, HookHandler } from "../HookHandler";
 
-export const hookHandlerOrderFeedDisconnected = (
-  tgKey: string,
-  tgChatIds: string[]
-): Hook<HookParams> => {
-  return new HookHandlerOrderFeedDisconnected(tgKey, tgChatIds);
-};
-
-class HookHandlerOrderFeedDisconnected extends Hook<HookParams> {
-  private readonly telegramNotification: Notification;
-  constructor(tgKey: string, tgChatIds: string[]) {
-    super();
-    this.telegramNotification = new TelegramNotification(tgKey, tgChatIds);
-  }
-
-  async execute(arg: HookParams, context: HookContext): Promise<void> {
-    const logger = context.logger.child({
-      hook: HookHandlerOrderFeedDisconnected.name,
+export const orderFeedDisconnected = (
+  notifier: Notifier
+): HookHandler<Hooks.OrderFeedDisconnected> => {
+  return async (
+    args: HookParams<Hooks.OrderFeedDisconnected>,
+    context?: HookContext
+  ) => {
+    const logger = context!.logger.child({
+      hook: "hookHandlerOrderFeedDisconnected",
     });
     const message = `Websocket connection is lost!`;
-    await this.telegramNotification.notify(message, { logger });
-  }
-}
+    await notifier.notify(message, { logger });
+  };
+};

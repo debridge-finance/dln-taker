@@ -268,16 +268,16 @@ export class BatchUnlocker {
         }
       );
 
-      const txHash = (await this.takeChain.unlockProvider.sendTransaction(
+      const txHash = await this.takeChain.unlockProvider.sendTransaction(
         batchUnlockTx,
         {
           logger,
         }
-      )) as string;
+      );
 
       this.hooksEngine.handleOrderUnlockSent({
-        fromChainId: giveChain.chain,
-        toChainId: this.takeChain.chain,
+        fromChainId: this.takeChain.chain,
+        toChainId: giveChain.chain,
         txHash,
         orderIds,
       });
@@ -287,8 +287,8 @@ export class BatchUnlocker {
     } catch (e) {
       const error = e as Error;
       this.hooksEngine.handleOrderUnlockFailed({
-        fromChainId: giveChain.chain,
-        toChainId: this.takeChain.chain,
+        fromChainId: this.takeChain.chain,
+        toChainId: giveChain.chain,
         reason: isRevertedError(error) ? "REVERTED" : "FAILED",
         message: error.message,
         orderIds,
@@ -322,8 +322,8 @@ export class BatchUnlocker {
       } catch (e) {
         const error = e as Error;
         this.hooksEngine.handleOrderUnlockFailed({
-          fromChainId: giveChain.chain,
-          toChainId: this.takeChain.chain,
+          fromChainId: this.takeChain.chain,
+          toChainId: giveChain.chain,
           reason: isRevertedError(error) ? "REVERTED" : "FAILED",
           message: error.message,
           orderIds: [orderId],
@@ -368,15 +368,15 @@ export class BatchUnlocker {
       logger
     );
 
-    const txHash = (await this.takeChain.unlockProvider.sendTransaction(
+    const txHash = await this.takeChain.unlockProvider.sendTransaction(
       unlockTx,
       {
         logger,
       }
-    )) as string;
+    );
     this.hooksEngine.handleOrderUnlockSent({
-      fromChainId: giveChain.chain,
-      toChainId: this.takeChain.chain,
+      fromChainId: this.takeChain.chain,
+      toChainId: giveChain.chain,
       txHash,
       orderIds: [orderId],
     });

@@ -1,14 +1,16 @@
 import { IncomingOrder } from "../../../interfaces";
 import { OrderProcessorContext } from "../../../processors/base";
-import { PostponingReasonEnum } from "../../PostponingReasonEnum";
+import { PostponingReason } from "../../HookEnums";
+import { Hooks } from "../../Hooks";
 import { OrderEstimation } from "../OrderEstimation";
+
 import { HookParams } from "./HookParams";
 
-export class OrderPostponedParams extends HookParams {
+export class OrderPostponedParams extends HookParams<Hooks.OrderPostponed> {
   order: IncomingOrder;
   isLive: boolean;
-  reason: PostponingReasonEnum;
-  message: string;
+  reason: PostponingReason;
+  message?: string;
   estimation?: OrderEstimation;
   context: OrderProcessorContext;
 }

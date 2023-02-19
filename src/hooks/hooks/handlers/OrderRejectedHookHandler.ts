@@ -1,27 +1,20 @@
-import { Notification } from "../../notification/Notification";
-import { TelegramNotification } from "../../notification/TelegramNotification";
+import { RejectionReason } from "../../HookEnums";
+import { Hooks } from "../../Hooks";
+import { Notifier } from "../../notification/Notifier";
+import { HookParams } from "../../types/params/HookParams";
 import { OrderRejectedParams } from "../../types/params/OrderRejectedParams";
-import { Hook } from "../Hook";
+import { HookHandler } from "../HookHandler";
 
-export const hookHandlerOrderRejected = (
-  tgKey: string,
-  tgChatIds: string[]
-): Hook<OrderRejectedParams> => {
-  return new HookHandlerOrderRejected(tgKey, tgChatIds);
-};
-
-class HookHandlerOrderRejected extends Hook<OrderRejectedParams> {
-  private readonly telegramNotification: Notification;
-  constructor(tgKey: string, tgChatIds: string[]) {
-    super();
-    this.telegramNotification = new TelegramNotification(tgKey, tgChatIds);
-  }
-
-  async execute(arg: OrderRejectedParams): Promise<void> {
+export const orderRejected = (
+  notifier: Notifier
+): HookHandler<Hooks.OrderRejected> => {
+  return async (args: HookParams<Hooks.OrderRejected>) => {
+    const arg = args as OrderRejectedParams;
     const logger = arg.context.logger.child({
-      hook: HookHandlerOrderRejected.name,
+      hook: "hookHandlerOrderRejected",
     });
-    const message = `Order #${arg.order.orderId} has been rejected, reason: ${arg.reason}`;
-    await this.telegramNotification.notify(message, { logger });
-  }
-}
+    const reason = RejectionReason[arg.reason];
+    const message = `Order #${arg.order.orderId} has been rejected, reason: ${reason}`;
+    await notifier.notify(message, { logger });
+  };
+};

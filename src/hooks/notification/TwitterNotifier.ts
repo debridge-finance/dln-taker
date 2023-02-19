@@ -1,8 +1,8 @@
 import Twitter from "twitter";
 
-import { Notification, NotificationContext } from "./Notification";
+import { NotificationContext, Notifier } from "./Notifier";
 
-export class TwitterNotification implements Notification {
+export class TwitterNotifier implements Notifier {
   private readonly client: Twitter;
 
   constructor(
@@ -24,7 +24,7 @@ export class TwitterNotification implements Notification {
       status: message,
     };
     const logger = context.logger.child({
-      notification: TwitterNotification.name,
+      notification: TwitterNotifier.name,
     });
 
     try {

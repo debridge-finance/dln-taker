@@ -1,4 +1,4 @@
-export enum HooksEnum {
+export enum Hooks {
   OrderFeedConnected,
   OrderFeedDisconnected,
   OrderRejected,

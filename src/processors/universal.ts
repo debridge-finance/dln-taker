@@ -11,8 +11,7 @@ import { Logger } from "pino";
 import Web3 from "web3";
 
 import { OrderInfoStatus } from "../enums/order.info.status";
-import { PostponingReasonEnum } from "../hooks/PostponingReasonEnum";
-import { RejectionReasonEnum } from "../hooks/RejectionReasonEnum";
+import { PostponingReason, RejectionReason } from "../hooks/HookEnums";
 import { IncomingOrderContext } from "../interfaces";
 import { createClientLogger } from "../logger";
 import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
@@ -273,7 +272,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
         isLive,
-        reason: RejectionReasonEnum.UNEXEPECTED_GIVE_TOKEN,
+        reason: RejectionReason.UNEXEPECTED_GIVE_TOKEN,
         context,
       });
       logger.info(
@@ -298,7 +297,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
         isLive,
-        reason: RejectionReasonEnum.ALREADY_FULFILLED,
+        reason: RejectionReason.ALREADY_FULFILLED,
         context,
       });
       logger.info("order is already handled on the give chain, skipping");
@@ -316,7 +315,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
         isLive,
-        reason: RejectionReasonEnum.ALERT_GIVE_MISSING,
+        reason: RejectionReason.ALERT_GIVE_MISSING,
         context,
       });
       return;
@@ -327,7 +326,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
         isLive,
-        reason: RejectionReasonEnum.WRONG_GIVE_STATUS,
+        reason: RejectionReason.WRONG_GIVE_STATUS,
         context,
       });
       return;
@@ -362,7 +361,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         estimation: undefined,
         context,
         isLive,
-        reason: PostponingReasonEnum.ESTIMATION_FAILED,
+        reason: PostponingReason.ESTIMATION_FAILED,
         message: error.message,
       });
       context.logger.error(`Error in estimation ${e}`);
@@ -397,8 +396,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         estimation: hookEstimation,
         context,
         isLive,
-        reason: PostponingReasonEnum.NON_PROFITABLE,
-        message: "",
+        reason: PostponingReason.NON_PROFITABLE,
       });
       logger.info("order is not profitable, postponing it to the mempool");
       this.mempoolService.addOrder({ orderInfo, context, isLive });
@@ -414,8 +412,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         estimation: hookEstimation,
         context,
         isLive,
-        reason: PostponingReasonEnum.NOT_ENOUGH_BALANCE,
-        message: "",
+        reason: PostponingReason.NOT_ENOUGH_BALANCE,
       });
       logger.info(
         `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${requiredReserveDstAmount}; postponing it to the mempool`
@@ -436,10 +433,10 @@ class UniversalProcessor extends BaseOrderProcessor {
     );
 
     try {
-      const txFulfill = (await this.takeChain.fulfullProvider.sendTransaction(
+      const txFulfill = await this.takeChain.fulfullProvider.sendTransaction(
         fulfillTx.tx,
         { logger }
-      )) as string;
+      );
       this.hooksEngine.handleOrderFulfilled({
         order: orderInfo,
         txHash: txFulfill,
@@ -453,8 +450,8 @@ class UniversalProcessor extends BaseOrderProcessor {
         context,
         isLive: true, // todo
         reason: isRevertedError(error)
-          ? PostponingReasonEnum.FULFILLMENT_REVERTED
-          : PostponingReasonEnum.FULFILLMENT_FAILED,
+          ? PostponingReason.FULFILLMENT_REVERTED
+          : PostponingReason.FULFILLMENT_FAILED,
         message: error.message,
       });
       logger.error(`fulfill transaction failed: ${e}`);

@@ -1,33 +1,25 @@
-import { Notification } from "../../notification/Notification";
-import { TelegramNotification } from "../../notification/TelegramNotification";
+import { Hooks } from "../../Hooks";
+import { Notifier } from "../../notification/Notifier";
+import { TelegramNotifier } from "../../notification/TelegramNotifier";
+import { HookParams } from "../../types/params/HookParams";
 import { OrderFeedConnectedParams } from "../../types/params/OrderFeedConnectedParams";
-import { Hook, HookContext } from "../Hook";
+import { HookContext, HookHandler } from "../HookHandler";
 
-export const hookHandlerOrderFeedConnected = (
-  tgKey: string,
-  tgChatIds: string[]
-): Hook<OrderFeedConnectedParams> => {
-  return new HookHandlerOrderFeedConnected(tgKey, tgChatIds);
-};
-
-class HookHandlerOrderFeedConnected extends Hook<OrderFeedConnectedParams> {
-  private readonly telegramNotification: Notification;
-  constructor(tgKey: string, tgChatIds: string[]) {
-    super();
-    this.telegramNotification = new TelegramNotification(tgKey, tgChatIds);
-  }
-
-  async execute(
-    arg: OrderFeedConnectedParams,
-    context: HookContext
-  ): Promise<void> {
-    const logger = context.logger.child({
-      hook: HookHandlerOrderFeedConnected.name,
+export const orderFeedConnected = (
+  notifier: Notifier
+): HookHandler<Hooks.OrderFeedConnected> => {
+  return async (
+    args: HookParams<Hooks.OrderFeedConnected>,
+    context?: HookContext
+  ) => {
+    const arg = args as OrderFeedConnectedParams;
+    const logger = context!.logger.child({
+      hook: "hookHandlerOrderFeedConnected",
     });
     let message = `Websocket connected`;
     if (arg.timeSinceLastDisconnect) {
       message = `Websocket connected after ${arg.timeSinceLastDisconnect} seconds`;
     }
-    await this.telegramNotification.notify(message, { logger });
-  }
-}
+    await notifier.notify(message, { logger });
+  };
+};

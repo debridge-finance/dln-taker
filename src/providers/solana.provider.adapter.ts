@@ -21,7 +21,10 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     return helpers.bufferToHex(this.wallet.publicKey.toBuffer());
   }
 
-  async sendTransaction(data: unknown, context: SendTransactionContext) {
+  async sendTransaction(
+    data: unknown,
+    context: SendTransactionContext
+  ): Promise<string> {
     const txid = await helpers.sendAll(
       this.connection,
       this.wallet,
@@ -32,7 +35,7 @@ export class SolanaProviderAdapter implements ProviderAdapter {
       true
     );
     context.logger.info(`[Solana] Sent tx: ${txid}`);
-    return txid;
+    return txid[0];
   }
 
   async getBalance(token: Uint8Array): Promise<string> {

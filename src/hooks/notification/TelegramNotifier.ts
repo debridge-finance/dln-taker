@@ -1,6 +1,6 @@
-import { Notification, NotificationContext } from "./Notification";
+import { NotificationContext, Notifier } from "./Notifier";
 
-export class TelegramNotification extends Notification {
+export class TelegramNotifier extends Notifier {
   constructor(
     private readonly tgKey: string,
     private readonly tgChatIds: string[]
@@ -10,7 +10,7 @@ export class TelegramNotification extends Notification {
 
   async notify(message: string, context: NotificationContext): Promise<void> {
     const logger = context.logger.child({
-      notification: TelegramNotification.name,
+      notification: TelegramNotifier.name,
     });
     for (const chatId of this.tgChatIds) {
       await fetch(`https://api.telegram.org/bot${this.tgKey}/sendMessage`, {

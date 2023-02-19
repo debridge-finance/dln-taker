@@ -120,7 +120,7 @@ export class WsNextOrder extends GetNextOrder {
       let timeSinceLastDisconnect;
       if (this.timeLastDisconnect) {
         timeSinceLastDisconnect =
-          new Date().getTime() - this.timeLastDisconnect.getTime();
+          (new Date().getTime() - this.timeLastDisconnect.getTime()) / 1000;
       }
       this.hooksEngine.handleOrderFeedConnected({
         timeSinceLastDisconnect,

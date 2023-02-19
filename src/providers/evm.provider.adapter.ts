@@ -28,7 +28,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
     return this.connection.eth.defaultAccount!;
   }
 
-  async sendTransaction(data: unknown, context: SendTransactionContext) {
+  async sendTransaction(
+    data: unknown,
+    context: SendTransactionContext
+  ): Promise<string> {
     const logger = context.logger.child({
       service: "EvmProviderAdapter",
       currentChainId: await this.connection.eth.getChainId(),
@@ -191,7 +194,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
     logger.info(`[EVM ${transactionHash}] transaction confirmed`);
 
-    return transactionHash;
+    return transactionHash as string;
   }
 
   private async sendTx(tx: Tx, logger: Logger): Promise<string> {
