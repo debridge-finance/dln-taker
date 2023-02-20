@@ -1,6 +1,9 @@
 import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
+import { OrderInfoStatus } from "./enums/order.info.status";
+import { OrderProcessorContext } from "./processors/base";
+
 export type ChainConfig = {
   PMM_SRC: string;
   PMM_DST: string;
@@ -20,20 +23,38 @@ export type Config = {
   CREATED_EVENT_TIMEOUT: number;
 };
 
-export type NextOrderInfo = {
+export type IncomingOrder = {
   orderId: string;
-  type: "created" | "fulfilled" | "other";
+  type: OrderInfoStatus;
   order: OrderData | null;
   taker?: string;
+};
+
+export type ProcessOrder = (params: IncomingOrderContext) => Promise<void>;
+
+export type IncomingOrderContext = {
+  orderInfo: IncomingOrder;
+  context: OrderProcessorContext;
+};
+
+export type OrderProcessorFunc = (order?: IncomingOrder) => Promise<void>;
+
+export type UnlockAuthority = {
+  chainId: ChainId;
+  address: string;
 };
 
 export abstract class GetNextOrder {
   protected enabledChains: ChainId[];
   protected logger: Logger;
+  protected processNextOrder: OrderProcessorFunc;
 
-  abstract init(): void;
+  constructor() {}
 
-  abstract getNextOrder(): Promise<NextOrderInfo | undefined>;
+  abstract init(
+    processNextOrder: OrderProcessorFunc,
+    UnlockAuthority: UnlockAuthority[]
+  ): void;
 
   setEnabledChains(enabledChains: ChainId[]) {
     this.enabledChains = enabledChains;

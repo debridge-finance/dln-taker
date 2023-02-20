@@ -1,5 +1,4 @@
-import { OrderProcessor } from "./order.processor";
-import { preswapProcessor } from "./preswap.proccessor";
-import { strictProcessor } from "./strict.processor";
+import { IOrderProcessor, OrderProcessorInitializer } from "./base";
+import { universalProcessor } from "./universal";
 
-export { OrderProcessor, preswapProcessor, strictProcessor };
+export { IOrderProcessor, universalProcessor, OrderProcessorInitializer };
