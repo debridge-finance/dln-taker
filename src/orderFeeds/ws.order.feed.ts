@@ -164,20 +164,15 @@ export class WsNextOrder extends GetNextOrder {
 
     this.socket.on("error", async (err) => {
       this.logger.error(`WsConnection received error: ${err.message}`);
-      if (
-        this.socket.readyState !== this.socket.CLOSED &&
-        this.socket.readyState !== this.socket.CLOSING
-      ) {
-        this.socket.terminate();
-      }
     });
 
     this.socket.on("close", () => {
       this.logger.debug(
         `WsConnection has been closed, retrying reconnection in ${this.pingTimeoutMs}ms`
       );
-      this.heartbeat();
     });
+
+    this.heartbeat();
   }
 
   private transformToNextOrderInfo(
