@@ -3,24 +3,24 @@ import {
   calculateExpectedTakeAmount,
   ChainEngine,
   ChainId,
+  ClientError,
   evm,
+  EvmChains,
   getEngineByChainId,
   OrderData,
   OrderState,
   pickReserveToken,
-  tokenAddressToString,
   PreswapFulfillOrderPayload,
-  EvmChains,
-  ClientError,
-  ClientErrorType
+  tokenAddressToString,
+  tokenStringToBuffer,
+  ZERO_EVM_ADDRESS,
 } from "@debridge-finance/dln-client";
 import { SwapConnectorRequest, SwapConnectorResult } from "@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import Web3 from "web3";
 
-import { OrderInfoStatus } from "../enums/order.info.status";
-import { IncomingOrderContext } from "../interfaces";
+import { IncomingOrder, IncomingOrderContext, OrderInfoStatus } from "../interfaces";
 import { createClientLogger } from "../logger";
 import { EvmProviderAdapter, Tx } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
@@ -157,86 +157,90 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   async process(params: IncomingOrderContext): Promise<void> {
     const { context, orderInfo } = params;
-    const { orderId, type, order } = orderInfo;
+    const { orderId } = orderInfo;
 
     params.context.logger = context.logger.child({
       processor: "universal",
       orderId,
     });
 
-    switch (type) {
+    switch (orderInfo.status) {
       case OrderInfoStatus.ArchivalCreated:
       case OrderInfoStatus.Created: {
-        return this.tryProcess(params);
+        // must remove this order from all queues bc new order can be an updated version
+        this.incomingOrdersMap.set(orderInfo.orderId, params);
+        return this.tryProcess(orderInfo.orderId);
       }
       case OrderInfoStatus.ArchivalFulfilled: {
-        this.batchUnlocker.unlockOrder(orderId, order!, context);
+        this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
         return;
       }
       case OrderInfoStatus.Cancelled: {
-        this.queue.delete(orderId);
-        this.priorityQueue.delete(orderId);
-        this.incomingOrdersMap.delete(orderId);
-        this.mempoolService.delete(orderId);
+        this.clearInternalQueues(orderId);
         context.logger.debug(`deleted from queues`);
         return;
       }
       case OrderInfoStatus.Fulfilled: {
-        this.queue.delete(orderId);
-        this.priorityQueue.delete(orderId);
-        this.incomingOrdersMap.delete(orderId);
-        this.mempoolService.delete(orderId);
+        this.clearInternalQueues(orderId);
         context.logger.debug(`deleted from queues`);
-        this.batchUnlocker.unlockOrder(orderId, order!, context);
+        this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
         return;
       }
-      case OrderInfoStatus.Other:
       default: {
         context.logger.error(
-          `status=${OrderInfoStatus[type]} not implemented, skipping`
+          `status=${OrderInfoStatus[orderInfo.status]} not implemented, skipping`
         );
         return;
       }
     }
   }
 
-  private async tryProcess(params: IncomingOrderContext): Promise<void> {
-    const { context, orderInfo } = params;
-    const { orderId } = orderInfo;
+  private clearInternalQueues(orderId: string): void {
+    this.queue.delete(orderId);
+    this.priorityQueue.delete(orderId);
+    this.incomingOrdersMap.delete(orderId)
+    this.mempoolService.delete(orderId);
+  }
+
+  private async tryProcess(orderId: string): Promise<void> {
+    const params = this.incomingOrdersMap.get(orderId);
+    if (!params) throw new Error("Unexpected: missing data for order");
+
+    const logger = params.context.logger;
+    const orderInfo = params.orderInfo;
 
     // already processing an order
     if (this.isLocked) {
-      context.logger.debug(
+      logger.debug(
         `Processor is currently processing an order, postponing`
       );
 
-      switch (params.orderInfo.type) {
+      switch (orderInfo.status) {
         case OrderInfoStatus.ArchivalCreated: {
-          this.queue.add(orderId);
-          context.logger.debug(`postponed to secondary queue`);
+          this.queue.add(orderInfo.orderId);
+          logger.debug(`postponed to secondary queue`);
           break;
         }
         case OrderInfoStatus.Created: {
-          this.priorityQueue.add(orderId);
-          context.logger.debug(`postponed to primary queue`);
+          this.priorityQueue.add(orderInfo.orderId);
+          logger.debug(`postponed to primary queue`);
           break;
         }
         default:
           throw new Error(
-            `Unexpected order status: ${OrderInfoStatus[params.orderInfo.type]}`
+            `Unexpected order status: ${OrderInfoStatus[orderInfo.status]}`
           );
       }
-      this.incomingOrdersMap.set(orderId, params);
       return;
     }
 
     // process this order
     this.isLocked = true;
     try {
-      await this.processOrder(params);
+      await this.processOrder(orderId);
     } catch (e) {
-      context.logger.error(`processing order failed with error: ${e}`);
-      context.logger.error(e);
+      logger.error(`processing order failed with error: ${e}`);
+      logger.error(e);
     }
     this.isLocked = false;
 
@@ -248,44 +252,29 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
   }
 
-  private pickNextOrder() {
-    const nextOrderId =
-      this.priorityQueue.values().next().value ||
-      this.queue.values().next().value;
-
-    if (nextOrderId) {
-      const order = this.incomingOrdersMap.get(nextOrderId);
-
-      this.priorityQueue.delete(nextOrderId);
-      this.queue.delete(nextOrderId);
-      this.incomingOrdersMap.delete(nextOrderId);
-
-      return order;
-    }
+  private pickNextOrder(): string | undefined {
+    return (
+      this.priorityQueue.values().next().value
+      || this.queue.values().next().value
+    )
   }
 
-  private async processOrder(
-    params: IncomingOrderContext
-  ): Promise<void | never> {
-    const { orderInfo, context } = params;
-    const { orderId, order } = orderInfo;
-    const logger = params.context.logger;
-
-    if (!order || !orderId) {
-      logger.error("order is empty, should not happen");
-      return;
-    }
+  private async processOrder(orderId: string): Promise<void | never> {
+    const params = this.incomingOrdersMap.get(orderId);
+    if (!params) throw new Error("Unexpected: missing data for order");
+    const { context, orderInfo } = params;
+    const logger = context.logger;
 
     const bucket = context.config.buckets.find(
       (bucket) =>
-        bucket.isOneOf(order.give.chainId, order.give.tokenAddress) &&
-        bucket.findFirstToken(order.take.chainId) !== undefined
+        bucket.isOneOf(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress) &&
+        bucket.findFirstToken(orderInfo.order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
       logger.info(
         `no bucket found to cover order's give token: ${tokenAddressToString(
-          order.give.chainId,
-          order.give.tokenAddress
+          orderInfo.order.give.chainId,
+          orderInfo.order.give.tokenAddress
         )}, skipping`
       );
       return;
@@ -293,8 +282,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     // validate that order is not fullfilled
     const takeOrderStatus = await context.config.client.getTakeOrderStatus(
-      orderId,
-      params.orderInfo.order!.take.chainId,
+      orderInfo.orderId,
+      orderInfo.order.take.chainId,
       { web3: this.takeChain.fulfullProvider.connection as Web3 }
     );
     if (
@@ -307,8 +296,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     // validate that order is created
     const giveOrderStatus = await context.config.client.getGiveOrderStatus(
-      params.orderInfo.orderId,
-      params.orderInfo.order!.give.chainId,
+      orderInfo.orderId,
+      orderInfo.order.give.chainId,
       { web3: context.giveChain.fulfullProvider.connection as Web3 }
     );
     if (giveOrderStatus?.status !== OrderState.Created) {
@@ -316,16 +305,86 @@ class UniversalProcessor extends BaseOrderProcessor {
       return;
     }
 
+    let allowPlaceToMempool = true;
+
+    // compare worthiness of the order against block confirmation thresholds
+    if (orderInfo.status == OrderInfoStatus.Created) {
+      const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info;
+      if (finalizationInfo == 'Revoked') {
+        logger.info('order has been revoked, cleaning and skipping');
+        this.clearInternalQueues(orderInfo.orderId);
+        return;
+      }
+      else if ('Confirmed' in finalizationInfo) {
+        // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
+        // to avoid data discrepancy and rely on WS instead
+        const announcedConfirmation = finalizationInfo.Confirmed.confirmation_blocks_count;
+        logger.info(`order announced with custom finality, announced confirmation: ${announcedConfirmation}`);
+
+        // we don't want this order to be put to mempool because we don't query actual block confirmations
+        allowPlaceToMempool = false;
+        logger.debug(`order won't appear in the mempool`)
+
+        // calculate USD worth of order
+        const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
+          context.config.tokenPriceService.getPrice(
+            orderInfo.order.give.chainId,
+            buffersAreEqual(orderInfo.order.give.tokenAddress, tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS)) ? null : orderInfo.order.give.tokenAddress,
+            {
+              logger: createClientLogger(context.logger)
+            }
+          ),
+          context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress, context.giveChain.fulfullProvider.connection as Web3)
+        ]);
+        logger.debug(`usd rate for give token: ${giveTokenUsdRate}`)
+        logger.debug(`decimals for give token: ${giveTokenDecimals}`)
+
+        // converting give amount
+        const usdWorth = BigNumber(giveTokenUsdRate)
+          .multipliedBy(orderInfo.order.give.amount.toString())
+          .dividedBy(new BigNumber(10).pow(giveTokenDecimals))
+          .toNumber();
+        logger.debug(`order worth in usd: ${usdWorth}`)
+
+        // find appropriate range corresponding to this USD worth
+        const range = context.config.chains[orderInfo.order.give.chainId]!.usdAmountConfirmations.find(
+          usdWorthRange => usdWorthRange.usdWorthFrom < usdWorth && usdWorth <= usdWorthRange.usdWorthTo
+        );
+
+        // range found, ensure current block confirmation >= expected
+        if (range?.minBlockConfirmations) {
+          logger.debug(`usdAmountConfirmationRange found: (${range.usdWorthFrom}, ${range.usdWorthTo}]`)
+
+          if (announcedConfirmation < range.minBlockConfirmations) {
+            logger.info("announced block confirmations is less than the block confirmation constraint; skipping the order")
+            return;
+          }
+          else {
+            logger.debug("accepting order for execution")
+          }
+        }
+        else { // range not found: we do not accept this order, let it come finalized
+          logger.debug('non-finalized order is not covered by any custom block confirmation range, skipping')
+          return;
+        }
+
+      }
+      else if ('Finalized' in finalizationInfo) {
+        // do nothing: order have stable finality according to the WS
+        logger.debug('order source announced this order as finalized')
+      }
+    }
+
     // perform rough estimation: assuming order.give.amount is what we need on balance
-    const pickedBucket = pickReserveToken(order, context.config.buckets);
+    const pickedBucket = pickReserveToken(orderInfo.order, context.config.buckets);
     const [reserveSrcTokenDecimals, reserveDstTokenDecimals] = await Promise.all([
-      context.config.client.getDecimals(order.give.chainId, pickedBucket.reserveSrcToken, context.giveChain.fulfullProvider.connection as Web3),
-      context.config.client.getDecimals(order.take.chainId, pickedBucket.reserveDstToken, this.takeChain.fulfullProvider.connection as Web3),
+      context.config.client.getDecimals(orderInfo.order.give.chainId, pickedBucket.reserveSrcToken, context.giveChain.fulfullProvider.connection as Web3),
+      context.config.client.getDecimals(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, this.takeChain.fulfullProvider.connection as Web3),
     ]);
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
-    let roughReserveDstAmount = BigNumber(order.give.amount.toString()).div(BigNumber(10).pow(reserveSrcTokenDecimals - reserveDstTokenDecimals)).integerValue();
-    logger.debug(`expressed order give amount (${order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
+    let roughReserveDstAmount = BigNumber(orderInfo.order.give.amount.toString()).div(BigNumber(10).pow(reserveSrcTokenDecimals - reserveDstTokenDecimals)).integerValue();
+    logger.debug(`expressed order give amount (${orderInfo.order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(orderInfo.order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[orderInfo.order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
 
     const accountReserveBalance =
       await this.takeChain.fulfullProvider.getBalance(pickedBucket.reserveDstToken);
@@ -348,8 +407,8 @@ class UniversalProcessor extends BaseOrderProcessor {
       const reasonableDummySlippage = 500; // 5%
       try {
         const fulfillTx = await this.createOrderFullfillTx<ChainId.Ethereum>(
-          orderId,
-          order,
+          orderInfo.orderId,
+          orderInfo.order,
           pickedBucket.reserveDstToken,
           roughReserveDstAmount.toString(),
           reasonableDummySlippage,
@@ -401,8 +460,8 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
 
     const batchSize =
-      order.give.chainId === ChainId.Solana ||
-      order.take.chainId === ChainId.Solana
+      orderInfo.order.give.chainId === ChainId.Solana ||
+      orderInfo.order.take.chainId === ChainId.Solana
         ? null
         : this.params.batchUnlockSize;
 
@@ -412,7 +471,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       isProfitable,
       reserveToTakeSlippageBps,
     } = await calculateExpectedTakeAmount(
-      order,
+      orderInfo.order,
       this.params.minProfitabilityBps,
       {
         client: context.config.client,
@@ -434,22 +493,23 @@ class UniversalProcessor extends BaseOrderProcessor {
       logger.info("order is profitable")
     }
     else {
-      logger.info("order is not profitable, postponing it to the mempool");
-      this.mempoolService.addOrder(params);
+      logger.info("order is not profitable");
+      if (allowPlaceToMempool)
+        this.mempoolService.addOrder(params);
       return;
     }
 
     if (!buffersAreEqual(reserveDstToken, pickedBucket.reserveDstToken)) {
       logger.error(`internal error: \
-dln-taker has picked ${tokenAddressToString(order.take.chainId, pickedBucket.reserveDstToken)} as reserve token, \
-while calculateExpectedTakeAmount returned ${tokenAddressToString(order.take.chainId, reserveDstToken)}`);
+dln-taker has picked ${tokenAddressToString(orderInfo.order.take.chainId, pickedBucket.reserveDstToken)} as reserve token, \
+while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.order.take.chainId, reserveDstToken)}`);
       return;
     }
 
     // fulfill order
-    const { tx: fulfillTx } = await this.createOrderFullfillTx(
-      orderId,
-      order,
+    const fulfillTx = await this.createOrderFullfillTx(
+      orderInfo.orderId,
+      orderInfo.order,
       reserveDstToken,
       requiredReserveDstAmount,
       reserveToTakeSlippageBps,
@@ -457,9 +517,9 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(order.take.cha
       context,
       logger
     );
-    if (getEngineByChainId(order.take.chainId) === ChainEngine.EVM) {
+    if (getEngineByChainId(orderInfo.order.take.chainId) === ChainEngine.EVM) {
       try {
-        const evmFulfillGas = await (this.takeChain.fulfullProvider.connection as Web3).eth.estimateGas(fulfillTx as Tx);
+        const evmFulfillGas = await (this.takeChain.fulfullProvider.connection as Web3).eth.estimateGas(fulfillTx.tx as Tx);
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
           logger.info(`final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit}); postponing to the mempool `)
@@ -490,15 +550,19 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(order.take.cha
     } catch (e) {
       logger.error(`fulfill transaction failed: ${e}`);
       logger.error(e);
-      this.mempoolService.addOrder(params);
+      if (allowPlaceToMempool)
+        this.mempoolService.addOrder(params);
       return;
     }
 
-    await this.waitIsOrderFulfilled(orderId, order, context, logger);
+    await this.waitIsOrderFulfilled(orderInfo.orderId, orderInfo.order, context, logger);
+
+    // order is fulfilled, remove it from queues (the order may have come again thru WS)
+    this.clearInternalQueues(orderInfo.orderId);
     logger.info(`order fulfilled: ${orderId}`)
 
     // unlocking
-    this.batchUnlocker.unlockOrder(orderId, order, context);
+    this.batchUnlocker.unlockOrder(orderInfo.orderId, orderInfo.order, context);
   }
 
   private async createOrderFullfillTx<T extends ChainId>(

@@ -90,6 +90,17 @@ const config: ExecutorLaunchConfig = {
       chain: ChainId.Arbitrum,
       chainRpc: `${process.env.ARBITRUM_RPC}`,
 
+      // Defines constraints imposed on all orders coming from/to this chain
+      constraints: {
+        // Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
+        requiredConfirmationsThresholds: [
+          // worth <$100: 1+ block confirmation
+          // [100, 1],
+
+          // worth >$100: guaranteed block confirmations (15)
+        ]
+      },
+
       // if the order is created on Ethereum and fulfilled on another chain (e.g. Solana),
       // unlocked funds will be sent to this Ethereum address
       beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
@@ -111,6 +122,15 @@ const config: ExecutorLaunchConfig = {
       chain: ChainId.Avalanche,
       chainRpc: `${process.env.AVALANCHE_RPC}`,
 
+      constraints: {
+        requiredConfirmationsThresholds: [
+          // worth <$100: 1+ block confirmation
+          // [100, 1],
+
+          // worth >$100: guaranteed block confirmations (15)
+        ]
+      },
+
       beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
       takerPrivateKey: `${process.env.AVALANCHE_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.AVALANCHE_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
@@ -119,6 +139,15 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.BSC,
       chainRpc: `${process.env.BNB_RPC}`,
+
+      constraints: {
+        requiredConfirmationsThresholds: [
+          // worth <$100: 1+ block confirmation
+          // [100, 1],
+
+          // worth >$100: guaranteed block confirmations (15)
+        ]
+      },
 
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
@@ -129,6 +158,15 @@ const config: ExecutorLaunchConfig = {
       chain: ChainId.Ethereum,
       chainRpc: `${process.env.ETHEREUM_RPC}`,
 
+      constraints: {
+        requiredConfirmationsThresholds: [
+          // worth <$100: 1+ block confirmation
+          // [100, 1],
+
+          // worth >$100: guaranteed block confirmations (15)
+        ]
+      },
+
       beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
       takerPrivateKey: `${process.env.ETHEREUM_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.ETHEREUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
@@ -137,6 +175,15 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Polygon,
       chainRpc: `${process.env.POLYGON_RPC}`,
+
+      constraints: {
+        requiredConfirmationsThresholds: [
+          // worth <$100: 32+ block confirmation
+          // [100, 32],
+
+          // worth >$100: guaranteed block confirmations (256)
+        ]
+      },
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,

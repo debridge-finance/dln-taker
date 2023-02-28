@@ -1,44 +1,44 @@
 import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
-import { OrderInfoStatus } from "./enums/order.info.status";
 import { OrderProcessorContext } from "./processors/base";
 
-export type ChainConfig = {
-  PMM_SRC: string;
-  PMM_DST: string;
-  DEBRIDGE: string;
-  DEBRIDGE_SETTINGS?: string;
-  WALLET: string;
-  RPC_URL: string;
-  BENEFICIARY: string;
-};
+export enum OrderInfoStatus {
+  Created,
+  ArchivalCreated,
+  ArchivalFulfilled,
+  Fulfilled,
+  Cancelled,
+}
 
-export type Config = {
-  [chain: number]: ChainConfig;
-  EXPECTED_PROFIT: number;
-  // RABBIT_URL: string;
-  // QUEUE_NAME: string;
-  WS_URL: string;
-  CREATED_EVENT_TIMEOUT: number;
-};
+type FinalizationInfo = {
+  Finalized: {
+    transaction_hash:  string;
+  }
+} | {
+  Confirmed: {
+    confirmation_blocks_count: number;
+    transaction_hash:  string;
+  }
+} | "Revoked";
 
-export type IncomingOrder = {
+export type IncomingOrder<T extends OrderInfoStatus> = {
   orderId: string;
-  type: OrderInfoStatus;
-  order: OrderData | null;
-  taker?: string;
-};
+  status: OrderInfoStatus;
+  order: OrderData;
+} & (T extends OrderInfoStatus.ArchivalFulfilled ? { unlockAuthority: string } : {}
+) & (T extends OrderInfoStatus.Fulfilled ? { unlockAuthority: string } : {}
+) & (T extends OrderInfoStatus.Created ? { finalization_info: FinalizationInfo } : {})
 
 export type ProcessOrder = (params: IncomingOrderContext) => Promise<void>;
 
 export type IncomingOrderContext = {
-  orderInfo: IncomingOrder;
+  orderInfo: IncomingOrder<OrderInfoStatus>;
   context: OrderProcessorContext;
   attempts: number;
 };
 
-export type OrderProcessorFunc = (order?: IncomingOrder) => Promise<void>;
+export type OrderProcessorFunc = (order: IncomingOrder<any>) => Promise<void>;
 
 export type UnlockAuthority = {
   chainId: ChainId;
@@ -54,7 +54,11 @@ export abstract class GetNextOrder {
 
   abstract init(
     processNextOrder: OrderProcessorFunc,
-    UnlockAuthority: UnlockAuthority[]
+    UnlockAuthority: UnlockAuthority[],
+    minConfirmationThresholds: Array<{
+      chainId: ChainId;
+      points: number[]
+    }>
   ): void;
 
   setEnabledChains(enabledChains: ChainId[]) {
@@ -64,12 +68,4 @@ export abstract class GetNextOrder {
   setLogger(logger: Logger) {
     this.logger = logger;
   }
-}
-
-export interface GetProfit {
-  getProfit(
-    dstChainId: ChainId,
-    giveUsdAmount: bigint,
-    takeUsdAmount: bigint
-  ): Promise<bigint>;
 }
