@@ -11,6 +11,15 @@ import { OrderProcessorInitializer } from "./processors";
 
 type address = string;
 
+export enum SupportedChain {
+  Avalanche = ChainId.Avalanche,
+  Arbitrum = ChainId.Arbitrum,
+  BSC = ChainId.BSC,
+  Ethereum = ChainId.Ethereum,
+  Polygon = ChainId.Polygon,
+  Solana = ChainId.Solana
+}
+
 export class EvmRebroadcastAdapterOpts {
   /**
    * defines a multiplier to increase a pending txn's gasPrice for pushing it off the mempool.
@@ -97,6 +106,28 @@ export interface ChainDefinition {
   //
 
   environment?: ChainEnvironment;
+
+  /**
+   * Defines constraints imposed on all orders coming from/to this chain
+   */
+  constraints?: {
+    /**
+     * Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
+     * For example, you may want to fulfill orders coming from Ethereum:
+     * - worth <$100 - immediately (after 1 block confirmation)
+     * - worth <$1,000 — after 6 block confirmations
+     * - everything else (worth $1,000+) - after default 12 block confirmations,
+     * then you can configure it:
+     *
+     * ```
+     * requiredConfirmationsThresholds: [
+     *  [100, 1],     // worth <$100: 1+ block confirmation
+     *  [1_000, 6],   // worth <$1,000: 6+ block confirmations
+     * ]
+     * ```
+     */
+    requiredConfirmationsThresholds?: Array<[thresholdAmountInUSD: number, minBlockConfirmations: number]>;
+  }
 
   //
   // taker related
