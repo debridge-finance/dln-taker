@@ -16,18 +16,27 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { Logger } from "pino";
 
-import { ExecutorLaunchConfig } from "../config";
-import { OrderInfoStatus } from "../enums/order.info.status";
+import { ExecutorLaunchConfig, SupportedChain } from "../config";
 import { PRODUCTION } from "../environments";
 import * as filters from "../filters";
 import { OrderFilter } from "../filters";
-import { GetNextOrder, IncomingOrder } from "../interfaces";
+import { GetNextOrder, IncomingOrder, OrderInfoStatus } from "../interfaces";
 import { WsNextOrder } from "../orderFeeds/ws.order.feed";
 import * as processors from "../processors";
 import { createWeb3WithPrivateKey } from "../processors/utils/create.web3.with.private.key";
 import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
+
+
+const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
+  [SupportedChain.Avalanche]: 15,
+  [SupportedChain.Arbitrum]: 15,
+  [SupportedChain.BSC]: 15,
+  [SupportedChain.Ethereum]: 12,
+  [SupportedChain.Polygon]: 256,
+  [SupportedChain.Solana]: 32,
+}
 
 export type ExecutorInitializingChain = {
   chain: ChainId;
@@ -37,11 +46,18 @@ export type ExecutorInitializingChain = {
   client: Solana.PmmClient | Evm.PmmEvmClient;
 };
 
+type UsdWorthBlockConfirmationConstraints = Array<{
+  usdWorthFrom: number,
+  usdWorthTo: number,
+  minBlockConfirmations: number,
+}>;
+
 export type ExecutorSupportedChain = {
   chain: ChainId;
   chainRpc: string;
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
+  usdAmountConfirmations: UsdWorthBlockConfirmationConstraints;
   orderProcessor: processors.IOrderProcessor;
   unlockProvider: ProviderAdapter;
   fulfullProvider: ProviderAdapter;
@@ -92,7 +108,11 @@ export class Executor implements IExecutor {
     for (const chain of config.chains) {
       this.logger.info(`initializing ${ChainId[chain.chain]}...`);
 
-      let client, unlockProvider, fulfullProvider;
+      if (!SupportedChain[chain.chain]) {
+        throw new Error(`${ChainId[chain.chain]} is not supported, remove it from the config`)
+      }
+
+      let client, unlockProvider, fulfillProvider;
       if (chain.chain === ChainId.Solana) {
         const solanaConnection = new Connection(chain.chainRpc);
         const solanaPmmSrc = new PublicKey(
@@ -118,7 +138,7 @@ export class Executor implements IExecutor {
               ? helpers.hexToBuffer(key)
               : bs58.decode(key)
           );
-        fulfullProvider = new SolanaProviderAdapter(
+        fulfillProvider = new SolanaProviderAdapter(
           solanaConnection,
           decodeKey(chain.takerPrivateKey)
         );
@@ -144,7 +164,7 @@ export class Executor implements IExecutor {
         );
         if (altInitTx) {
           this.logger.info(`Initializing Solana Address Lookup Table (ALT)`)
-          await fulfullProvider.sendTransaction(altInitTx, { logger: this.logger })
+          await fulfillProvider.sendTransaction(altInitTx, { logger: this.logger })
         } else {
           this.logger.info(`Solana Address Lookup Table (ALT) already exists`)
         }
@@ -159,7 +179,7 @@ export class Executor implements IExecutor {
           chain.chainRpc,
           chain.takerPrivateKey
         );
-        fulfullProvider = new EvmProviderAdapter(
+        fulfillProvider = new EvmProviderAdapter(
           web3Fulfill,
           chain.environment?.evm?.evmRebroadcastAdapterOpts
         );
@@ -197,7 +217,7 @@ export class Executor implements IExecutor {
         chain: chain.chain,
         chainRpc: chain.chainRpc,
         unlockProvider,
-        fulfullProvider,
+        fulfullProvider: fulfillProvider,
         client,
       };
       const orderProcessor = await processorInitializer(chain.chain, {
@@ -237,8 +257,9 @@ export class Executor implements IExecutor {
         dstFilters,
         orderProcessor,
         unlockProvider,
-        fulfullProvider,
+        fulfullProvider: fulfillProvider,
         client,
+        usdAmountConfirmations: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain.constraints?.requiredConfirmationsThresholds || []),
         beneficiary: chain.beneficiary,
       };
 
@@ -263,32 +284,54 @@ export class Executor implements IExecutor {
         address: chain.unlockProvider.address as string,
       };
     });
-    orderFeed.init(this.execute.bind(this), unlockAuthorities);
+    const minConfirmationThresholds = Object.values(this.chains).map(chain => ({
+      chainId: chain.chain,
+      points: chain.usdAmountConfirmations.map(t => t.minBlockConfirmations)
+    }))
+    orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds);
+
     this.isInitialized = true;
   }
 
-  async execute(nextOrderInfo?: IncomingOrder) {
-    if (!this.isInitialized) throw new Error("executor is not initialized");
+  private getConfirmationRanges(chain: SupportedChain, requiredConfirmationsThresholds: Array<[usdWorth: number, blocks: number]>): UsdWorthBlockConfirmationConstraints {
+    const ranges: UsdWorthBlockConfirmationConstraints = [];
+    requiredConfirmationsThresholds
+      .sort(([usdWorthA], [usdWorthB]) => usdWorthA < usdWorthB ? -1 : 1) // sort by usdWorth ASC
+      .forEach(([usdWorth, minBlockConfirmations], index, thresholdsSortedByUsdWorth) => {
+        const [prevThresholdUsdWorth, prevMinBlockConfirmations] = index === 0 ? [0, 0] : thresholdsSortedByUsdWorth[index - 1];
 
-    if (nextOrderInfo && nextOrderInfo.order && nextOrderInfo.orderId) {
-      const orderId = nextOrderInfo.orderId;
-      const logger = this.logger.child({ orderId });
-      logger.info(`new order received, type: ${OrderInfoStatus[nextOrderInfo.type]}`)
-      logger.debug(nextOrderInfo);
-      try {
-        await this.executeOrder(nextOrderInfo, logger);
-      } catch (e) {
-        logger.error(`received error while order execution: ${e}`);
-        logger.error(e);
-      }
-    } else {
-      this.logger.debug("message is empty, skipping");
-      this.logger.debug(nextOrderInfo);
+        if (minBlockConfirmations <= prevMinBlockConfirmations) {
+          throw new Error(`Unable to set required confirmation threshold for $${usdWorth} on ${SupportedChain[chain]}: minBlockConfirmations (${minBlockConfirmations}) must be greater than ${prevMinBlockConfirmations}`)
+        }
+        if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= minBlockConfirmations) {
+          throw new Error(`Unable to set required confirmation threshold for $${usdWorth} on ${SupportedChain[chain]}: minBlockConfirmations (${minBlockConfirmations}) must be less than max block confirmations (${BLOCK_CONFIRMATIONS_HARD_CAPS[chain]})`)
+        }
+
+        ranges.push({
+          usdWorthFrom: prevThresholdUsdWorth,
+          usdWorthTo: usdWorth,
+          minBlockConfirmations: minBlockConfirmations
+        })
+      });
+
+    return ranges;
+  }
+
+  async execute(nextOrderInfo: IncomingOrder<any>) {
+    const orderId = nextOrderInfo.orderId;
+    const logger = this.logger.child({ orderId });
+    logger.info(`new order received, type: ${OrderInfoStatus[nextOrderInfo.status]}`)
+    logger.debug(nextOrderInfo);
+    try {
+      await this.executeOrder(nextOrderInfo, logger);
+    } catch (e) {
+      logger.error(`received error while order execution: ${e}`);
+      logger.error(e);
     }
   }
 
   private async executeOrder(
-    nextOrderInfo: IncomingOrder,
+    nextOrderInfo: IncomingOrder<any>,
     logger: Logger
   ): Promise<boolean> {
     const { order, orderId } = nextOrderInfo;
@@ -330,7 +373,7 @@ export class Executor implements IExecutor {
     //
     if (
       [OrderInfoStatus.Created, OrderInfoStatus.ArchivalCreated].includes(
-        nextOrderInfo.type
+        nextOrderInfo.status
       )
     ) {
       logger.debug("running filters against the order");
