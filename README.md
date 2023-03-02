@@ -9,6 +9,7 @@
   - [Preparing the environment](#preparing-the-environment)
   - [Understanding reserve funds](#understanding-reserve-funds)
   - [Deploying reserve funds](#deploying-reserve-funds)
+- [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
   - [Restricting orders from fulfillment](#restricting-orders-from-fulfillment)
   - [Placing new orders](#placing-new-orders)
@@ -143,6 +144,40 @@ For every chain you as a taker would like to support:
   - a reasonable amount of native blockchain currency (e.g., 1 ETH on Ethereum) to pay gas for fulfillment transactions.
 - Register the unlock authority address (its private key must be set as an `unlockAuthorityPrivateKey` in the configuration file) and load it with:
   - a reasonable amount of native blockchain currency (e.g. 1 ETH on Ethereum) to pay gas for order unlocking transactions.
+
+## Managing cross-chain risk/reward ratio
+
+Executing cross-chain transactions is all about managing risks properly: no one wants to perform actions on the destination chain triggered from the source chain and later face a huge network reorg event which vanishes the triggering transaction. Thus, we at deBridge rely on safe block confirmations which ensure guaranteed transaction finality and help anyone avoid losing funds by fulfilling orders that get unexpectedly vanished:
+
+| Chain     | Guaranteed block confirmations |
+| --------- | ------------------------------ |
+| Arbitrum  | 15                  |
+| Avalanche | 15                  |
+| BNB Chain | 15                  |
+| Ethereum  | 15                  |
+| Polygon   | 256                 |
+
+However, DLN is an open market with natural competitiveness, where some takers may be willing to put more risk on small amounts of their funds attempting to fulfill orders with lesser block confirmations to get ahead of other takers. For example, some may be willing to fulfill orders under $100 as soon as they appear on blockchains (after 1 block confirmation), because the reward of being the first no matter what beats the risk of losing this amount of money.
+
+By default, `dln-taker` fulfills orders only after guaranteed block confirmations passed, however it gives a flexible way to set custom block confirmations for any worth threshold expressed in US dollars. This configuration must be set explicitly for every chain where orders may come from:
+
+```ts
+chain: ChainId.Arbitrum,
+
+// Defines constraints imposed on all orders coming from/to this chain
+constraints: {
+  // Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
+  requiredConfirmationsThresholds: [
+    // orders worth <=$100 would be attempted to be fulfilled after 1+ block confirmation
+    [100, 1],
+
+    // orders worth ($100-$1,000] would be attempted to be fulfilled after 6+ block confirmation
+    [1000, 6],
+
+    // orders worth >$1,000+ would be attempted to be fulfilled after guaranteed block confirmations (15 for Arbitrum)
+  ]
+},
+```
 
 ## Testing the order execution flow in the wild
 
