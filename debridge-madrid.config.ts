@@ -6,7 +6,7 @@ import {
 } from "@debridge-finance/dln-client";
 
 import { ExecutorLaunchConfig } from "./src/config";
-import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
+import { PRERELEASE_ENVIRONMENT_CODENAME_MADRID as environment } from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
 import * as filters from "./src/filters";
@@ -45,12 +45,14 @@ const config: ExecutorLaunchConfig = {
 
   orderProcessor: processors.universalProcessor({
     minProfitabilityBps: 4,
+    mempoolInterval: 60 * 5, // 5m
   }),
 
   chains: [
     {
       chain: ChainId.Solana,
       chainRpc: `${process.env.SOLANA_RPC}`,
+      environment: environment.chains[ChainId.Solana],
 
       beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
       takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
@@ -60,6 +62,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Arbitrum,
       chainRpc: `${process.env.ARBITRUM_RPC}`,
+      environment: environment.chains[ChainId.Arbitrum],
 
       beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
       takerPrivateKey: `${process.env.ARBITRUM_TAKER_PRIVATE_KEY}`,
@@ -75,6 +78,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Avalanche,
       chainRpc: `${process.env.AVALANCHE_RPC}`,
+      environment: environment.chains[ChainId.Avalanche],
 
       beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
       takerPrivateKey: `${process.env.AVALANCHE_TAKER_PRIVATE_KEY}`,
@@ -90,6 +94,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.BSC,
       chainRpc: `${process.env.BNB_RPC}`,
+      environment: environment.chains[ChainId.BSC],
 
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BNB_TAKER_PRIVATE_KEY}`,
@@ -105,6 +110,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Ethereum,
       chainRpc: `${process.env.ETHEREUM_RPC}`,
+      environment: environment.chains[ChainId.Ethereum],
 
       beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
       takerPrivateKey: `${process.env.ETHEREUM_TAKER_PRIVATE_KEY}`,
@@ -120,6 +126,7 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Polygon,
       chainRpc: `${process.env.POLYGON_RPC}`,
+      environment: environment.chains[ChainId.Polygon],
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,
       takerPrivateKey: `${process.env.POLYGON_TAKER_PRIVATE_KEY}`,
