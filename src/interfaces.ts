@@ -9,6 +9,10 @@ export enum OrderInfoStatus {
   ArchivalFulfilled,
   Fulfilled,
   Cancelled,
+  UnlockSent,
+  UnlockClaim,
+  TakeOfferDecreased,
+  GiveOfferIncreased
 }
 
 type FinalizationInfo = {
