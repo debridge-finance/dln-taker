@@ -56,6 +56,10 @@ enum WsOrderInfoStatus {
   ArchivalFulfilled,
   Fulfilled,
   Cancelled,
+  UnlockSent,
+  UnlockClaim,
+  TakeOfferDecreased,
+  GiveOfferIncreased
 }
 
 type WsOrderInfo<T extends WsOrderInfoStatus> = {
@@ -248,6 +252,34 @@ export class WsNextOrder extends GetNextOrder {
           status: OrderInfoStatus.Cancelled,
         }
         return cancelledOrder
+        case WsOrderInfoStatus.UnlockSent:
+          const unlockSent: IncomingOrder<OrderInfoStatus.UnlockSent> =  {
+            orderId,
+            order,
+            status: OrderInfoStatus.UnlockSent,
+          }
+          return unlockSent
+        case WsOrderInfoStatus.UnlockClaim:
+          const UnlockClaim: IncomingOrder<OrderInfoStatus.UnlockClaim> =  {
+            orderId,
+            order,
+            status: OrderInfoStatus.UnlockClaim,
+          }
+          return UnlockClaim
+        case WsOrderInfoStatus.TakeOfferDecreased:
+          const TakeOfferDecreased: IncomingOrder<OrderInfoStatus.TakeOfferDecreased> =  {
+            orderId,
+            order,
+            status: OrderInfoStatus.TakeOfferDecreased,
+          }
+          return TakeOfferDecreased
+        case WsOrderInfoStatus.GiveOfferIncreased:
+          const GiveOfferIncreased: IncomingOrder<OrderInfoStatus.GiveOfferIncreased> =  {
+            orderId,
+            order,
+            status: OrderInfoStatus.GiveOfferIncreased,
+          }
+          return GiveOfferIncreased
       default:
         throw new Error(`Unsupported order state: ${WsOrderInfoStatus[status]}`);
     }
