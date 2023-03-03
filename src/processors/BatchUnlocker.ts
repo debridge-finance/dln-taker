@@ -83,6 +83,14 @@ export class BatchUnlocker {
     }
 
     // filling batch queue
+    return this.addOrder(orderId, order, context);
+  }
+
+  async addOrder(
+    orderId: string,
+    order: OrderData,
+    context: OrderProcessorContext) {
+
     if (!this.unlockBatchesOrderIdMap.has(order.give.chainId)) {
       this.unlockBatchesOrderIdMap.set(order.give.chainId, new Set());
     }

@@ -187,7 +187,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         return;
       }
       default: {
-        context.logger.error(
+        context.logger.debug(
           `status=${OrderInfoStatus[orderInfo.status]} not implemented, skipping`
         );
         return;
@@ -562,7 +562,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     logger.info(`order fulfilled: ${orderId}`)
 
     // unlocking
-    this.batchUnlocker.unlockOrder(orderInfo.orderId, orderInfo.order, context);
+    this.batchUnlocker.addOrder(orderInfo.orderId, orderInfo.order, context);
   }
 
   private async createOrderFullfillTx<T extends ChainId>(
