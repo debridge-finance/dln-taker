@@ -167,7 +167,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         return;
       }
       default: {
-        context.logger.error(
+        context.logger.debug(
           `status=${OrderInfoStatus[orderInfo.status]} not implemented, skipping`
         );
         return;
@@ -434,7 +434,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.clearInternalQueues(orderInfo.orderId);
 
     // unlocking
-    this.batchUnlocker.unlockOrder(orderInfo.orderId, orderInfo.order, context);
+    this.batchUnlocker.addOrder(orderInfo.orderId, orderInfo.order, context);
   }
 
   private async createOrderFullfillTx(
