@@ -1,23 +1,31 @@
 import { Logger } from "pino";
 
 import { IncomingOrderContext, ProcessOrder } from "../interfaces";
+import { setTimeout } from 'timers/promises'
 
 export class MempoolService {
   private readonly logger: Logger;
   private readonly orderParams = new Map<string, IncomingOrderContext>();
-  private isLocked: boolean = false; // for lock process while current processing is working
   constructor(
     logger: Logger,
     private readonly processOrderFunction: ProcessOrder,
-    mempoolInterval: number
+    private readonly maxReprocessDelay: number,
+    private readonly delayStep: number = 30
   ) {
     this.logger = logger.child({ service: "MempoolService" });
-    setInterval(() => {
-      this.process();
-    }, mempoolInterval * 1000);
   }
 
-  addOrder(params: IncomingOrderContext) {
+  private getDelayPromise(delay: number) {
+    return setTimeout(delay * 1000)
+  }
+
+  /**
+   * Adds an order to the mempool. An order would be invoked when either a default delay is triggered
+   * or the given trigger (as Promise) or delay (in seconds)
+   * @param params
+   * @param triggerOrDelay
+   */
+  addOrder(params: IncomingOrderContext, triggerOrDelay?: Promise<any> | number) {
     const orderId = params.orderInfo.orderId;
     this.orderParams.set(orderId, params);
 
@@ -28,24 +36,35 @@ export class MempoolService {
     this.logger.debug(
       `current mempool size: ${this.orderParams.size} order(s)`
     );
-  }
 
-  async process() {
-    if (this.isLocked) {
-      this.logger.debug("MempoolService is already working");
-      return;
-    }
-    this.isLocked = true;
-    const ordersCountBeforeProcessing = this.orderParams.size;
-    this.logger.info(
-      `sending ${ordersCountBeforeProcessing} orders to the processing`
-    );
-    this.orderParams.forEach((value) => {
-      this.processOrderFunction(value);
-    });
-    this.orderParams.clear();
+    const promiseStartTime = new Date()
+    const maxTimeoutPromise = this.getDelayPromise(this.maxReprocessDelay + (this.delayStep * params.attempts))
+    if (triggerOrDelay && typeof triggerOrDelay === 'number')
+      triggerOrDelay = this.getDelayPromise(triggerOrDelay);
 
-    this.isLocked = false;
+    const trigger = triggerOrDelay
+      ? Promise.any([triggerOrDelay, maxTimeoutPromise])
+      : maxTimeoutPromise;
+
+    trigger
+      .catch((reason) => {
+        params.context.logger.error(`mempool promise triggered error: ${reason}`)
+        params.context.logger.error(reason);
+      })
+      .finally(() => {
+        const settlementTime = new Date();
+        const waitingTime = (settlementTime.getTime() - promiseStartTime.getTime()) / 1000;
+        params.context.logger.debug(`mempool promise triggered after ${waitingTime}s`)
+        if (this.orderParams.has(orderId)) {
+          params.context.logger.debug(`invoking order processing routine`)
+          this.orderParams.delete(orderId);
+          params.attempts++;
+          this.processOrderFunction(params);
+        }
+        else {
+          params.context.logger.debug(`order does not exist in the mempool`)
+        }
+      })
   }
 
   delete(orderId: string) {

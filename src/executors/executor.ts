@@ -364,6 +364,7 @@ export class Executor implements IExecutor {
         config: this,
         giveChain,
       },
+      attempts: 0
     });
 
     return true;

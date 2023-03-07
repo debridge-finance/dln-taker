@@ -54,9 +54,6 @@ const config: ExecutorLaunchConfig = {
     // the deBridge app and the API suggest users placing orders with as much margin as 4bps
     minProfitabilityBps: 4,
 
-    // how often to re-evaluate orders that were not fulfilled for a reason
-    mempoolInterval: 60 * 5, // 5m
-
     // Number of orders (per every chain where orders are coming from and to) to accumulate to unlock them in batches
     // Min: 1; max: 10, default: 10.
     // This means that dln-taker would accumulate orders (that were fulfilled successfully) rather then unlock

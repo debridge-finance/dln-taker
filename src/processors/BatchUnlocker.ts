@@ -7,7 +7,7 @@ import {
   tokenAddressToString,
   tokenStringToBuffer,
 } from "@debridge-finance/dln-client";
-import { Transaction } from "@solana/web3.js";
+import { Transaction, VersionedTransaction } from "@solana/web3.js";
 import { Logger } from "pino";
 import Web3 from "web3";
 
@@ -175,7 +175,7 @@ export class BatchUnlocker {
     giveChainId: ChainId,
     orderIds: string[]
   ): Promise<string[]> {
-    const unlockedOrders = [];
+    const unlockedOrders: string[] = [];
     const logger = this.logger.child({
       giveChainId,
       orderIds
@@ -305,7 +305,7 @@ export class BatchUnlocker {
     orderIds: string[],
     logger: Logger
   ): Promise<string[]> {
-    const unlockedOrders = [];
+    const unlockedOrders: string[] = [];
     // execute unlock for each order(solana doesnt support batch unlock now)
     for (const orderId of orderIds) {
       try {
@@ -371,7 +371,7 @@ export class BatchUnlocker {
     executionFeeAmount: bigint,
     rewards: bigint[],
     logger: Logger
-  ): Promise<Transaction> {
+  ): Promise<VersionedTransaction> {
     // todo fix any
     let unlockTxPayload: any;
     if (order.take.chainId === ChainId.Solana) {
