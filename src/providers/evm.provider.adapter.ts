@@ -7,8 +7,22 @@ import Web3 from "web3";
 import { EvmRebroadcastAdapterOpts } from "../config";
 
 import { ProviderAdapter, SendTransactionContext } from "./provider.adapter";
-import { Tx } from "./types/tx";
 import { getEvmAccountBalance } from "./utils/getEvmAccountBalance";
+
+// reasonable multiplier for gas estimated before txn is being broadcasted
+export const GAS_MULTIPLIER = 1.1;
+
+export class Tx {
+  data: string;
+  to: string;
+  value: number;
+
+  from?: string;
+  gasPrice?: string;
+  gas?: number;
+  nonce?: number;
+}
+
 
 export class EvmProviderAdapter implements ProviderAdapter {
   wallet: never;
@@ -197,7 +211,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
       }
     });
 
-    logger.info(`tx confirmed: ${transactionHash}`);
+    logger.debug(`tx confirmed: ${transactionHash}`);
 
     return transactionHash;
   }
@@ -206,35 +220,42 @@ export class EvmProviderAdapter implements ProviderAdapter {
     return new Promise(async (resolve, reject) => {
       tx.from = this.connection.eth.defaultAccount!;
 
-      let estimatedGas: number = 0;
-      try {
-        estimatedGas = await this.connection.eth.estimateGas(tx);
-      } catch (error) {
-        const message = `estimation failed: ${error}`
-        logger.error(message);
-        logger.error(error);
-        logger.error(`tx which caused estimation failure: ${JSON.stringify(tx)}`)
-        reject(message);
-        return;
-      }
-
-      const txForSign = {
-        ...tx,
-        gas: (estimatedGas * 1.1).toFixed(0),
-      };
-      logger.debug(`sending tx: ${JSON.stringify(txForSign)}`);
-      this.connection.eth
-        .sendTransaction(txForSign)
-        .once("transactionHash", (hash: string) => {
-          logger.debug(`tx sent, txHash: ${hash}`);
-          resolve(hash);
-        })
-        .catch((error) => {
-          const message = `sending tx failed: ${error}`
+      if (!tx.gas) {
+        let estimatedGas: number = 0;
+        try {
+          estimatedGas = await this.connection.eth.estimateGas(tx);
+        } catch (error) {
+          const message = `estimation failed: ${error}`
           logger.error(message);
           logger.error(error);
+          logger.error(`tx which caused estimation failure: ${JSON.stringify(tx)}`)
           reject(message);
-        });
+          return;
+        }
+        tx.gas = estimatedGas * GAS_MULTIPLIER;
+      }
+
+      logger.debug(`sending tx: ${JSON.stringify(tx)}`);
+      const errorHandler = (error: any) => {
+        logger.error("sending failed");
+        logger.error(error);
+        reject(error);
+      }
+
+      // kinda weird code below: THREE checks
+      try { // this is needed because sendTransaction() may throw an error during tx preparation (e.g., incorrect gas value)
+        this.connection.eth
+          .sendTransaction(tx)
+          .on("error", errorHandler) // this is needed of RPC node raises an error
+          .once("transactionHash", (hash: string) => {
+            logger.debug(`tx sent, txHash: ${hash}`);
+            resolve(hash);
+          })
+          .catch(errorHandler); // this is needed to catch async errors occurred in another loop
+        }
+        catch (error) {
+          errorHandler(error)
+        }
     });
   }
 

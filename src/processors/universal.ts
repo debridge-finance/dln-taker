@@ -1,9 +1,13 @@
 import {
+  buffersAreEqual,
   calculateExpectedTakeAmount,
+  ChainEngine,
   ChainId,
   evm,
+  getEngineByChainId,
   OrderData,
   OrderState,
+  pickReserveToken,
   tokenAddressToString,
 } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
@@ -13,7 +17,7 @@ import Web3 from "web3";
 import { OrderInfoStatus } from "../enums/order.info.status";
 import { IncomingOrderContext } from "../interfaces";
 import { createClientLogger } from "../logger";
-import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
+import { EvmProviderAdapter, Tx } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
 import {
@@ -26,6 +30,9 @@ import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
 
+// reasonable multiplier for gas estimated for the fulfill txn
+const EVM_FULFILL_GAS_MULTIPLIER = 1.25;
+
 export type UniversalProcessorParams = {
   /**
    * desired profitability. Setting a higher value would prevent executor from fulfilling most orders because
@@ -33,9 +40,13 @@ export type UniversalProcessorParams = {
    */
   minProfitabilityBps: number;
   /**
-   * how often to re-evaluate orders that were not fulfilled for a reason
+   * Mempool: max amount of seconds to wait before second attempt to process an order; default: 60s
    */
   mempoolInterval: number;
+  /**
+   * Mempool: amount of seconds to add to the max amount of seconds on each subsequent attempt; default: 30s
+   */
+  mempoolMaxDelayStep: number;
   /**
    * Number of orders (per every chain where orders are coming from and to) to accumulate to unlock them in batches
    *     Min: 1; max: 10, default: 10.
@@ -60,7 +71,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
-    mempoolInterval: 60, // every 60s
+    mempoolInterval: 60,
+    mempoolMaxDelayStep: 30,
     batchUnlockSize: 10,
   };
 
@@ -294,6 +306,62 @@ class UniversalProcessor extends BaseOrderProcessor {
       return;
     }
 
+    // perform rough estimation: assuming order.give.amount is what we need on balance
+    const pickedBucket = pickReserveToken(order, context.config.buckets);
+    const [reserveSrcTokenDecimals, reserveDstTokenDecimals] = await Promise.all([
+      context.config.client.getDecimals(order.give.chainId, pickedBucket.reserveSrcToken, context.giveChain.fulfullProvider.connection as Web3),
+      context.config.client.getDecimals(order.take.chainId, pickedBucket.reserveDstToken, this.takeChain.fulfullProvider.connection as Web3),
+    ]);
+
+    // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
+    let roughReserveDstAmount = BigNumber(order.give.amount.toString()).div(BigNumber(10).pow(reserveSrcTokenDecimals - reserveDstTokenDecimals)).integerValue();
+    logger.debug(`expressed order give amount in reserve dst token ${tokenAddressToString(order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
+
+    const accountReserveBalance =
+      await this.takeChain.fulfullProvider.getBalance(pickedBucket.reserveDstToken);
+    if (new BigNumber(accountReserveBalance).lt(roughReserveDstAmount)) {
+      logger.info(
+        `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${roughReserveDstAmount}; postponing it to the mempool`
+      );
+      this.mempoolService.addOrder(params);
+      return;
+    }
+    logger.debug(`enough balance (${accountReserveBalance.toString()}) to cover order (${roughReserveDstAmount.toString()})`)
+
+    // no since we know we
+    let evmFulfillGasLimit: number | undefined;
+    if (getEngineByChainId(this.takeChain.chain) == ChainEngine.EVM) {
+      // when performing estimation, we need to set some slippage for the swap. Let's set it reasonably high, because
+      // we don't care right now
+      const reasonableDummySlippage = 500; // 5%
+      const estimateFulfillTx = await this.createOrderFullfillTx<ChainId.Ethereum>(
+        orderId,
+        order,
+        pickedBucket.reserveDstToken,
+        roughReserveDstAmount.toString(),
+        reasonableDummySlippage,
+        context,
+        logger
+      );
+      try {
+        evmFulfillGasLimit = await (this.takeChain.fulfullProvider.connection as Web3).eth.estimateGas({
+          to: estimateFulfillTx.to,
+          data: estimateFulfillTx.data,
+          value: estimateFulfillTx.value.toString(),
+        });
+        logger.debug(`estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${evmFulfillGasLimit} gas units`);
+
+        evmFulfillGasLimit = Math.round(evmFulfillGasLimit * EVM_FULFILL_GAS_MULTIPLIER);
+        logger.debug(`declared gas limit for the fulfill tx to be used in further estimations: ${evmFulfillGasLimit} gas units`);
+      }
+      catch (e) {
+        logger.error(`unable to estimate fullfil tx: ${e}; this can be because the order is not profitable; postponing to the mempool`)
+        logger.error(e);
+        this.mempoolService.addOrder(params);
+        return;
+      }
+    }
+
     const batchSize =
       order.give.chainId === ChainId.Solana ||
       order.take.chainId === ChainId.Solana
@@ -317,23 +385,20 @@ class UniversalProcessor extends BaseOrderProcessor {
         swapConnector: context.config.swapConnector,
         logger: createClientLogger(logger),
         batchSize,
+        evmFulfillGasLimit
       }
     );
 
     if (!isProfitable) {
       logger.info("order is not profitable, postponing it to the mempool");
-      this.mempoolService.addOrder({ orderInfo, context });
+      this.mempoolService.addOrder(params);
       return;
     }
 
-    const accountReserveBalance =
-      await this.takeChain.fulfullProvider.getBalance(reserveDstToken);
-
-    if (new BigNumber(accountReserveBalance).lt(requiredReserveDstAmount)) {
-      logger.info(
-        `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${requiredReserveDstAmount}; postponing it to the mempool`
-      );
-      this.mempoolService.addOrder({ orderInfo, context });
+    if (!buffersAreEqual(reserveDstToken, pickedBucket.reserveDstToken)) {
+      logger.error(`internal error: \
+dln-taker has picked ${tokenAddressToString(order.take.chainId, pickedBucket.reserveDstToken)} as reserve token, \
+while calculateExpectedTakeAmount returned ${tokenAddressToString(order.take.chainId, reserveDstToken)}`);
       return;
     }
 
@@ -347,27 +412,50 @@ class UniversalProcessor extends BaseOrderProcessor {
       context,
       logger
     );
+    if (getEngineByChainId(order.take.chainId) === ChainEngine.EVM) {
+      try {
+        const evmFulfillGas = await (this.takeChain.fulfullProvider.connection as Web3).eth.estimateGas(fulfillTx as Tx);
+        logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
+        if (evmFulfillGas > evmFulfillGasLimit!) {
+          logger.info(`final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit}); postponing to the mempool `)
+          // reprocess order after 5s delay, but no more than two times in a row
+          const maxFastTrackAttempts = 2; // attempts
+          const fastTrackDelay = 5; // seconds
+          this.mempoolService.addOrder(params, params.attempts < maxFastTrackAttempts ? fastTrackDelay : undefined);
+          return;
+        }
+      }
+      catch (e) {
+        logger.error(`unable to estimate fullfil tx: ${e}; postponing to the mempool`)
+        logger.error(e);
+        this.mempoolService.addOrder(params);
+        return;
+      }
+
+      (fulfillTx as any as Tx).gas = evmFulfillGasLimit;
+    }
 
     try {
       const txFulfill = await this.takeChain.fulfullProvider.sendTransaction(
-        fulfillTx.tx,
+        fulfillTx,
         { logger }
       );
-      logger.info(`fulfill transaction ${txFulfill} is completed`);
+      logger.info(`fulfill tx broadcasted, txhash: ${txFulfill}`);
     } catch (e) {
       logger.error(`fulfill transaction failed: ${e}`);
       logger.error(e);
-      this.mempoolService.addOrder({ orderInfo, context });
+      this.mempoolService.addOrder(params);
       return;
     }
 
     await this.waitIsOrderFulfilled(orderId, order, context, logger);
+    logger.info(`order fulfilled: ${orderId}`)
 
     // unlocking
     this.batchUnlocker.unlockOrder(orderId, order, context);
   }
 
-  private async createOrderFullfillTx(
+  private async createOrderFullfillTx<T extends ChainId>(
     orderId: string,
     order: OrderData,
     reserveDstToken: Uint8Array,
@@ -395,7 +483,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     fullFillTxPayload.reservedAmount = reservedAmount;
     fullFillTxPayload.slippageBps = reserveToTakeSlippageBps;
     fullFillTxPayload.loggerInstance = createClientLogger(logger);
-    const fulfillTx = await context.config.client.preswapAndFulfillOrder(
+    const fulfillTx = await context.config.client.preswapAndFulfillOrder<T>(
       order,
       orderId,
       reserveDstToken,
@@ -403,7 +491,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     );
     logger.debug(`fulfillTx is created`);
     logger.debug(fulfillTx);
-    return fulfillTx;
+    return fulfillTx.tx;
   }
 }
 
