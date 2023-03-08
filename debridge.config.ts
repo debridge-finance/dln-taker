@@ -6,10 +6,12 @@ import {
 } from "@debridge-finance/dln-client";
 
 import { ExecutorLaunchConfig } from "./src/config";
-import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
+import * as environments from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
 import * as filters from "./src/filters";
+
+const environment = !!process.env.USE_MADRID ? environments.PRERELEASE_ENVIRONMENT_CODENAME_MADRID : environments.PRODUCTION;
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(environment.WSS, {

@@ -7,11 +7,11 @@ services:
     container_name: dln-executor
     restart: unless-stopped
     environment:
-      - ENABLED_CHAINS=${ENABLED_CHAINS}
       - LOG_LEVEL=${LOG_LEVEL}
       - WS_API_KEY=${WS_API_KEY}
       - COINGECKO_API_KEY=${COINGECKO_API_KEY}
       - SENTRY_DSN=${SENTRY_DSN}
+      - USE_MADRID=${USE_MADRID}
 
       - ARBITRUM_RPC=${ARBITRUM_RPC}
       - ARBITRUM_BENEFICIARY=${ARBITRUM_BENEFICIARY}
