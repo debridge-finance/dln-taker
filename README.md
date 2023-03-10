@@ -163,7 +163,7 @@ This will make `dln-taker` fulfill orders with the `0xd8dA6BF26964aF9D7eEd9e03E5
 
 ### Placing new orders
 
-You can use the [order placement app](https://dln.debridge.io/) to place new orders. Mind that you need to have an access code as this product is in the gated launch state.
+You can use the [order placement app](https://dln.debridge.finance/) to place new orders. Mind that you need to have an access code as this product is in the gated launch state.
 
 If you decided to use the `whitelistedReceiver` filter (mentioned in the previous section) then don't forget to set the `receiver` property of an order with your trusted address.
 
