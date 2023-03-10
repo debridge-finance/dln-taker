@@ -7,6 +7,7 @@
 - [How `dln-taker` works?](#how-dln-taker-works)
 - [Installation](#installation)
   - [Preparing the environment](#preparing-the-environment)
+  - [Generating keypair for solana](#generating-keypair-for-solana)
   - [Understanding reserve funds](#understanding-reserve-funds)
   - [Deploying reserve funds](#deploying-reserve-funds)
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
@@ -114,6 +115,26 @@ The next step is to deploy your assets to the addresses used by `dln-taker` for 
 
 If you wish to avoid order fulfillments in a particular chain, use the [`disableFulfill`](./ADVANCED.md#disablefulfill) filter in the config file, however you are **still required** to fill the variables with correct values to enable orders coming from such chain. For example, if you wouldn't want to deploy liquidity on Solana (and thus avoid fulfillments in this chain), add the `disableFulfill` filter to the Solana's section of the configuration file, but you'll still be able to fulfill orders coming **from** Solana. If you wish to exclude the chain from processing, skipping orders coming from and to such chain, just comment out the corresponding section in the config file: in this case, any order coming from or to Solana would be dropped by your instance of `dln-taker`.
 
+### Generating keypair for solana
+
+You can generate keypair for solana using `@solana/web3.js` library or using Solana CLI
+
+#### Solana CLI keypair generation
+1. Install [Solana CLI](https://docs.solana.com/ru/cli/install-solana-cli-tools)
+2. Generate keypair using [Paper Wallet](https://docs.solana.com/ru/wallet-guide/paper-wallet#creating-a-paper-wallet) which supports both creating kp from scratch and seed phrase derivation
+
+#### JS Keypair generation
+1. Install @solana/web3.js - `npm i @solana/web3.js`
+2. Execute following code
+```ts
+import { Keypair } from "@solana/web3.js";
+
+const kp = Keypair.generate();
+const pubkey = kp.publicKey.toBase58();
+const priv = Buffer.from(kp.secretKey).toString("hex");
+
+console.log(`Private key (hex-encoded) : 0x${priv}, public (base58): ${pubkey}!`)
+```
 
 ### Understanding reserve funds
 
