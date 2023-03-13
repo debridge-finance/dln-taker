@@ -25,6 +25,10 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     data: unknown,
     context: SendTransactionContext
   ): Promise<string> {
+    const logger = context.logger.child({
+      service: "SolanaProviderAdapter",
+      currentChainId: ChainId.Solana,
+    });
     const txid = await helpers.sendAll(
       this.connection,
       this.wallet,
@@ -34,8 +38,8 @@ export class SolanaProviderAdapter implements ProviderAdapter {
       false,
       true
     );
-    context.logger.info(`[Solana] Sent tx: ${txid}`);
-    return txid[0];
+    logger.debug(`tx confirmed: ${txid}`);
+    return txid;
   }
 
   async getBalance(token: Uint8Array): Promise<string> {

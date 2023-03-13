@@ -156,7 +156,8 @@ export class WsNextOrder extends GetNextOrder {
     });
     this.socket.on("message", (event: Buffer) => {
       const data = JSON.parse(event.toString("utf-8"));
-      this.logger.debug(`📨 ws received new message ${JSON.stringify(data)}`);
+      this.logger.info(`📨 ws received new message`);
+      this.logger.debug(data);
       if ("Order" in data) {
         const parsedEvent = data as WsOrderEvent;
         const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
@@ -176,19 +177,17 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("error", async (err) => {
-      this.logger.error(
-        `WsConnection received error: ${err.message}, retrying reconnection in ${this.pingTimeoutMs}ms`
-      );
-      clearTimeout(this.pingTimer);
-      this.socket.terminate();
-      setTimeout(this.initWs.bind(this), this.pingTimeoutMs);
+      this.logger.error(`WsConnection received error: ${err.message}`);
     });
 
     this.socket.on("close", () => {
       this.hooksEngine.handleOrderFeedDisconnected();
-      this.logger.debug(`WsConnection has been closed`);
-      clearTimeout(this.pingTimer);
+      this.logger.debug(
+        `WsConnection has been closed, retrying reconnection in ${this.pingTimeoutMs}ms`
+      );
     });
+
+    this.heartbeat();
   }
 
   private transformToNextOrderInfo(

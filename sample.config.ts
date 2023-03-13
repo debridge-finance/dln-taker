@@ -9,12 +9,15 @@ import { ExecutorLaunchConfig } from "./src/config";
 import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
-import * as filters from "./src/filters";
+
+// sanity check to ensure that .env file is supplied
+if (process.env.WS_API_KEY === undefined)
+  throw new Error(`Missing WS_API_KEY environment variable. Did you managed to create the .env file based on sample.env?`)
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(environment.WSS, {
     headers: {
-      Authorization: process.env.WS_API_KEY ? `Bearer ${process.env.WS_API_KEY}` : undefined,
+      Authorization: `Bearer ${process.env.WS_API_KEY}`,
     },
   } as any),
 
@@ -46,7 +49,7 @@ const config: ExecutorLaunchConfig = {
   ),
 
   orderProcessor: processors.universalProcessor({
-    // desired profitability. Setting a higher value would prevent executor from fulfilling most orders because
+    // desired profitability. Setting a higher value would prevent dln-taker from fulfilling most orders because
     // the deBridge app and the API suggest users placing orders with as much margin as 4bps
     minProfitabilityBps: 4,
 
@@ -55,7 +58,7 @@ const config: ExecutorLaunchConfig = {
 
     // Number of orders (per every chain where orders are coming from and to) to accumulate to unlock them in batches
     // Min: 1; max: 10, default: 10.
-    // This means that the executor would accumulate orders (that were fulfilled successfully) rather then unlock
+    // This means that dln-taker would accumulate orders (that were fulfilled successfully) rather then unlock
     // them on the go, and would send a batch of unlock commands every time enough orders were fulfilled, dramatically
     // reducing the cost of the unlock command execution.
     // You can set a lesser value to unlock orders more frequently, however please note that this value directly
@@ -74,7 +77,7 @@ const config: ExecutorLaunchConfig = {
       // unlocked funds will be sent to this Solana address
       beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
 
-      // if the order is created on another chain (e.g. Ethereum), DLN executor would attempt to fulfill
+      // if the order is created on another chain (e.g. Ethereum), dln-taker would attempt to fulfill
       // this order on behalf of this address
       // Warn! base58 representation of a private key.
       // Warn! For security reasons, put it to the .env file
@@ -93,13 +96,13 @@ const config: ExecutorLaunchConfig = {
       // unlocked funds will be sent to this Ethereum address
       beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
 
-      // if the order is created on another chain (e.g. Solana), DLN executor would attempt to fulfill
+      // if the order is created on another chain (e.g. Solana), dln-taker would attempt to fulfill
       // this order on behalf of this address
       // Warn! base64 representation of a private key.
       // Warn! For security reasons, put it to the .env file
       takerPrivateKey: `${process.env.ARBITRUM_TAKER_PRIVATE_KEY}`,
 
-      // if the order is created on another chain (e.g. Solana), DLN executor would unlock it
+      // if the order is created on another chain (e.g. Solana), dln-taker would unlock it
       // after successful fulfillment on behalf of this address
       // Warn! base64 representation of a private key.
       // Warn! For security reasons, put it to the .env file

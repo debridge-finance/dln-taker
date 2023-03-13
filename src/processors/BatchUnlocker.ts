@@ -181,10 +181,31 @@ export class BatchUnlocker {
     const unlockedOrders = [];
     const logger = this.logger.child({
       giveChainId,
+      orderIds,
     });
 
     logger.info(`picked ${orderIds.length} orders to unlock`);
     logger.debug(orderIds.join(","));
+
+    // get current state of the orders, to catch those that are already fulfilled
+    const notUnlockedOrders: boolean[] = await Promise.all(
+      orderIds.map(async (orderId) => {
+        const orderState = await this.executor.client.getTakeOrderStatus(
+          orderId,
+          this.takeChain.chain,
+          { web3: this.takeChain.fulfullProvider.connection as Web3 }
+        );
+
+        return orderState?.status === OrderState.Fulfilled;
+      })
+    );
+    // filter off orders that are already unlocked
+    orderIds = orderIds.filter((_, idx) => {
+      if (notUnlockedOrders[idx]) return true;
+      unlockedOrders.push(orderIds[idx]);
+      return false;
+    });
+    logger.debug(`pre-filtering: ${unlockedOrders.length} already unlocked`);
 
     const giveChain = this.executor.chains[giveChainId];
     if (!giveChain)
