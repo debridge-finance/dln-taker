@@ -61,7 +61,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
     } as Tx;
     let currentTxHash: string;
 
-    const transactionHash = await new Promise(async (resolve, reject) => {
+    const transactionHash: string = await new Promise(async (resolve, reject) => {
       let rebroadcastInterval: NodeJS.Timer;
       let pollingInterval: NodeJS.Timer;
       let timeout: NodeJS.Timer;
@@ -72,10 +72,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
         clearTimeout(timeout);
       };
 
-      const success = (v: any) => {
+      const success = (txHash: string) => {
         this.staleTx = undefined;
         clearTimers();
-        resolve(v);
+        resolve(txHash);
       };
 
       const failWithUndeterminedBehavior = (message: string) => {
@@ -95,13 +95,13 @@ export class EvmProviderAdapter implements ProviderAdapter {
       try {
         currentTxHash = await this.sendTx(currentTx, logger);
         let pollingLogger = logger.child({
-          service: "evm poller",
+          service: "evm_poller",
           txHash: currentTxHash,
         });
 
         pollingInterval = setInterval(async () => {
           try {
-            pollingLogger.debug(`start polling...`);
+            pollingLogger.debug(`polling...`);
 
             const transactionReceiptResult =
               await this.connection.eth.getTransactionReceipt(currentTxHash);
@@ -120,6 +120,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
             }
           } catch (e) {
             pollingLogger.error(`poller raised an error: ${e}`);
+            pollingLogger.error(e);
             // todo discuss should we throw here
           }
         }, this.rebroadcast.pollingInterval);
@@ -127,7 +128,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
         let attemptsRebroadcast = 0;
         rebroadcastInterval = setInterval(async () => {
           try {
-            pollingLogger.debug(`rebroadcasting`);
+            pollingLogger.debug(`rebroadcasting...`);
 
             if (
               this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast
@@ -175,9 +176,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
             })
             currentTxHash = rebroadcastedTxHash;
           } catch (e) {
-            pollingLogger.error(`rebroadcast raised an error: ${e}`);
+            const message = `rebroadcasting failed: ${e}`;
+            pollingLogger.error(message);
             pollingLogger.error(e)
-            // fail(`rebroadcasting ${currentTxHash} raised an error: ${e}`);
+            fail(message);
           }
         }, this.rebroadcast.rebroadcastInterval);
 
@@ -188,9 +190,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
           failWithUndeterminedBehavior("poller reached timeout");
         }, this.rebroadcast.pollingTimeframe);
       } catch (e) {
-        logger.error(`sending tx failed: ${e}`);
+        const message = `sending tx failed: ${e}`
+        logger.error(message);
         logger.error(e);
-        fail(`sending tx failed`);
+        fail(message);
       }
     });
 
@@ -207,11 +210,12 @@ export class EvmProviderAdapter implements ProviderAdapter {
       try {
         estimatedGas = await this.connection.eth.estimateGas(tx);
       } catch (error) {
-        logger.error(
-          `estimation failed: ${error}, tx: ${JSON.stringify(tx)}`,
-          error
-        );
-        reject(error);
+        const message = `estimation failed: ${error}`
+        logger.error(message);
+        logger.error(error);
+        logger.error(`tx which caused estimation failure: ${JSON.stringify(tx)}`)
+        reject(message);
+        return;
       }
 
       const txForSign = {
@@ -226,9 +230,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
           resolve(hash);
         })
         .catch((error) => {
-          logger.error("sending failed");
+          const message = `sending tx failed: ${error}`
+          logger.error(message);
           logger.error(error);
-          reject(error);
+          reject(message);
         });
     });
   }
