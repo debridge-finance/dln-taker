@@ -11,6 +11,6 @@ export interface ProviderAdapter {
   sendTransaction: (
     data: unknown,
     context: SendTransactionContext
-  ) => Promise<unknown>;
+  ) => Promise<string>;
   getBalance: (token: Uint8Array) => Promise<string>;
 }

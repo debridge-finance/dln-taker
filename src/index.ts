@@ -29,6 +29,6 @@ async function main() {
 
 main().catch((e) => {
   console.error(`Launching executor failed`);
-  console.error(e)
+  console.error(e);
   process.exit(1);
 });

@@ -16,11 +16,13 @@ import {
   ExecutorSupportedChain,
   IExecutor,
 } from "../executors/executor";
+import { HooksEngine } from "../hooks/HooksEngine";
 import { createClientLogger } from "../logger";
 import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
 import { OrderProcessorContext } from "./base";
+import { isRevertedError } from "./utils/isRevertedError";
 
 export class BatchUnlocker {
   private ordersDataMap = new Map<string, OrderData>(); // orderId => orderData
@@ -32,7 +34,8 @@ export class BatchUnlocker {
   constructor(
     logger: Logger,
     private readonly takeChain: ExecutorInitializingChain,
-    private readonly batchUnlockSize: number
+    private readonly batchUnlockSize: number,
+    private readonly hooksEngine: HooksEngine
   ) {
     this.logger = logger.child({
       service: "batchUnlock",
@@ -89,8 +92,8 @@ export class BatchUnlocker {
   async addOrder(
     orderId: string,
     order: OrderData,
-    context: OrderProcessorContext) {
-
+    context: OrderProcessorContext
+  ) {
     if (!this.unlockBatchesOrderIdMap.has(order.give.chainId)) {
       this.unlockBatchesOrderIdMap.set(order.give.chainId, new Set());
     }
@@ -186,29 +189,31 @@ export class BatchUnlocker {
     const unlockedOrders = [];
     const logger = this.logger.child({
       giveChainId,
-      orderIds
+      orderIds,
     });
 
     logger.info(`picked ${orderIds.length} orders to unlock`);
     logger.debug(orderIds.join(","));
 
     // get current state of the orders, to catch those that are already fulfilled
-    const notUnlockedOrders: boolean[] = await Promise.all(orderIds.map(async (orderId) => {
-      const orderState = await this.executor.client.getTakeOrderStatus(
-        orderId,
-        this.takeChain.chain,
-        { web3: this.takeChain.fulfullProvider.connection as Web3 }
-      );
+    const notUnlockedOrders: boolean[] = await Promise.all(
+      orderIds.map(async (orderId) => {
+        const orderState = await this.executor.client.getTakeOrderStatus(
+          orderId,
+          this.takeChain.chain,
+          { web3: this.takeChain.fulfullProvider.connection as Web3 }
+        );
 
-      return orderState?.status === OrderState.Fulfilled
-    }));
+        return orderState?.status === OrderState.Fulfilled;
+      })
+    );
     // filter off orders that are already unlocked
     orderIds = orderIds.filter((_, idx) => {
       if (notUnlockedOrders[idx]) return true;
-      unlockedOrders.push(orderIds[idx])
+      unlockedOrders.push(orderIds[idx]);
       return false;
-    })
-    logger.debug(`pre-filtering: ${unlockedOrders.length} already unlocked`)
+    });
+    logger.debug(`pre-filtering: ${unlockedOrders.length} already unlocked`);
 
     const giveChain = this.executor.chains[giveChainId];
     if (!giveChain)
@@ -292,13 +297,31 @@ export class BatchUnlocker {
         }
       );
 
-      await this.takeChain.unlockProvider.sendTransaction(batchUnlockTx, {
-        logger,
+      const txHash = await this.takeChain.unlockProvider.sendTransaction(
+        batchUnlockTx,
+        {
+          logger,
+        }
+      );
+
+      this.hooksEngine.handleOrderUnlockSent({
+        fromChainId: this.takeChain.chain,
+        toChainId: giveChain.chain,
+        txHash,
+        orderIds,
       });
 
       logger.info(`unlocked orders: ${orderIds.join(",")}`);
       return orderIds;
     } catch (e) {
+      const error = e as Error;
+      this.hooksEngine.handleOrderUnlockFailed({
+        fromChainId: this.takeChain.chain,
+        toChainId: giveChain.chain,
+        reason: isRevertedError(error) ? "REVERTED" : "FAILED",
+        message: error.message,
+        orderIds,
+      });
       logger.error(`failed to unlock ${orderIds.length} order(s): ${e}`);
       logger.error(`failed batch contained: ${orderIds.join(",")}`);
       logger.error(e);
@@ -326,6 +349,14 @@ export class BatchUnlocker {
         );
         unlockedOrders.push(orderId);
       } catch (e) {
+        const error = e as Error;
+        this.hooksEngine.handleOrderUnlockFailed({
+          fromChainId: this.takeChain.chain,
+          toChainId: giveChain.chain,
+          reason: isRevertedError(error) ? "REVERTED" : "FAILED",
+          message: error.message,
+          orderIds: [orderId],
+        });
         logger.error(`failed to unlock ${orderId} order: ${e}`);
         logger.error(e);
       }
@@ -366,8 +397,17 @@ export class BatchUnlocker {
       logger
     );
 
-    await this.takeChain.unlockProvider.sendTransaction(unlockTx, {
-      logger,
+    const txHash = await this.takeChain.unlockProvider.sendTransaction(
+      unlockTx,
+      {
+        logger,
+      }
+    );
+    this.hooksEngine.handleOrderUnlockSent({
+      fromChainId: this.takeChain.chain,
+      toChainId: giveChain.chain,
+      txHash,
+      orderIds: [orderId],
     });
     logger.info(`unlocked order: ${orderId}`);
   }

@@ -6,6 +6,8 @@ import {
 } from "@debridge-finance/dln-client";
 
 import { OrderFilterInitializer } from "./filters/order.filter";
+import { Hooks } from "./hooks/Hooks";
+import { HookHandler } from "./hooks/hooks/HookHandler";
 import { GetNextOrder } from "./interfaces";
 import { OrderProcessorInitializer } from "./processors";
 
@@ -17,7 +19,7 @@ export enum SupportedChain {
   BSC = ChainId.BSC,
   Ethereum = ChainId.Ethereum,
   Polygon = ChainId.Polygon,
-  Solana = ChainId.Solana
+  Solana = ChainId.Solana,
 }
 
 export class EvmRebroadcastAdapterOpts {
@@ -132,7 +134,7 @@ export interface ChainDefinition {
      * ```
      */
     requiredConfirmationsThresholds?: Array<[thresholdAmountInUSD: number, minBlockConfirmations: number]>;
-  }
+  };
 
   //
   // taker related
@@ -181,6 +183,13 @@ export interface ExecutorLaunchConfig {
    * Defines an order processor that implements the fulfillment strategy
    */
   orderProcessor?: OrderProcessorInitializer;
+
+  /**
+   * Hook handlers
+   */
+  hookHandlers?: {
+    [key in Hooks]?: HookHandler<key>[];
+  };
 
   /**
    * Token price provider

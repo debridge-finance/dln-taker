@@ -20,6 +20,7 @@ import { ExecutorLaunchConfig, SupportedChain } from "../config";
 import { PRODUCTION } from "../environments";
 import * as filters from "../filters";
 import { OrderFilter } from "../filters";
+import { HooksEngine } from "../hooks/HooksEngine";
 import { GetNextOrder, IncomingOrder, OrderInfoStatus } from "../interfaces";
 import { WsNextOrder } from "../orderFeeds/ws.order.feed";
 import * as processors from "../processors";
@@ -28,7 +29,6 @@ import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
-
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Avalanche]: 15,
   [SupportedChain.Arbitrum]: 15,
@@ -36,7 +36,7 @@ const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Ethereum]: 12,
   [SupportedChain.Polygon]: 256,
   [SupportedChain.Solana]: 32,
-}
+};
 
 export type ExecutorInitializingChain = {
   chain: ChainId;
@@ -46,11 +46,11 @@ export type ExecutorInitializingChain = {
   client: Solana.PmmClient | Evm.PmmEvmClient;
 };
 
-type UsdWorthBlockConfirmationConstraints = Array<{
-  usdWorthFrom: number,
-  usdWorthTo: number,
-  minBlockConfirmations: number,
-}>;
+type UsdWorthBlockConfirmationConstraints = {
+  usdWorthFrom: number;
+  usdWorthTo: number;
+  minBlockConfirmations: number;
+}[];
 
 export type ExecutorSupportedChain = {
   chain: ChainId;
@@ -84,7 +84,7 @@ export class Executor implements IExecutor {
 
   private isInitialized = false;
   private readonly url1Inch = "https://nodes.debridge.finance";
-  constructor(private readonly logger: Logger) { }
+  constructor(private readonly logger: Logger) {}
 
   async init(config: ExecutorLaunchConfig) {
     if (this.isInitialized) return;
@@ -103,13 +103,16 @@ export class Executor implements IExecutor {
     );
 
     this.buckets = config.buckets;
+    const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
 
     const clients: { [key in number]: any } = {};
     for (const chain of config.chains) {
       this.logger.info(`initializing ${ChainId[chain.chain]}...`);
 
       if (!SupportedChain[chain.chain]) {
-        throw new Error(`${ChainId[chain.chain]} is not supported, remove it from the config`)
+        throw new Error(
+          `${ChainId[chain.chain]} is not supported, remove it from the config`
+        );
       }
 
       let client, unlockProvider, fulfillProvider;
@@ -117,19 +120,19 @@ export class Executor implements IExecutor {
         const solanaConnection = new Connection(chain.chainRpc);
         const solanaPmmSrc = new PublicKey(
           chain.environment?.pmmSrc ||
-          PRODUCTION.chains[ChainId.Solana]!.pmmSrc!
+            PRODUCTION.chains[ChainId.Solana]!.pmmSrc!
         );
         const solanaPmmDst = new PublicKey(
           chain.environment?.pmmDst ||
-          PRODUCTION.chains[ChainId.Solana]!.pmmDst!
+            PRODUCTION.chains[ChainId.Solana]!.pmmDst!
         );
         const solanaDebridge = new PublicKey(
           chain.environment?.deBridgeContract ||
-          PRODUCTION.chains![ChainId.Solana]!.deBridgeContract!
+            PRODUCTION.chains![ChainId.Solana]!.deBridgeContract!
         );
         const solanaDebridgeSetting = new PublicKey(
           chain.environment?.solana?.debridgeSetting ||
-          PRODUCTION.chains![ChainId.Solana]!.solana!.debridgeSetting!
+            PRODUCTION.chains![ChainId.Solana]!.solana!.debridgeSetting!
         );
 
         const decodeKey = (key: string) =>
@@ -159,14 +162,16 @@ export class Executor implements IExecutor {
         // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
         const altInitTx = await client.initForFulfillPreswap(
           new PublicKey(chain.beneficiary),
-          config.chains.map(chainConfig => chainConfig.chain),
+          config.chains.map((chainConfig) => chainConfig.chain),
           jupiterConnector
         );
         if (altInitTx) {
-          this.logger.info(`Initializing Solana Address Lookup Table (ALT)`)
-          await fulfillProvider.sendTransaction(altInitTx, { logger: this.logger })
+          this.logger.info(`Initializing Solana Address Lookup Table (ALT)`);
+          await fulfillProvider.sendTransaction(altInitTx, {
+            logger: this.logger,
+          });
         } else {
-          this.logger.info(`Solana Address Lookup Table (ALT) already exists`)
+          this.logger.info(`Solana Address Lookup Table (ALT) already exists`);
         }
       } else {
         const web3UnlockAuthority = createWeb3WithPrivateKey(
@@ -224,6 +229,7 @@ export class Executor implements IExecutor {
         takeChain: initializingChain,
         buckets: config.buckets,
         logger: this.logger,
+        hooksEngine,
       });
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -259,7 +265,10 @@ export class Executor implements IExecutor {
         unlockProvider,
         fulfullProvider: fulfillProvider,
         client,
-        usdAmountConfirmations: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain.constraints?.requiredConfirmationsThresholds || []),
+        usdAmountConfirmations: this.getConfirmationRanges(
+          chain.chain as unknown as SupportedChain,
+          chain.constraints?.requiredConfirmationsThresholds || []
+        ),
         beneficiary: chain.beneficiary,
       };
 
@@ -284,35 +293,58 @@ export class Executor implements IExecutor {
         address: chain.unlockProvider.address as string,
       };
     });
-    const minConfirmationThresholds = Object.values(this.chains).map(chain => ({
-      chainId: chain.chain,
-      points: chain.usdAmountConfirmations.map(t => t.minBlockConfirmations)
-    }))
-    orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds);
+    const minConfirmationThresholds = Object.values(this.chains).map(
+      (chain) => ({
+        chainId: chain.chain,
+        points: chain.usdAmountConfirmations.map(
+          (t) => t.minBlockConfirmations
+        ),
+      })
+    );
+    orderFeed.init(
+      this.execute.bind(this),
+      unlockAuthorities,
+      minConfirmationThresholds,
+      hooksEngine
+    );
 
     this.isInitialized = true;
   }
 
-  private getConfirmationRanges(chain: SupportedChain, requiredConfirmationsThresholds: Array<[usdWorth: number, blocks: number]>): UsdWorthBlockConfirmationConstraints {
+  private getConfirmationRanges(
+    chain: SupportedChain,
+    requiredConfirmationsThresholds: [usdWorth: number, blocks: number][]
+  ): UsdWorthBlockConfirmationConstraints {
     const ranges: UsdWorthBlockConfirmationConstraints = [];
     requiredConfirmationsThresholds
-      .sort(([usdWorthA], [usdWorthB]) => usdWorthA < usdWorthB ? -1 : 1) // sort by usdWorth ASC
-      .forEach(([usdWorth, minBlockConfirmations], index, thresholdsSortedByUsdWorth) => {
-        const [prevThresholdUsdWorth, prevMinBlockConfirmations] = index === 0 ? [0, 0] : thresholdsSortedByUsdWorth[index - 1];
+      .sort(([usdWorthA], [usdWorthB]) => (usdWorthA < usdWorthB ? -1 : 1)) // sort by usdWorth ASC
+      .forEach(
+        (
+          [usdWorth, minBlockConfirmations],
+          index,
+          thresholdsSortedByUsdWorth
+        ) => {
+          const [prevThresholdUsdWorth, prevMinBlockConfirmations] =
+            index === 0 ? [0, 0] : thresholdsSortedByUsdWorth[index - 1];
 
-        if (minBlockConfirmations <= prevMinBlockConfirmations) {
-          throw new Error(`Unable to set required confirmation threshold for $${usdWorth} on ${SupportedChain[chain]}: minBlockConfirmations (${minBlockConfirmations}) must be greater than ${prevMinBlockConfirmations}`)
-        }
-        if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= minBlockConfirmations) {
-          throw new Error(`Unable to set required confirmation threshold for $${usdWorth} on ${SupportedChain[chain]}: minBlockConfirmations (${minBlockConfirmations}) must be less than max block confirmations (${BLOCK_CONFIRMATIONS_HARD_CAPS[chain]})`)
-        }
+          if (minBlockConfirmations <= prevMinBlockConfirmations) {
+            throw new Error(
+              `Unable to set required confirmation threshold for $${usdWorth} on ${SupportedChain[chain]}: minBlockConfirmations (${minBlockConfirmations}) must be greater than ${prevMinBlockConfirmations}`
+            );
+          }
+          if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= minBlockConfirmations) {
+            throw new Error(
+              `Unable to set required confirmation threshold for $${usdWorth} on ${SupportedChain[chain]}: minBlockConfirmations (${minBlockConfirmations}) must be less than max block confirmations (${BLOCK_CONFIRMATIONS_HARD_CAPS[chain]})`
+            );
+          }
 
-        ranges.push({
-          usdWorthFrom: prevThresholdUsdWorth,
-          usdWorthTo: usdWorth,
-          minBlockConfirmations: minBlockConfirmations
-        })
-      });
+          ranges.push({
+            usdWorthFrom: prevThresholdUsdWorth,
+            usdWorthTo: usdWorth,
+            minBlockConfirmations,
+          });
+        }
+      );
 
     return ranges;
   }
@@ -320,7 +352,9 @@ export class Executor implements IExecutor {
   async execute(nextOrderInfo: IncomingOrder<any>) {
     const orderId = nextOrderInfo.orderId;
     const logger = this.logger.child({ orderId });
-    logger.info(`new order received, type: ${OrderInfoStatus[nextOrderInfo.status]}`)
+    logger.info(
+      `new order received, type: ${OrderInfoStatus[nextOrderInfo.status]}`
+    );
     logger.debug(nextOrderInfo);
     try {
       await this.executeOrder(nextOrderInfo, logger);

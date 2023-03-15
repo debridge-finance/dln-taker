@@ -4,7 +4,8 @@ import { Logger } from "pino";
 export const createClientLogger = (logger: Logger) => {
   return new ClientLogger((level: LogLevel, args) => {
     // concat args so they appear as a first string in pino
-    const message = args
+
+  const message = args
       .reduce<string>((result, currentValue) => {
         let currentString = currentValue;
         if (typeof currentValue === "object") {
@@ -13,6 +14,7 @@ export const createClientLogger = (logger: Logger) => {
         return result + " " + currentString;
       }, "")
       .trim();
+
     switch (level) {
       case LogLevel.LOG: {
         logger.info(message);

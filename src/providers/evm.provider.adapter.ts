@@ -28,7 +28,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
     return this.connection.eth.defaultAccount!;
   }
 
-  async sendTransaction(data: unknown, context: SendTransactionContext) {
+  async sendTransaction(
+    data: unknown,
+    context: SendTransactionContext
+  ): Promise<string> {
     const logger = context.logger.child({
       service: "EvmProviderAdapter",
       currentChainId: await this.connection.eth.getChainId(),
@@ -61,141 +64,143 @@ export class EvmProviderAdapter implements ProviderAdapter {
     } as Tx;
     let currentTxHash: string;
 
-    const transactionHash: string = await new Promise(async (resolve, reject) => {
-      let rebroadcastInterval: NodeJS.Timer;
-      let pollingInterval: NodeJS.Timer;
-      let timeout: NodeJS.Timer;
+    const transactionHash: string = await new Promise(
+      async (resolve, reject) => {
+        let rebroadcastInterval: NodeJS.Timer;
+        let pollingInterval: NodeJS.Timer;
+        let timeout: NodeJS.Timer;
 
-      const clearTimers = () => {
-        clearInterval(rebroadcastInterval);
-        clearInterval(pollingInterval);
-        clearTimeout(timeout);
-      };
+        const clearTimers = () => {
+          clearInterval(rebroadcastInterval);
+          clearInterval(pollingInterval);
+          clearTimeout(timeout);
+        };
 
-      const success = (txHash: string) => {
-        this.staleTx = undefined;
-        clearTimers();
-        resolve(txHash);
-      };
+        const success = (txHash: string) => {
+          this.staleTx = undefined;
+          clearTimers();
+          resolve(txHash);
+        };
 
-      const failWithUndeterminedBehavior = (message: string) => {
-        logger.error(
-          `Cannot confirm tx ${currentTxHash}, marking it as stale for future replacement. Reason: ${message}`
-        );
-        this.staleTx = currentTx;
-        clearTimers();
-        reject(message);
-      };
-
-      const fail = (message: string) => {
-        clearTimers();
-        reject(message);
-      };
-
-      try {
-        currentTxHash = await this.sendTx(currentTx, logger);
-        let pollingLogger = logger.child({
-          service: "evm_poller",
-          txHash: currentTxHash,
-        });
-
-        pollingInterval = setInterval(async () => {
-          try {
-            pollingLogger.debug(`polling...`);
-
-            const transactionReceiptResult =
-              await this.connection.eth.getTransactionReceipt(currentTxHash);
-            pollingLogger.debug(
-              `poller received tx receipt, status: ${transactionReceiptResult?.status}`
-            );
-
-            if (transactionReceiptResult?.status === true) {
-              pollingLogger.debug(`tx confirmed`);
-
-              success(currentTxHash);
-            } else if (transactionReceiptResult?.status === false) {
-              pollingLogger.debug(`tx reverted`);
-
-              fail(`tx ${currentTxHash} reverted`);
-            }
-          } catch (e) {
-            pollingLogger.error(`poller raised an error: ${e}`);
-            pollingLogger.error(e);
-            // todo discuss should we throw here
-          }
-        }, this.rebroadcast.pollingInterval);
-
-        let attemptsRebroadcast = 0;
-        rebroadcastInterval = setInterval(async () => {
-          try {
-            pollingLogger.debug(`rebroadcasting...`);
-
-            if (
-              this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast
-            ) {
-              pollingLogger.debug(
-                `no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts})`
-              );
-
-              failWithUndeterminedBehavior(`rebroadcasting aborted`);
-            }
-
-            // pick gas price for bumping
-            const currentGasPrice = await this.connection.eth.getGasPrice();
-            const bumpedGasPrice = new BigNumber(nextGasPrice).multipliedBy(
-              this.rebroadcast.bumpGasPriceMultiplier!
-            );
-            nextGasPrice = BigNumber.max(
-              currentGasPrice,
-              bumpedGasPrice
-            ).toFixed(0);
-            pollingLogger.debug(
-              `picking bumped gas: current=${currentGasPrice}, bumped=${bumpedGasPrice}, picked=${nextGasPrice}`
-            );
-
-            // check bumped gas price
-            if (
-              this.rebroadcast.rebroadcastMaxBumpedGasPriceWei &&
-              new BigNumber(nextGasPrice).gt(
-                this.rebroadcast.rebroadcastMaxBumpedGasPriceWei
-              )
-            ) {
-              pollingLogger.debug(
-                `picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`
-              );
-              failWithUndeterminedBehavior(`rebroadcasting aborted`);
-            }
-
-            // run re-broadcast
-            currentTx.gasPrice = nextGasPrice;
-            attemptsRebroadcast++;
-            const rebroadcastedTxHash = await this.sendTx(currentTx, logger);
-            pollingLogger.debug(`rebroadcasted as ${rebroadcastedTxHash}`);
-            pollingLogger = pollingLogger.child({
-              txHash: rebroadcastedTxHash
-            })
-            currentTxHash = rebroadcastedTxHash;
-          } catch (e) {
-            const message = `rebroadcasting failed: ${e}`;
-            pollingLogger.error(message);
-            pollingLogger.error(e)
-            fail(message);
-          }
-        }, this.rebroadcast.rebroadcastInterval);
-
-        timeout = setTimeout(() => {
-          pollingLogger.error(
-            `poller reached timeout of ${this.rebroadcast.pollingTimeframe}ms`
+        const failWithUndeterminedBehavior = (message: string) => {
+          logger.error(
+            `Cannot confirm tx ${currentTxHash}, marking it as stale for future replacement. Reason: ${message}`
           );
-          failWithUndeterminedBehavior("poller reached timeout");
-        }, this.rebroadcast.pollingTimeframe);
-      } catch (e) {
-        const message = `sending tx failed: ${e}`
-        logger.error(message);
-        logger.error(e);
-        fail(message);
+          this.staleTx = currentTx;
+          clearTimers();
+          reject(message);
+        };
+
+        const fail = (message: string) => {
+          clearTimers();
+          reject(message);
+        };
+
+        try {
+          currentTxHash = await this.sendTx(currentTx, logger);
+          let pollingLogger = logger.child({
+            service: "evm_poller",
+            txHash: currentTxHash,
+          });
+
+          pollingInterval = setInterval(async () => {
+            try {
+              pollingLogger.debug(`polling...`);
+
+              const transactionReceiptResult =
+                await this.connection.eth.getTransactionReceipt(currentTxHash);
+              pollingLogger.debug(
+                `poller received tx receipt, status: ${transactionReceiptResult?.status}`
+              );
+
+              if (transactionReceiptResult?.status === true) {
+                pollingLogger.debug(`tx confirmed`);
+
+                success(currentTxHash);
+              } else if (transactionReceiptResult?.status === false) {
+                pollingLogger.debug(`tx reverted`);
+
+                fail(`tx ${currentTxHash} reverted`);
+              }
+            } catch (e) {
+              pollingLogger.error(`poller raised an error: ${e}`);
+              pollingLogger.error(e);
+              // todo discuss should we throw here
+            }
+          }, this.rebroadcast.pollingInterval);
+
+          let attemptsRebroadcast = 0;
+          rebroadcastInterval = setInterval(async () => {
+            try {
+              pollingLogger.debug(`rebroadcasting...`);
+
+              if (
+                this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast
+              ) {
+                pollingLogger.debug(
+                  `no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts})`
+                );
+
+                failWithUndeterminedBehavior(`rebroadcasting aborted`);
+              }
+
+              // pick gas price for bumping
+              const currentGasPrice = await this.connection.eth.getGasPrice();
+              const bumpedGasPrice = new BigNumber(nextGasPrice).multipliedBy(
+                this.rebroadcast.bumpGasPriceMultiplier!
+              );
+              nextGasPrice = BigNumber.max(
+                currentGasPrice,
+                bumpedGasPrice
+              ).toFixed(0);
+              pollingLogger.debug(
+                `picking bumped gas: current=${currentGasPrice}, bumped=${bumpedGasPrice}, picked=${nextGasPrice}`
+              );
+
+              // check bumped gas price
+              if (
+                this.rebroadcast.rebroadcastMaxBumpedGasPriceWei &&
+                new BigNumber(nextGasPrice).gt(
+                  this.rebroadcast.rebroadcastMaxBumpedGasPriceWei
+                )
+              ) {
+                pollingLogger.debug(
+                  `picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`
+                );
+                failWithUndeterminedBehavior(`rebroadcasting aborted`);
+              }
+
+              // run re-broadcast
+              currentTx.gasPrice = nextGasPrice;
+              attemptsRebroadcast++;
+              const rebroadcastedTxHash = await this.sendTx(currentTx, logger);
+              pollingLogger.debug(`rebroadcasted as ${rebroadcastedTxHash}`);
+              pollingLogger = pollingLogger.child({
+                txHash: rebroadcastedTxHash,
+              });
+              currentTxHash = rebroadcastedTxHash;
+            } catch (e) {
+              const message = `rebroadcasting failed: ${e}`;
+              pollingLogger.error(message);
+              pollingLogger.error(e);
+              fail(message);
+            }
+          }, this.rebroadcast.rebroadcastInterval);
+
+          timeout = setTimeout(() => {
+            pollingLogger.error(
+              `poller reached timeout of ${this.rebroadcast.pollingTimeframe}ms`
+            );
+            failWithUndeterminedBehavior("poller reached timeout");
+          }, this.rebroadcast.pollingTimeframe);
+        } catch (e) {
+          const message = `sending tx failed: ${e}`;
+          logger.error(message);
+          logger.error(e);
+          fail(message);
+        }
       }
-    });
+    );
 
     logger.info(`tx confirmed: ${transactionHash}`);
 
@@ -210,10 +215,12 @@ export class EvmProviderAdapter implements ProviderAdapter {
       try {
         estimatedGas = await this.connection.eth.estimateGas(tx);
       } catch (error) {
-        const message = `estimation failed: ${error}`
+        const message = `estimation failed: ${error}`;
         logger.error(message);
         logger.error(error);
-        logger.error(`tx which caused estimation failure: ${JSON.stringify(tx)}`)
+        logger.error(
+          `tx which caused estimation failure: ${JSON.stringify(tx)}`
+        );
         reject(message);
         return;
       }
@@ -230,7 +237,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
           resolve(hash);
         })
         .catch((error) => {
-          const message = `sending tx failed: ${error}`
+          const message = `sending tx failed: ${error}`;
           logger.error(message);
           logger.error(error);
           reject(message);

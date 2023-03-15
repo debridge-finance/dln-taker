@@ -9,11 +9,12 @@ import { ExecutorLaunchConfig } from "./src/config";
 import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
-import * as filters from "./src/filters";
 
 // sanity check to ensure that .env file is supplied
 if (process.env.WS_API_KEY === undefined)
-  throw new Error(`Missing WS_API_KEY environment variable. Did you managed to create the .env file based on sample.env?`)
+  throw new Error(
+    `Missing WS_API_KEY environment variable. Did you managed to create the .env file based on sample.env?`
+  );
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(environment.WSS, {
@@ -39,8 +40,8 @@ const config: ExecutorLaunchConfig = {
     // Setting the ETH bucket
     //
     new TokensBucket({
-      [ChainId.Arbitrum]: ['0x0000000000000000000000000000000000000000'],
-      [ChainId.Ethereum]: ['0x0000000000000000000000000000000000000000']
+      [ChainId.Arbitrum]: ["0x0000000000000000000000000000000000000000"],
+      [ChainId.Ethereum]: ["0x0000000000000000000000000000000000000000"],
     }),
   ],
 
@@ -99,9 +100,8 @@ const config: ExecutorLaunchConfig = {
         requiredConfirmationsThresholds: [
           // worth <$100: 1+ block confirmation
           // [100, 1],
-
           // worth >$100: guaranteed block confirmations (15)
-        ]
+        ],
       },
 
       // if the order is created on Ethereum and fulfilled on another chain (e.g. Solana),
@@ -129,9 +129,8 @@ const config: ExecutorLaunchConfig = {
         requiredConfirmationsThresholds: [
           // worth <$100: 1+ block confirmation
           // [100, 1],
-
           // worth >$100: guaranteed block confirmations (15)
-        ]
+        ],
       },
 
       beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
@@ -147,9 +146,8 @@ const config: ExecutorLaunchConfig = {
         requiredConfirmationsThresholds: [
           // worth <$100: 1+ block confirmation
           // [100, 1],
-
           // worth >$100: guaranteed block confirmations (15)
-        ]
+        ],
       },
 
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
@@ -165,9 +163,8 @@ const config: ExecutorLaunchConfig = {
         requiredConfirmationsThresholds: [
           // worth <$100: 1+ block confirmation
           // [100, 1],
-
           // worth >$100: guaranteed block confirmations (15)
-        ]
+        ],
       },
 
       beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
@@ -183,9 +180,8 @@ const config: ExecutorLaunchConfig = {
         requiredConfirmationsThresholds: [
           // worth <$100: 32+ block confirmation
           // [100, 32],
-
           // worth >$100: guaranteed block confirmations (256)
-        ]
+        ],
       },
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,

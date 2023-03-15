@@ -21,12 +21,14 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     return helpers.bufferToHex(this.wallet.publicKey.toBuffer());
   }
 
-  async sendTransaction(data: unknown, context: SendTransactionContext) {
+  async sendTransaction(
+    data: unknown,
+    context: SendTransactionContext
+  ): Promise<string> {
     const logger = context.logger.child({
       service: "SolanaProviderAdapter",
       currentChainId: ChainId.Solana,
     });
-
     const txid = await helpers.sendAll(
       this.connection,
       this.wallet,

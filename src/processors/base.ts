@@ -13,8 +13,8 @@ import {
   ExecutorSupportedChain,
   IExecutor,
 } from "../executors/executor";
+import { HooksEngine } from "../hooks/HooksEngine";
 import { IncomingOrderContext } from "../interfaces";
-import { createClientLogger } from "../logger";
 
 export class OrderProcessorContext {
   logger: Logger;
@@ -26,6 +26,7 @@ export class OrderProcessorInitContext {
   takeChain: ExecutorInitializingChain;
   buckets: TokensBucket[];
   logger: Logger;
+  hooksEngine: HooksEngine;
 }
 
 export type OrderProcessorInitializer = (
@@ -44,6 +45,7 @@ export interface IOrderProcessor {
 export abstract class BaseOrderProcessor implements IOrderProcessor {
   protected chainId: ChainId;
   protected takeChain: ExecutorInitializingChain;
+  protected hooksEngine: HooksEngine;
 
   abstract init(
     chainId: ChainId,

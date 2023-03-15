@@ -9,14 +9,17 @@ import { ExecutorLaunchConfig } from "./src/config";
 import * as environments from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
-import * as filters from "./src/filters";
 
-const environment = !!process.env.USE_MADRID ? environments.PRERELEASE_ENVIRONMENT_CODENAME_MADRID : environments.PRODUCTION;
+const environment = !!process.env.USE_MADRID
+  ? environments.PRERELEASE_ENVIRONMENT_CODENAME_MADRID
+  : environments.PRODUCTION;
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(process.env.WSS ?? environment.WSS, {
     headers: {
-      Authorization: process.env.WS_API_KEY ? `Bearer ${process.env.WS_API_KEY}` : undefined,
+      Authorization: process.env.WS_API_KEY
+        ? `Bearer ${process.env.WS_API_KEY}`
+        : undefined,
     },
   } as any),
 
@@ -35,8 +38,8 @@ const config: ExecutorLaunchConfig = {
     }),
     // ETH
     new TokensBucket({
-      [ChainId.Arbitrum]: ['0x0000000000000000000000000000000000000000'],
-      [ChainId.Ethereum]: ['0x0000000000000000000000000000000000000000']
+      [ChainId.Arbitrum]: ["0x0000000000000000000000000000000000000000"],
+      [ChainId.Ethereum]: ["0x0000000000000000000000000000000000000000"],
     }),
   ],
 
@@ -69,9 +72,7 @@ const config: ExecutorLaunchConfig = {
       unlockAuthorityPrivateKey: `${process.env.ARBITRUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
 
       constraints: {
-        requiredConfirmationsThresholds: [
-          [100, 1],
-        ]
+        requiredConfirmationsThresholds: [[100, 1]],
       },
     },
 
@@ -84,9 +85,7 @@ const config: ExecutorLaunchConfig = {
       unlockAuthorityPrivateKey: `${process.env.AVALANCHE_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
 
       constraints: {
-        requiredConfirmationsThresholds: [
-          [100, 1],
-        ]
+        requiredConfirmationsThresholds: [[100, 1]],
       },
     },
 
@@ -99,9 +98,7 @@ const config: ExecutorLaunchConfig = {
       unlockAuthorityPrivateKey: `${process.env.BNB_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
 
       constraints: {
-        requiredConfirmationsThresholds: [
-          [100, 1],
-        ]
+        requiredConfirmationsThresholds: [[100, 1]],
       },
     },
 
@@ -114,9 +111,7 @@ const config: ExecutorLaunchConfig = {
       unlockAuthorityPrivateKey: `${process.env.ETHEREUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
 
       constraints: {
-        requiredConfirmationsThresholds: [
-          [100, 1],
-        ]
+        requiredConfirmationsThresholds: [[100, 1]],
       },
     },
 
@@ -129,9 +124,7 @@ const config: ExecutorLaunchConfig = {
       unlockAuthorityPrivateKey: `${process.env.POLYGON_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
 
       constraints: {
-        requiredConfirmationsThresholds: [
-          [100, 1],
-        ]
+        requiredConfirmationsThresholds: [[100, 1]],
       },
     },
   ],

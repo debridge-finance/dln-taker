@@ -3,7 +3,8 @@
     "compilerOptions": {
         "moduleResolution": "node",
         "module": "commonjs",
-        "types": ["mocha", "chai", "node"]
+        "types": ["mocha", "chai", "node"],
+        "lib": ["es2021", "dom"]
     },
     "include": ["src", "tests"],
     "typedocOptions": {
