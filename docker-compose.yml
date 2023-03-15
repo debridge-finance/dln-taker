@@ -1,5 +1,21 @@
 version: "3.6"
 services:
+  postgres:
+    image: postgres:14.1
+    container_name: postgres${DOCKER_ID}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PG_RANDOM_ID=${PG_RANDOM_ID}
+      - POSTGRES_DATABASE=${POSTGRES_DATABASE}
+      - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
   dln-executor:
     image: debridgefinance/dln-executor
     # container_name: dln-executor${DOCKER_ID}
