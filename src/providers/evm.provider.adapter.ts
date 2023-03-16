@@ -21,6 +21,8 @@ export class Tx {
   gasPrice?: string;
   gas?: number;
   nonce?: number;
+
+  cappedGasPrice?: BigNumber;
 }
 
 
@@ -53,11 +55,6 @@ export class EvmProviderAdapter implements ProviderAdapter {
       this.connection.eth.defaultAccount!
     );
     let nextGasPrice = await this.connection.eth.getGasPrice();
-
-    // {{{ DEBUG
-    // For Polygon: you can decrease current gasPrice by 10% to test poller
-    // nextGasPrice = new BigNumber(nextGasPrice).multipliedBy(0.9).toFixed(0);
-    // }}}
 
     if (this.staleTx && this.staleTx.nonce! >= nonce) {
       nextGasPrice = BigNumber.max(
@@ -169,13 +166,11 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
             // check bumped gas price
             if (
-              this.rebroadcast.rebroadcastMaxBumpedGasPriceWei &&
-              new BigNumber(nextGasPrice).gt(
-                this.rebroadcast.rebroadcastMaxBumpedGasPriceWei
-              )
+              tx.cappedGasPrice &&
+              new BigNumber(nextGasPrice).gt(tx.cappedGasPrice)
             ) {
               pollingLogger.debug(
-                `picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${this.rebroadcast.rebroadcastMaxBumpedGasPriceWei})`
+                `picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${tx.cappedGasPrice})`
               );
               failWithUndeterminedBehavior(`rebroadcasting aborted`);
             }
@@ -271,12 +266,8 @@ export class EvmProviderAdapter implements ProviderAdapter {
       this.rebroadcast.rebroadcastMaxAttempts = 3;
     }
 
-    if (rebroadcast?.rebroadcastMaxBumpedGasPriceWei === undefined) {
-      this.rebroadcast.rebroadcastMaxBumpedGasPriceWei = undefined;
-    }
-
     if (rebroadcast?.bumpGasPriceMultiplier === undefined) {
-      this.rebroadcast.bumpGasPriceMultiplier = 1.15;
+      this.rebroadcast.bumpGasPriceMultiplier = 1.1;
     }
 
     if (rebroadcast?.pollingTimeframe === undefined) {
