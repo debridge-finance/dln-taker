@@ -14,7 +14,7 @@ type address = string;
 export class EvmRebroadcastAdapterOpts {
   /**
    * defines a multiplier to increase a pending txn's gasPrice for pushing it off the mempool.
-   * Default: 1.15
+   * Default: 1.1
    */
   bumpGasPriceMultiplier?: number;
 
@@ -41,11 +41,6 @@ export class EvmRebroadcastAdapterOpts {
    * default: 3
    */
   rebroadcastMaxAttempts?: number;
-
-  /**
-   * gas price cap for bumped gas price during transaction rebroadcasting
-   */
-  rebroadcastMaxBumpedGasPriceWei?: number;
 }
 
 export type ChainEnvironment = {
