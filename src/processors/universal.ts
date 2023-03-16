@@ -9,7 +9,12 @@ import {
   OrderState,
   pickReserveToken,
   tokenAddressToString,
+  PreswapFulfillOrderPayload,
+  EvmChains,
+  ClientError,
+  ClientErrorType
 } from "@debridge-finance/dln-client";
+import { SwapConnectorRequest, SwapConnectorResult } from "@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import Web3 from "web3";
@@ -30,8 +35,13 @@ import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
 
-// reasonable multiplier for gas estimated for the fulfill txn
+// reasonable multiplier for gas estimated for the fulfill txn to define max
+// gas we are willing to estimate
 const EVM_FULFILL_GAS_MULTIPLIER = 1.25;
+
+// reasonable multiplier for gas price to define max gas price we are willing to
+// bump until
+const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.3;
 
 export type UniversalProcessorParams = {
   /**
@@ -315,7 +325,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
     let roughReserveDstAmount = BigNumber(order.give.amount.toString()).div(BigNumber(10).pow(reserveSrcTokenDecimals - reserveDstTokenDecimals)).integerValue();
-    logger.debug(`expressed order give amount in reserve dst token ${tokenAddressToString(order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
+    logger.debug(`expressed order give amount (${order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
 
     const accountReserveBalance =
       await this.takeChain.fulfullProvider.getBalance(pickedBucket.reserveDstToken);
@@ -328,35 +338,63 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
     logger.debug(`enough balance (${accountReserveBalance.toString()}) to cover order (${roughReserveDstAmount.toString()})`)
 
-    // no since we know we
     let evmFulfillGasLimit: number | undefined;
+    let evmFulfillCappedGasPrice: BigNumber | undefined;
+    let preswapTx: SwapConnectorResult<EvmChains> | undefined;
     if (getEngineByChainId(this.takeChain.chain) == ChainEngine.EVM) {
       // when performing estimation, we need to set some slippage for the swap. Let's set it reasonably high, because
       // we don't care right now
+
       const reasonableDummySlippage = 500; // 5%
-      const estimateFulfillTx = await this.createOrderFullfillTx<ChainId.Ethereum>(
-        orderId,
-        order,
-        pickedBucket.reserveDstToken,
-        roughReserveDstAmount.toString(),
-        reasonableDummySlippage,
-        context,
-        logger
-      );
       try {
+        const fulfillTx = await this.createOrderFullfillTx<ChainId.Ethereum>(
+          orderId,
+          order,
+          pickedBucket.reserveDstToken,
+          roughReserveDstAmount.toString(),
+          reasonableDummySlippage,
+          undefined,
+          context,
+          logger
+        );
+
+        //
+        // predicting gas price cap
+        //
+        const currentGasPrice = BigNumber(
+          await (this.takeChain.fulfullProvider.connection as Web3).eth.getGasPrice()
+        );
+        evmFulfillCappedGasPrice = currentGasPrice
+          .multipliedBy(EVM_FULFILL_GAS_PRICE_MULTIPLIER)
+          .integerValue();
+        logger.debug(`capped gas price: ${evmFulfillCappedGasPrice.toFixed(0)}`)
+
+        //
+        // predicting gas limit
+        //
         evmFulfillGasLimit = await (this.takeChain.fulfullProvider.connection as Web3).eth.estimateGas({
-          to: estimateFulfillTx.to,
-          data: estimateFulfillTx.data,
-          value: estimateFulfillTx.value.toString(),
+          to: fulfillTx.tx.to,
+          data: fulfillTx.tx.data,
+          value: fulfillTx.tx.value.toString(),
         });
         logger.debug(`estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${evmFulfillGasLimit} gas units`);
 
         evmFulfillGasLimit = Math.round(evmFulfillGasLimit * EVM_FULFILL_GAS_MULTIPLIER);
         logger.debug(`declared gas limit for the fulfill tx to be used in further estimations: ${evmFulfillGasLimit} gas units`);
+
+        //
+        // this needed to preserve swap routes (1inch specific)
+        //
+        preswapTx = fulfillTx.preswapTx;
       }
       catch (e) {
-        logger.error(`unable to estimate fullfil tx: ${e}; this can be because the order is not profitable; postponing to the mempool`)
-        logger.error(e);
+        if (e instanceof ClientError) {
+          logger.info(`preliminary fullfil tx estimation failed: ${e}, reason: ${e.type}; postponing to the mempool`)
+        }
+        else {
+          logger.error(`unable to estimate preliminary fullfil tx: ${e}; this can be because the order is not profitable; postponing to the mempool`);
+          logger.error(e);
+        }
         this.mempoolService.addOrder(params);
         return;
       }
@@ -385,11 +423,17 @@ class UniversalProcessor extends BaseOrderProcessor {
         swapConnector: context.config.swapConnector,
         logger: createClientLogger(logger),
         batchSize,
-        evmFulfillGasLimit
+        evmFulfillGasLimit,
+        evmFulfillCappedGasPrice: evmFulfillCappedGasPrice ? BigInt(evmFulfillCappedGasPrice.integerValue().toString()) : undefined,
+        swapEstimationPreference: preswapTx
       }
     );
 
-    if (!isProfitable) {
+
+    if (isProfitable) {
+      logger.info("order is profitable")
+    }
+    else {
       logger.info("order is not profitable, postponing it to the mempool");
       this.mempoolService.addOrder(params);
       return;
@@ -403,12 +447,13 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(order.take.cha
     }
 
     // fulfill order
-    const fulfillTx = await this.createOrderFullfillTx(
+    const { tx: fulfillTx } = await this.createOrderFullfillTx(
       orderId,
       order,
       reserveDstToken,
       requiredReserveDstAmount,
       reserveToTakeSlippageBps,
+      preswapTx,
       context,
       logger
     );
@@ -433,6 +478,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(order.take.cha
       }
 
       (fulfillTx as any as Tx).gas = evmFulfillGasLimit;
+      (fulfillTx as any as Tx).cappedGasPrice = evmFulfillCappedGasPrice;
     }
 
     try {
@@ -461,37 +507,44 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(order.take.cha
     reserveDstToken: Uint8Array,
     reservedAmount: string,
     reserveToTakeSlippageBps: number | null,
+    preferEstimation: SwapConnectorRequest['preferEstimation'] | undefined,
     context: OrderProcessorContext,
     logger: Logger
   ) {
-    let fullFillTxPayload: any;
+    let fullFillTxPayload: PreswapFulfillOrderPayload<any> = {
+      slippageBps: reserveToTakeSlippageBps || undefined,
+      swapConnector: context.config.swapConnector,
+      reservedAmount: reservedAmount,
+      loggerInstance: createClientLogger(logger),
+      preferEstimation
+    }
     if (order.take.chainId === ChainId.Solana) {
       const wallet = (this.takeChain.fulfullProvider as SolanaProviderAdapter)
         .wallet.publicKey;
-      fullFillTxPayload = {
-        taker: wallet,
-      };
+      const solanaFullFillTxPayload: PreswapFulfillOrderPayload<ChainId.Solana> = {
+        taker: wallet
+      }
+      fullFillTxPayload = solanaFullFillTxPayload;
     } else {
-      fullFillTxPayload = {
-        web3: this.takeChain.fulfullProvider.connection,
+      const evmfullFillTxPayload: PreswapFulfillOrderPayload<EvmChains> = {
+        ...fullFillTxPayload,
+        web3: this.takeChain.fulfullProvider.connection as Web3,
         permit: "0x",
         takerAddress: this.takeChain.fulfullProvider.address,
-        unlockAuthority: this.takeChain.unlockProvider.address,
+        unlockAuthority: this.takeChain.unlockProvider.address
       };
+      fullFillTxPayload = evmfullFillTxPayload;
     }
-    fullFillTxPayload.swapConnector = context.config.swapConnector;
-    fullFillTxPayload.reservedAmount = reservedAmount;
-    fullFillTxPayload.slippageBps = reserveToTakeSlippageBps;
-    fullFillTxPayload.loggerInstance = createClientLogger(logger);
+
     const fulfillTx = await context.config.client.preswapAndFulfillOrder<T>(
       order,
       orderId,
       reserveDstToken,
-      fullFillTxPayload
+      fullFillTxPayload as PreswapFulfillOrderPayload<T>
     );
     logger.debug(`fulfillTx is created`);
     logger.debug(fulfillTx);
-    return fulfillTx.tx;
+    return fulfillTx;
   }
 }
 
