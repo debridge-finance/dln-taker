@@ -121,12 +121,12 @@ export interface ChainDefinition {
      *
      * ```
      * requiredConfirmationsThresholds: [
-     *  [100, 1],     // worth <$100: 1+ block confirmation
-     *  [1_000, 6],   // worth <$1,000: 6+ block confirmations
+     *  {thresholdAmountInUSD: 100, minBlockConfirmations: 1},     // worth <$100: 1+ block confirmation
+     *  {thresholdAmountInUSD: 1_000, minBlockConfirmations: 6},   // worth <$1,000: 6+ block confirmations
      * ]
      * ```
      */
-    requiredConfirmationsThresholds?: Array<[thresholdAmountInUSD: number, minBlockConfirmations: number]>;
+    requiredConfirmationsThresholds?: Array<{thresholdAmountInUSD: number, minBlockConfirmations: number}>;
   }
 
   //

@@ -69,7 +69,7 @@ const config: ExecutorLaunchConfig = {
 
       constraints: {
         requiredConfirmationsThresholds: [
-          [100, 1],
+          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
         ]
       },
     },
@@ -84,7 +84,7 @@ const config: ExecutorLaunchConfig = {
 
       constraints: {
         requiredConfirmationsThresholds: [
-          [100, 1],
+          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
         ]
       },
     },
@@ -99,7 +99,7 @@ const config: ExecutorLaunchConfig = {
 
       constraints: {
         requiredConfirmationsThresholds: [
-          [100, 1],
+          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
         ]
       },
     },
@@ -114,7 +114,7 @@ const config: ExecutorLaunchConfig = {
 
       constraints: {
         requiredConfirmationsThresholds: [
-          [100, 1],
+          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
         ]
       },
     },
@@ -129,7 +129,7 @@ const config: ExecutorLaunchConfig = {
 
       constraints: {
         requiredConfirmationsThresholds: [
-          [100, 1],
+          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
         ]
       },
     },

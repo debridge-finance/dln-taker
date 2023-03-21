@@ -172,10 +172,10 @@ constraints: {
   // Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
   requiredConfirmationsThresholds: [
     // orders worth <=$100 would be attempted to be fulfilled after 1+ block confirmation
-    [100, 1],
+    {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
     // orders worth ($100-$1,000] would be attempted to be fulfilled after 6+ block confirmation
-    [1000, 6],
+    {thresholdAmountInUSD: 1000, minBlockConfirmations: 6},
 
     // orders worth >$1,000+ would be attempted to be fulfilled after guaranteed block confirmations (15 for Arbitrum)
   ]
