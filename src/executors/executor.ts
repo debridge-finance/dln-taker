@@ -16,7 +16,7 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { Logger } from "pino";
 
-import { ExecutorLaunchConfig, SupportedChain } from "../config";
+import { ChainDefinition, ExecutorLaunchConfig, SupportedChain } from "../config";
 import { PRODUCTION } from "../environments";
 import * as filters from "../filters";
 import { OrderFilter } from "../filters";
@@ -259,7 +259,7 @@ export class Executor implements IExecutor {
         unlockProvider,
         fulfullProvider: fulfillProvider,
         client,
-        usdAmountConfirmations: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain.constraints?.requiredConfirmationsThresholds || []),
+        usdAmountConfirmations: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain),
         beneficiary: chain.beneficiary,
       };
 
@@ -293,24 +293,25 @@ export class Executor implements IExecutor {
     this.isInitialized = true;
   }
 
-  private getConfirmationRanges(chain: SupportedChain, requiredConfirmationsThresholds: Array<[usdWorth: number, blocks: number]>): UsdWorthBlockConfirmationConstraints {
+  private getConfirmationRanges(chain: SupportedChain, definition: ChainDefinition): UsdWorthBlockConfirmationConstraints {
     const ranges: UsdWorthBlockConfirmationConstraints = [];
+    const requiredConfirmationsThresholds = definition.constraints?.requiredConfirmationsThresholds || [];
     requiredConfirmationsThresholds
-      .sort(([usdWorthA], [usdWorthB]) => usdWorthA < usdWorthB ? -1 : 1) // sort by usdWorth ASC
-      .forEach(([usdWorth, minBlockConfirmations], index, thresholdsSortedByUsdWorth) => {
-        const [prevThresholdUsdWorth, prevMinBlockConfirmations] = index === 0 ? [0, 0] : thresholdsSortedByUsdWorth[index - 1];
+      .sort((a, b) => a.thresholdAmountInUSD < b.thresholdAmountInUSD ? -1 : 1) // sort by usdWorth ASC
+      .forEach((threshold, index, thresholdsSortedByUsdWorth) => {
+        const prev = index === 0 ? {minBlockConfirmations: 0, thresholdAmountInUSD: 0} : thresholdsSortedByUsdWorth[index - 1];
 
-        if (minBlockConfirmations <= prevMinBlockConfirmations) {
-          throw new Error(`Unable to set required confirmation threshold for $${usdWorth} on ${SupportedChain[chain]}: minBlockConfirmations (${minBlockConfirmations}) must be greater than ${prevMinBlockConfirmations}`)
+        if (threshold.minBlockConfirmations <= prev.minBlockConfirmations) {
+          throw new Error(`Unable to set required confirmation threshold for $${threshold.thresholdAmountInUSD} on ${SupportedChain[chain]}: minBlockConfirmations (${threshold.minBlockConfirmations}) must be greater than ${prev.minBlockConfirmations}`)
         }
-        if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= minBlockConfirmations) {
-          throw new Error(`Unable to set required confirmation threshold for $${usdWorth} on ${SupportedChain[chain]}: minBlockConfirmations (${minBlockConfirmations}) must be less than max block confirmations (${BLOCK_CONFIRMATIONS_HARD_CAPS[chain]})`)
+        if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= threshold.minBlockConfirmations) {
+          throw new Error(`Unable to set required confirmation threshold for $${threshold.thresholdAmountInUSD} on ${SupportedChain[chain]}: minBlockConfirmations (${threshold.minBlockConfirmations}) must be less than max block confirmations (${BLOCK_CONFIRMATIONS_HARD_CAPS[chain]})`)
         }
 
         ranges.push({
-          usdWorthFrom: prevThresholdUsdWorth,
-          usdWorthTo: usdWorth,
-          minBlockConfirmations: minBlockConfirmations
+          usdWorthFrom: prev.thresholdAmountInUSD,
+          usdWorthTo: threshold.thresholdAmountInUSD,
+          minBlockConfirmations: threshold.minBlockConfirmations
         })
       });
 

@@ -98,7 +98,7 @@ const config: ExecutorLaunchConfig = {
         // Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
         requiredConfirmationsThresholds: [
           // worth <$100: 1+ block confirmation
-          // [100, 1],
+          // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (15)
         ]
@@ -128,7 +128,7 @@ const config: ExecutorLaunchConfig = {
       constraints: {
         requiredConfirmationsThresholds: [
           // worth <$100: 1+ block confirmation
-          // [100, 1],
+          // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (15)
         ]
@@ -146,7 +146,7 @@ const config: ExecutorLaunchConfig = {
       constraints: {
         requiredConfirmationsThresholds: [
           // worth <$100: 1+ block confirmation
-          // [100, 1],
+          // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (15)
         ]
@@ -164,7 +164,7 @@ const config: ExecutorLaunchConfig = {
       constraints: {
         requiredConfirmationsThresholds: [
           // worth <$100: 1+ block confirmation
-          // [100, 1],
+          // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (15)
         ]
@@ -182,7 +182,7 @@ const config: ExecutorLaunchConfig = {
       constraints: {
         requiredConfirmationsThresholds: [
           // worth <$100: 32+ block confirmation
-          // [100, 32],
+          // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (256)
         ]
