@@ -28,6 +28,10 @@ import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
 
+import { isRevertedError } from "./utils/isRevertedError";
+import { PostponingReason, RejectionReason } from "../hooks/HookEnums";
+
+
 export type UniversalProcessorParams = {
   /**
    * desired profitability. Setting a higher value would prevent executor from fulfilling most orders because
@@ -84,6 +88,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   ): Promise<void> {
     this.chainId = chainId;
     this.takeChain = context.takeChain;
+    this.hooksEngine = context.hooksEngine;
 
     const logger = context.logger.child({
       processor: "universal",
@@ -93,7 +98,8 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.batchUnlocker = new BatchUnlocker(
       logger,
       this.takeChain,
-      this.params.batchUnlockSize
+      this.params.batchUnlockSize,
+      context.hooksEngine,
     );
 
     this.mempoolService = new MempoolService(
@@ -254,6 +260,11 @@ class UniversalProcessor extends BaseOrderProcessor {
         bucket.findFirstToken(orderInfo.order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
+      this.hooksEngine.handleOrderRejected({
+        order: orderInfo,
+        reason: RejectionReason.UNEXEPECTED_GIVE_TOKEN,
+        context,
+      });
       logger.info(
         `no bucket found to cover order's give token: ${tokenAddressToString(
           orderInfo.order.give.chainId,
@@ -273,6 +284,11 @@ class UniversalProcessor extends BaseOrderProcessor {
       takeOrderStatus?.status !== OrderState.NotSet &&
       takeOrderStatus?.status !== undefined
     ) {
+      this.hooksEngine.handleOrderRejected({
+        order: orderInfo,
+        reason: RejectionReason.ALREADY_FULFILLED,
+        context,
+      });
       logger.info("order is already handled on the give chain, skipping");
       return;
     }
@@ -283,8 +299,24 @@ class UniversalProcessor extends BaseOrderProcessor {
       orderInfo.order.give.chainId,
       { web3: context.giveChain.fulfullProvider.connection as Web3 }
     );
+
+    if (giveOrderStatus?.status === undefined) {
+      logger.info("order is not exists in give chain");
+      this.hooksEngine.handleOrderRejected({
+        order: orderInfo,
+        reason: RejectionReason.ALERT_GIVE_MISSING,
+        context,
+      });
+      return;
+    }
+
     if (giveOrderStatus?.status !== OrderState.Created) {
-      logger.info("inexistent order, skipping");
+      logger.info("order has wrong status");
+      this.hooksEngine.handleOrderRejected({
+        order: orderInfo,
+        reason: RejectionReason.WRONG_GIVE_STATUS,
+        context,
+      });
       return;
     }
 
@@ -364,27 +396,64 @@ class UniversalProcessor extends BaseOrderProcessor {
         ? null
         : this.params.batchUnlockSize;
 
+    let estimation;
+    try {
+      estimation = await calculateExpectedTakeAmount(
+        orderInfo.order,
+        this.params.minProfitabilityBps,
+        {
+          client: context.config.client,
+          giveConnection: context.giveChain.fulfullProvider.connection as Web3,
+          takeConnection: this.takeChain.fulfullProvider.connection as Web3,
+          priceTokenService: context.config.tokenPriceService,
+          buckets: context.config.buckets,
+          swapConnector: context.config.swapConnector,
+          logger: createClientLogger(logger),
+          batchSize,
+        }
+      );
+    } catch (e) {
+      const error = e as Error;
+      this.hooksEngine.handleOrderPostponed({
+        order: orderInfo,
+        estimation: undefined,
+        context,
+        reason: PostponingReason.ESTIMATION_FAILED,
+        message: error.message,
+      });
+      context.logger.error(`Error in estimation ${e}`);
+      context.logger.error(e);
+      return;
+    }
+
     const {
       reserveDstToken,
       requiredReserveDstAmount,
       isProfitable,
       reserveToTakeSlippageBps,
-    } = await calculateExpectedTakeAmount(
-      orderInfo.order,
-      this.params.minProfitabilityBps,
-      {
-        client: context.config.client,
-        giveConnection: context.giveChain.fulfullProvider.connection as Web3,
-        takeConnection: this.takeChain.fulfullProvider.connection as Web3,
-        priceTokenService: context.config.tokenPriceService,
-        buckets: context.config.buckets,
-        swapConnector: context.config.swapConnector,
-        logger: createClientLogger(logger),
-        batchSize,
-      }
-    );
+    } = estimation;
+
+    const hookEstimation = {
+      isProfitable,
+      reserveToken: reserveDstToken,
+      requiredReserveAmount: requiredReserveDstAmount,
+      fulfillToken: orderInfo.order?.take.tokenAddress!,
+      projectedFulfillAmount: orderInfo.order.take.amount!.toString(),
+    };
+    this.hooksEngine.handleOrderEstimated({
+      order: orderInfo,
+      estimation: hookEstimation,
+      context,
+    });
 
     if (!isProfitable) {
+      this.hooksEngine.handleOrderPostponed({
+        order: orderInfo,
+        estimation: hookEstimation,
+        context,
+        reason: PostponingReason.NON_PROFITABLE,
+      });
+
       logger.info("order is not profitable");
       if (allowPlaceToMempool)
         this.mempoolService.addOrder({ orderInfo, context });
@@ -395,6 +464,13 @@ class UniversalProcessor extends BaseOrderProcessor {
       await this.takeChain.fulfullProvider.getBalance(reserveDstToken);
 
     if (new BigNumber(accountReserveBalance).lt(requiredReserveDstAmount)) {
+      this.hooksEngine.handleOrderPostponed({
+        order: orderInfo,
+        estimation: hookEstimation,
+        context,
+        reason: PostponingReason.NOT_ENOUGH_BALANCE,
+      });
+
       logger.info(
         `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${requiredReserveDstAmount}`
       );
@@ -419,8 +495,22 @@ class UniversalProcessor extends BaseOrderProcessor {
         fulfillTx.tx,
         { logger }
       );
+      this.hooksEngine.handleOrderFulfilled({
+        order: orderInfo,
+        txHash: txFulfill,
+      });
       logger.info(`fulfill transaction ${txFulfill} is completed`);
     } catch (e) {
+      const error = e as Error;
+      this.hooksEngine.handleOrderPostponed({
+        order: orderInfo,
+        estimation: hookEstimation,
+        context,
+        reason: isRevertedError(error)
+          ? PostponingReason.FULFILLMENT_REVERTED
+          : PostponingReason.FULFILLMENT_FAILED,
+        message: error.message,
+      });
       logger.error(`fulfill transaction failed: ${e}`);
       logger.error(e);
       if (allowPlaceToMempool)

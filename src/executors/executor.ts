@@ -15,6 +15,7 @@ import { helpers } from "@debridge-finance/solana-utils";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { Logger } from "pino";
+import { HooksEngine } from "../hooks/HooksEngine";
 
 import { ChainDefinition, ExecutorLaunchConfig, SupportedChain } from "../config";
 import { PRODUCTION } from "../environments";
@@ -103,6 +104,7 @@ export class Executor implements IExecutor {
     );
 
     this.buckets = config.buckets;
+    const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
 
     const clients: { [key in number]: any } = {};
     for (const chain of config.chains) {
@@ -224,6 +226,7 @@ export class Executor implements IExecutor {
         takeChain: initializingChain,
         buckets: config.buckets,
         logger: this.logger,
+        hooksEngine,
       });
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -288,7 +291,7 @@ export class Executor implements IExecutor {
       chainId: chain.chain,
       points: chain.usdAmountConfirmations.map(t => t.minBlockConfirmations)
     }))
-    orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds);
+    orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds, hooksEngine);
 
     this.isInitialized = true;
   }
