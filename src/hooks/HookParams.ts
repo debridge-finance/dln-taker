@@ -1,33 +1,39 @@
 import { ChainId } from "@debridge-finance/dln-client";
 
-import { IncomingOrder } from "../../interfaces";
-import { OrderProcessorContext } from "../../processors/base";
-import { Hooks, PostponingReason, RejectionReason } from "../HookEnums";
+import { IncomingOrder } from "../interfaces";
+import { OrderProcessorContext } from "../processors/base";
+import { Hook, OrderPostponedHookReason, OrderRejectedHookReason } from "./HookEnums";
 
-import { OrderEstimation } from "./OrderEstimation";
+export type OrderEstimation = {
+  isProfitable: boolean; // CalculateResult.isProfitable
+  reserveToken: Uint8Array; // CalculateResult.reserveDstToken
+  requiredReserveAmount: string; // CalculateResult.requiredReserveDstAmount
+  fulfillToken: Uint8Array; // order.take.tokenAddress
+  projectedFulfillAmount: string; // CalculateResult.profitableTakeAmount
+};
 
-export type HookParams<T extends Hooks> =
-  {} & (T extends Hooks.OrderFeedConnected
+export type HookParams<T extends Hook> =
+  {} & (T extends Hook.OrderFeedConnected
     ? {
         timeSinceLastDisconnect?: number;
       }
     : {}) &
-    (T extends Hooks.OrderFulfilled
+    (T extends Hook.OrderFulfilled
       ? {
           order: IncomingOrder<any>;
           txHash: string;
         }
       : {}) &
-    (T extends Hooks.OrderPostponed
+    (T extends Hook.OrderPostponed
       ? {
           order: IncomingOrder<any>;
-          reason: PostponingReason;
+          reason: OrderPostponedHookReason;
           message?: string;
           estimation?: OrderEstimation;
           context: OrderProcessorContext;
         }
       : {}) &
-    (T extends Hooks.OrderUnlockFailed
+    (T extends Hook.OrderUnlockFailed
       ? {
           orderIds: string[];
           fromChainId: ChainId;
@@ -36,7 +42,7 @@ export type HookParams<T extends Hooks> =
           message: string;
         }
       : {}) &
-    (T extends Hooks.OrderUnlockSent
+    (T extends Hook.OrderUnlockSent
       ? {
           orderIds: string[];
           fromChainId: ChainId;
@@ -44,14 +50,14 @@ export type HookParams<T extends Hooks> =
           txHash: string;
         }
       : {}) &
-    (T extends Hooks.OrderRejected
+    (T extends Hook.OrderRejected
       ? {
           order: IncomingOrder<any>;
-          reason: RejectionReason;
+          reason: OrderRejectedHookReason;
           context: OrderProcessorContext;
         }
       : {}) &
-    (T extends Hooks.OrderEstimated
+    (T extends Hook.OrderEstimated
       ? {
           order: IncomingOrder<any>;
           estimation: OrderEstimation;

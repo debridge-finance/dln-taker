@@ -1,13 +1,13 @@
 import { Logger } from "pino";
 
-import { Hooks } from "./HookEnums";
-import { HookParams } from "./types/HookParams";
+import { Hook } from "./HookEnums";
+import { HookParams } from "./HookParams";
 
 export type HookContext = {
   logger: Logger;
 };
 
-export type HookHandler<T extends Hooks> = (
+export type HookHandler<T extends Hook> = (
   args: HookParams<T>,
   logger?: HookContext
 ) => Promise<void>;

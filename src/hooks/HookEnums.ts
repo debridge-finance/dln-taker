@@ -1,4 +1,4 @@
-export enum Hooks {
+export enum Hook {
   OrderFeedConnected,
   OrderFeedDisconnected,
   OrderRejected,
@@ -9,7 +9,7 @@ export enum Hooks {
   OrderUnlockFailed,
 }
 
-export enum PostponingReason {
+export enum OrderPostponedHookReason {
   /**
    * indicates that taker’s reserve account has not enough funds to fulfill the order
    */
@@ -36,12 +36,20 @@ export enum PostponingReason {
   FULFILLMENT_REVERTED,
 }
 
-export enum RejectionReason {
+export enum OrderRejectedHookReason {
   /**
    * indicates that the order on the give chain locks a token which is not registered in any token buckets in the executor’s configuration
    */
-  UNEXEPECTED_GIVE_TOKEN,
+  UNEXPECTED_GIVE_TOKEN,
+
+  /**
+   * indicates that the order has been already fulfilled
+   */
   ALREADY_FULFILLED,
+
+  /**
+   * indicates that the order has been cancelled
+   */
   ALREADY_CANCELLED,
 
   /**

@@ -100,6 +100,8 @@ export class WsNextOrder extends GetNextOrder {
     clearTimeout(this.pingTimer);
 
     this.pingTimer = setTimeout(() => {
+      this.hooksEngine.handleOrderFeedDisconnected();
+
       this.logger.error(`WsConnection appears to be stale, reconnecting`);
       this.socket.terminate();
       this.initWs();
@@ -123,6 +125,7 @@ export class WsNextOrder extends GetNextOrder {
     super.processNextOrder = process;
     this.unlockAuthorities = unlockAuthorities;
     this.minConfirmationThresholds = minConfirmationThresholds;
+    this.hooksEngine = hooksEngine;
     await this.initWs();
   }
 
@@ -206,7 +209,6 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("close", () => {
-      this.hooksEngine.handleOrderFeedDisconnected();
       this.logger.debug(
         `WsConnection has been closed, retrying reconnection in ${this.pingTimeoutMs}ms`
       );

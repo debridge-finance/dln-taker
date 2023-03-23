@@ -29,7 +29,7 @@ import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
 
 import { isRevertedError } from "./utils/isRevertedError";
-import { PostponingReason, RejectionReason } from "../hooks/HookEnums";
+import { OrderPostponedHookReason, OrderRejectedHookReason } from "../hooks/HookEnums";
 
 
 export type UniversalProcessorParams = {
@@ -262,7 +262,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     if (bucket === undefined) {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        reason: RejectionReason.UNEXEPECTED_GIVE_TOKEN,
+        reason: OrderRejectedHookReason.UNEXPECTED_GIVE_TOKEN,
         context,
       });
       logger.info(
@@ -286,7 +286,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     ) {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        reason: RejectionReason.ALREADY_FULFILLED,
+        reason: OrderRejectedHookReason.ALREADY_FULFILLED,
         context,
       });
       logger.info("order is already handled on the give chain, skipping");
@@ -304,7 +304,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       logger.info("order is not exists in give chain");
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        reason: RejectionReason.ALERT_GIVE_MISSING,
+        reason: OrderRejectedHookReason.ALERT_GIVE_MISSING,
         context,
       });
       return;
@@ -314,7 +314,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       logger.info("order has wrong status");
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        reason: RejectionReason.WRONG_GIVE_STATUS,
+        reason: OrderRejectedHookReason.WRONG_GIVE_STATUS,
         context,
       });
       return;
@@ -418,7 +418,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         estimation: undefined,
         context,
-        reason: PostponingReason.ESTIMATION_FAILED,
+        reason: OrderPostponedHookReason.ESTIMATION_FAILED,
         message: error.message,
       });
       context.logger.error(`Error in estimation ${e}`);
@@ -451,7 +451,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         estimation: hookEstimation,
         context,
-        reason: PostponingReason.NON_PROFITABLE,
+        reason: OrderPostponedHookReason.NON_PROFITABLE,
       });
 
       logger.info("order is not profitable");
@@ -468,7 +468,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         estimation: hookEstimation,
         context,
-        reason: PostponingReason.NOT_ENOUGH_BALANCE,
+        reason: OrderPostponedHookReason.NOT_ENOUGH_BALANCE,
       });
 
       logger.info(
@@ -507,8 +507,8 @@ class UniversalProcessor extends BaseOrderProcessor {
         estimation: hookEstimation,
         context,
         reason: isRevertedError(error)
-          ? PostponingReason.FULFILLMENT_REVERTED
-          : PostponingReason.FULFILLMENT_FAILED,
+          ? OrderPostponedHookReason.FULFILLMENT_REVERTED
+          : OrderPostponedHookReason.FULFILLMENT_FAILED,
         message: error.message,
       });
       logger.error(`fulfill transaction failed: ${e}`);

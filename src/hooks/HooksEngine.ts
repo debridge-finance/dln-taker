@@ -1,61 +1,61 @@
 import { Logger } from "pino";
 
-import { Hooks } from "./HookEnums";
+import { Hook } from "./HookEnums";
 import { HookHandler } from "./HookHandler";
-import { HookParams } from "./types/HookParams";
+import { HookParams } from "./HookParams";
 
 export class HooksEngine {
   constructor(
     private readonly hookHandlers: {
-      [key in Hooks]?: HookHandler<key>[];
+      [key in Hook]?: HookHandler<key>[];
     },
     private readonly logger: Logger,
   ) {}
 
-  handleOrderFeedConnected(params: HookParams<Hooks.OrderFeedConnected>) {
-    this.process(Hooks.OrderFeedConnected, params);
+  handleOrderFeedConnected(params: HookParams<Hook.OrderFeedConnected>) {
+    this.process(Hook.OrderFeedConnected, params);
   }
 
   handleOrderFeedDisconnected() {
-    this.process(Hooks.OrderFeedDisconnected, {});
+    this.process(Hook.OrderFeedDisconnected, {});
   }
 
-  handleOrderRejected(params: HookParams<Hooks.OrderRejected>) {
-    this.process(Hooks.OrderRejected, params);
+  handleOrderRejected(params: HookParams<Hook.OrderRejected>) {
+    this.process(Hook.OrderRejected, params);
   }
 
-  handleOrderEstimated(params: HookParams<Hooks.OrderEstimated>) {
-    this.process(Hooks.OrderEstimated, params);
+  handleOrderEstimated(params: HookParams<Hook.OrderEstimated>) {
+    this.process(Hook.OrderEstimated, params);
   }
 
-  handleOrderPostponed(params: HookParams<Hooks.OrderPostponed>) {
-    this.process(Hooks.OrderPostponed, params);
+  handleOrderPostponed(params: HookParams<Hook.OrderPostponed>) {
+    this.process(Hook.OrderPostponed, params);
   }
 
-  handleOrderFulfilled(params: HookParams<Hooks.OrderFulfilled>) {
-    this.process(Hooks.OrderFulfilled, params);
+  handleOrderFulfilled(params: HookParams<Hook.OrderFulfilled>) {
+    this.process(Hook.OrderFulfilled, params);
   }
 
-  handleOrderUnlockSent(params: HookParams<Hooks.OrderUnlockSent>) {
-    this.process(Hooks.OrderUnlockSent, params);
+  handleOrderUnlockSent(params: HookParams<Hook.OrderUnlockSent>) {
+    this.process(Hook.OrderUnlockSent, params);
   }
 
-  handleOrderUnlockFailed(params: HookParams<Hooks.OrderUnlockFailed>) {
-    this.process(Hooks.OrderUnlockFailed, params);
+  handleOrderUnlockFailed(params: HookParams<Hook.OrderUnlockFailed>) {
+    this.process(Hook.OrderUnlockFailed, params);
   }
 
-  private async process<T extends Hooks>(
-    hookEnum: Hooks,
+  private async process<T extends Hook>(
+    hook: Hook,
     params: HookParams<T>
   ): Promise<void> {
-    const handlers = this.hookHandlers[hookEnum];
+    const handlers = this.hookHandlers[hook];
     if (!handlers) return;
     for (const handler of handlers) {
       try {
         // @ts-ignore
         await handler(params, { logger: this.logger });
       } catch (e) {
-        this.logger.error(`Error in execution hook handler in ${hookEnum}`);
+        this.logger.error(`an error occurred while invoking handler for the ${Hook[hook]} hook: ${e}`);
         this.logger.error(e);
       }
     }

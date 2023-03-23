@@ -6,7 +6,7 @@ import {
 } from "@debridge-finance/dln-client";
 
 import { OrderFilterInitializer } from "./filters/order.filter";
-import { Hooks } from "./hooks/HookEnums";
+import { Hook } from "./hooks/HookEnums";
 import { HookHandler } from "./hooks/HookHandler";
 import { GetNextOrder } from "./interfaces";
 import { OrderProcessorInitializer } from "./processors";
@@ -188,7 +188,7 @@ export interface ExecutorLaunchConfig {
    * Hook handlers
    */
   hookHandlers?: {
-    [key in Hooks]?: HookHandler<key>[];
+    [key in Hook]?: HookHandler<key>[];
   };
 
   /**
