@@ -24,9 +24,10 @@ export class ExecutorEngine {
 
   private createLogger() {
     const prettyStream = pretty({
-      colorize: true,
+      colorize: process.stdout.isTTY,
       sync: true,
       singleLine: true,
+      translateTime: 'yyyy-mm-dd HH:MM:ss.l',
     });
     const streams: any[] = [
       {
@@ -43,8 +44,9 @@ export class ExecutorEngine {
     this.logger = pino(
       {
         level: process.env.LOG_LEVEL || "info",
+        translateFormat: 'd mmm yyyy H:MM'
       },
-      pino.multistream(streams)
+      pino.multistream(streams, {}),
     );
   }
 }
