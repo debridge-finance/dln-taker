@@ -31,7 +31,7 @@ export const takeAmountUsdEquivalentBetween = (
       const clientLogger = createClientLogger(logger);
       const takeWeb3 = (
         context.takeChain
-          .fulfullProvider as EvmProviderAdapter
+          .fulfillProvider as EvmProviderAdapter
       ).connection;
       const takeAddress = helpers.bufferToHex(
         Buffer.from(order.take.tokenAddress)

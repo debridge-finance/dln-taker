@@ -28,7 +28,7 @@ export const giveAmountUsdEquivalentBetween = (
         filter: "giveAmountUsdEquivalentBetween",
       });
       const clientLogger = createClientLogger(logger);
-      const giveWeb3 = (context.giveChain.fulfullProvider as EvmProviderAdapter)
+      const giveWeb3 = (context.giveChain.fulfillProvider as EvmProviderAdapter)
         .connection;
       const giveAddress = helpers.bufferToHex(
         Buffer.from(order.give.tokenAddress)

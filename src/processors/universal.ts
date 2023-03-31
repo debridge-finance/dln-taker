@@ -140,7 +140,7 @@ class UniversalProcessor extends BaseOrderProcessor {
             chainId,
             evm.ServiceType.CrosschainForwarder
           ),
-          this.takeChain.fulfullProvider as EvmProviderAdapter,
+          this.takeChain.fulfillProvider as EvmProviderAdapter,
           logger
         );
 
@@ -148,7 +148,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           chainId,
           token,
           client.getContractAddress(chainId, evm.ServiceType.Destination),
-          this.takeChain.fulfullProvider as EvmProviderAdapter,
+          this.takeChain.fulfillProvider as EvmProviderAdapter,
           logger
         );
       }
@@ -290,7 +290,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     const takeOrderStatus = await context.config.client.getTakeOrderStatus(
       orderInfo.orderId,
       orderInfo.order.take.chainId,
-      { web3: this.takeChain.fulfullProvider.connection as Web3 }
+      { web3: this.takeChain.fulfillProvider.connection as Web3 }
     );
     if (
       takeOrderStatus?.status !== OrderState.NotSet &&
@@ -304,7 +304,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     const giveOrderStatus = await context.config.client.getGiveOrderStatus(
       orderInfo.orderId,
       orderInfo.order.give.chainId,
-      { web3: context.giveChain.fulfullProvider.connection as Web3 }
+      { web3: context.giveChain.fulfillProvider.connection as Web3 }
     );
     if (giveOrderStatus?.status !== OrderState.Created) {
       logger.info("inexistent order, skipping");
@@ -340,7 +340,7 @@ class UniversalProcessor extends BaseOrderProcessor {
               logger: createClientLogger(context.logger)
             }
           ),
-          context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress, context.giveChain.fulfullProvider.connection as Web3)
+          context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress, context.giveChain.fulfillProvider.connection as Web3)
         ]);
         logger.debug(`usd rate for give token: ${giveTokenUsdRate}`)
         logger.debug(`decimals for give token: ${giveTokenDecimals}`)
@@ -384,8 +384,8 @@ class UniversalProcessor extends BaseOrderProcessor {
     // perform rough estimation: assuming order.give.amount is what we need on balance
     const pickedBucket = pickReserveToken(orderInfo.order, context.config.buckets);
     const [reserveSrcTokenDecimals, reserveDstTokenDecimals] = await Promise.all([
-      context.config.client.getDecimals(orderInfo.order.give.chainId, pickedBucket.reserveSrcToken, context.giveChain.fulfullProvider.connection as Web3),
-      context.config.client.getDecimals(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, this.takeChain.fulfullProvider.connection as Web3),
+      context.config.client.getDecimals(orderInfo.order.give.chainId, pickedBucket.reserveSrcToken, context.giveChain.fulfillProvider.connection as Web3),
+      context.config.client.getDecimals(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, this.takeChain.fulfillProvider.connection as Web3),
     ]);
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
@@ -393,7 +393,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     logger.debug(`expressed order give amount (${orderInfo.order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(orderInfo.order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[orderInfo.order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
 
     const accountReserveBalance =
-      await this.takeChain.fulfullProvider.getBalance(pickedBucket.reserveDstToken);
+      await this.takeChain.fulfillProvider.getBalance(pickedBucket.reserveDstToken);
     if (new BigNumber(accountReserveBalance).lt(roughReserveDstAmount)) {
       logger.info(
         `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${roughReserveDstAmount}; postponing it to the mempool`
@@ -427,7 +427,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         // predicting gas price cap
         //
         const currentGasPrice = BigNumber(
-          await (this.takeChain.fulfullProvider.connection as Web3).eth.getGasPrice()
+          await (this.takeChain.fulfillProvider.connection as Web3).eth.getGasPrice()
         );
         evmFulfillCappedGasPrice = currentGasPrice
           .multipliedBy(EVM_FULFILL_GAS_PRICE_MULTIPLIER)
@@ -437,7 +437,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         //
         // predicting gas limit
         //
-        evmFulfillGasLimit = await (this.takeChain.fulfullProvider.connection as Web3).eth.estimateGas({
+        evmFulfillGasLimit = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas({
           to: fulfillTx.tx.to,
           data: fulfillTx.tx.data,
           value: fulfillTx.tx.value.toString(),
@@ -481,8 +481,8 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.params.minProfitabilityBps,
       {
         client: context.config.client,
-        giveConnection: context.giveChain.fulfullProvider.connection as Web3,
-        takeConnection: this.takeChain.fulfullProvider.connection as Web3,
+        giveConnection: context.giveChain.fulfillProvider.connection as Web3,
+        takeConnection: this.takeChain.fulfillProvider.connection as Web3,
         priceTokenService: context.config.tokenPriceService,
         buckets: context.config.buckets,
         swapConnector: context.config.swapConnector,
@@ -525,7 +525,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     );
     if (getEngineByChainId(orderInfo.order.take.chainId) === ChainEngine.EVM) {
       try {
-        const evmFulfillGas = await (this.takeChain.fulfullProvider.connection as Web3).eth.estimateGas(fulfillTx.tx as Tx);
+        const evmFulfillGas = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas(fulfillTx.tx as Tx);
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
           logger.info(`final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit}); postponing to the mempool `)
@@ -548,7 +548,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     }
 
     try {
-      const txFulfill = await this.takeChain.fulfullProvider.sendTransaction(
+      const txFulfill = await this.takeChain.fulfillProvider.sendTransaction(
         fulfillTx,
         { logger }
       );
@@ -589,7 +589,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       preferEstimation
     }
     if (order.take.chainId === ChainId.Solana) {
-      const wallet = (this.takeChain.fulfullProvider as SolanaProviderAdapter)
+      const wallet = (this.takeChain.fulfillProvider as SolanaProviderAdapter)
         .wallet.publicKey;
       const solanaFullFillTxPayload: PreswapFulfillOrderPayload<ChainId.Solana> = {
         taker: wallet
@@ -598,9 +598,9 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     } else {
       const evmfullFillTxPayload: PreswapFulfillOrderPayload<EvmChains> = {
         ...fullFillTxPayload,
-        web3: this.takeChain.fulfullProvider.connection as Web3,
+        web3: this.takeChain.fulfillProvider.connection as Web3,
         permit: "0x",
-        takerAddress: this.takeChain.fulfullProvider.address,
+        takerAddress: this.takeChain.fulfillProvider.address,
         unlockAuthority: this.takeChain.unlockProvider.address
       };
       fullFillTxPayload = evmfullFillTxPayload;
