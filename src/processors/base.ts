@@ -61,7 +61,7 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
       let state = await context.config.client.getTakeOrderStatus(
         orderId,
         order.take.chainId,
-        { web3: this.takeChain.fulfullProvider.connection as Web3 }
+        { web3: this.takeChain.fulfillProvider.connection as Web3 }
       );
       const limit = 10;
       let iteration = 0;

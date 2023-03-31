@@ -52,7 +52,7 @@ export class BatchUnlocker {
     const orderState = await this.executor.client.getTakeOrderStatus(
       orderId,
       order.take.chainId,
-      { web3: this.takeChain.fulfullProvider.connection as Web3 }
+      { web3: this.takeChain.fulfillProvider.connection as Web3 }
     );
     // order must be in the FULFILLED state
     if (orderState?.status !== OrderState.Fulfilled) {
@@ -197,7 +197,7 @@ export class BatchUnlocker {
       const orderState = await this.executor.client.getTakeOrderStatus(
         orderId,
         this.takeChain.chain,
-        { web3: this.takeChain.fulfullProvider.connection as Web3 }
+        { web3: this.takeChain.fulfillProvider.connection as Web3 }
       );
 
       return orderState?.status === OrderState.Fulfilled

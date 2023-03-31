@@ -42,7 +42,7 @@ export type ExecutorInitializingChain = {
   chain: ChainId;
   chainRpc: string;
   unlockProvider: ProviderAdapter;
-  fulfullProvider: ProviderAdapter;
+  fulfillProvider: ProviderAdapter;
   client: Solana.PmmClient | Evm.PmmEvmClient;
 };
 
@@ -60,7 +60,7 @@ export type ExecutorSupportedChain = {
   usdAmountConfirmations: UsdWorthBlockConfirmationConstraints;
   orderProcessor: processors.IOrderProcessor;
   unlockProvider: ProviderAdapter;
-  fulfullProvider: ProviderAdapter;
+  fulfillProvider: ProviderAdapter;
   beneficiary: string;
   client: Solana.PmmClient | Evm.PmmEvmClient;
 };
@@ -217,7 +217,7 @@ export class Executor implements IExecutor {
         chain: chain.chain,
         chainRpc: chain.chainRpc,
         unlockProvider,
-        fulfullProvider: fulfillProvider,
+        fulfillProvider: fulfillProvider,
         client,
       };
       const orderProcessor = await processorInitializer(chain.chain, {
@@ -257,7 +257,7 @@ export class Executor implements IExecutor {
         dstFilters,
         orderProcessor,
         unlockProvider,
-        fulfullProvider: fulfillProvider,
+        fulfillProvider: fulfillProvider,
         client,
         usdAmountConfirmations: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain),
         beneficiary: chain.beneficiary,
