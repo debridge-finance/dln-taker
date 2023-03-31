@@ -253,10 +253,16 @@ class UniversalProcessor extends BaseOrderProcessor {
   }
 
   private pickNextOrder(): string | undefined {
-    return (
-      this.priorityQueue.values().next().value
-      || this.queue.values().next().value
-    )
+    const nextOrderId =
+      this.priorityQueue.values().next().value ||
+      this.queue.values().next().value;
+
+    if (nextOrderId) {
+      this.priorityQueue.delete(nextOrderId);
+      this.queue.delete(nextOrderId);
+
+      return nextOrderId;
+    }
   }
 
   private async processOrder(orderId: string): Promise<void | never> {
