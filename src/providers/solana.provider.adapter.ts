@@ -37,7 +37,7 @@ export class SolanaProviderAdapter implements ProviderAdapter {
       true
     );
     logger.debug(`tx confirmed: ${txid}`);
-    return txid;
+    return txid[0];
   }
 
   async getBalance(token: Uint8Array): Promise<string> {
