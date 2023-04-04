@@ -2,6 +2,7 @@ import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
 import { OrderProcessorContext } from "./processors/base";
+import { HooksEngine } from "./hooks/HooksEngine";
 
 export enum OrderInfoStatus {
   Created,
@@ -62,7 +63,8 @@ export abstract class GetNextOrder {
     minConfirmationThresholds: Array<{
       chainId: ChainId;
       points: number[]
-    }>
+    }>,
+    hooksEngine: HooksEngine,
   ): void;
 
   setEnabledChains(enabledChains: ChainId[]) {
