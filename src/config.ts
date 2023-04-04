@@ -8,6 +8,8 @@ import {
 import { OrderFilterInitializer } from "./filters/order.filter";
 import { GetNextOrder } from "./interfaces";
 import { OrderProcessorInitializer } from "./processors";
+import { Hooks } from "./hooks/HookEnums";
+import { HookHandler } from "./hooks/HookHandler";
 
 type address = string;
 
@@ -176,6 +178,13 @@ export interface ExecutorLaunchConfig {
    * Defines an order processor that implements the fulfillment strategy
    */
   orderProcessor?: OrderProcessorInitializer;
+
+  /**
+   * Hook handlers
+   */
+  hookHandlers?: {
+    [key in Hooks]?: HookHandler<key>[];
+  };
 
   /**
    * Token price provider
