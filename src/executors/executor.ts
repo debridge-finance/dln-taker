@@ -27,6 +27,7 @@ import { createWeb3WithPrivateKey } from "../processors/utils/create.web3.with.p
 import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
+import { HooksEngine } from "../hooks/HooksEngine";
 
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
@@ -103,6 +104,7 @@ export class Executor implements IExecutor {
     );
 
     this.buckets = config.buckets;
+    const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
 
     const clients: { [key in number]: any } = {};
     for (const chain of config.chains) {
@@ -224,6 +226,7 @@ export class Executor implements IExecutor {
         takeChain: initializingChain,
         buckets: config.buckets,
         logger: this.logger,
+        hooksEngine,
       });
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -288,7 +291,7 @@ export class Executor implements IExecutor {
       chainId: chain.chain,
       points: chain.usdAmountConfirmations.map(t => t.minBlockConfirmations)
     }))
-    orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds);
+    orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds, hooksEngine);
 
     this.isInitialized = true;
   }
