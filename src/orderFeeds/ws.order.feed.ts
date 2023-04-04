@@ -10,6 +10,7 @@ import {
   OrderProcessorFunc,
   UnlockAuthority,
 } from "../interfaces";
+import { HooksEngine } from "../hooks/HooksEngine";
 
 type WsOrderOffer = {
   chain_id: string;
@@ -91,6 +92,8 @@ export class WsNextOrder extends GetNextOrder {
     chainId: ChainId;
     points: number[]
   }>;
+  private hooksEngine: HooksEngine;
+  private timeLastDisconnect: Date;
 
   private heartbeat() {
     clearTimeout(this.pingTimer);
@@ -114,10 +117,12 @@ export class WsNextOrder extends GetNextOrder {
       chainId: ChainId;
       points: number[]
     }>,
+    hooksEngine: HooksEngine,
   ) {
     super.processNextOrder = process;
     this.unlockAuthorities = unlockAuthorities;
     this.minConfirmationThresholds = minConfirmationThresholds;
+    this.hooksEngine = hooksEngine;
     await this.initWs();
   }
 
@@ -126,6 +131,14 @@ export class WsNextOrder extends GetNextOrder {
     this.socket.on("ping", this.heartbeat.bind(this));
     this.socket.on("open", () => {
       this.logger.debug("🔌 ws opened connection");
+      let timeSinceLastDisconnect;
+      if (this.timeLastDisconnect) {
+        timeSinceLastDisconnect =
+            (new Date().getTime() - this.timeLastDisconnect.getTime()) / 1000;
+      }
+      this.hooksEngine.handleOrderFeedConnected({
+        timeSinceLastDisconnect,
+      });
       this.heartbeat();
 
       // Subscribe to all new orders
@@ -193,6 +206,8 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("close", () => {
+      this.timeLastDisconnect = new Date();
+      this.hooksEngine.handleOrderFeedDisconnected();
       this.logger.debug(
         `WsConnection has been closed, retrying reconnection in ${this.pingTimeoutMs}ms`
       );
