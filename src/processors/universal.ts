@@ -513,7 +513,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     }
 
     // fulfill order
-    const fulfillTx = await this.createOrderFullfillTx(
+    const { tx: fulfillTx } = await this.createOrderFullfillTx(
       orderInfo.orderId,
       orderInfo.order,
       reserveDstToken,
@@ -525,7 +525,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     );
     if (getEngineByChainId(orderInfo.order.take.chainId) === ChainEngine.EVM) {
       try {
-        const evmFulfillGas = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas(fulfillTx.tx as Tx);
+        const evmFulfillGas = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas(fulfillTx as Tx);
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
           logger.info(`final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit}); postponing to the mempool `)
@@ -543,8 +543,8 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         return;
       }
 
-      (fulfillTx as any as Tx).gas = evmFulfillGasLimit;
-      (fulfillTx as any as Tx).cappedGasPrice = evmFulfillCappedGasPrice;
+      fulfillTx.gas = evmFulfillGasLimit;
+      fulfillTx.cappedGasPrice = evmFulfillCappedGasPrice;
     }
 
     try {
