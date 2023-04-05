@@ -26,14 +26,7 @@ export const getEvmAccountBalance = async (
   web3: Web3,
   tokenContract: string,
   address: string
-) => {
-  let result;
-  if (!tokenContract) {
-    result = await web3.eth.getBalance(address);
-  } else {
-    const contract = new web3.eth.Contract(balanceOfABI, tokenContract);
-    result = await contract.methods.balanceOf(address).call();
-  }
-
-  return result;
+): Promise<string> => {
+  const contract = new web3.eth.Contract(balanceOfABI, tokenContract);
+  return contract.methods.balanceOf(address).call();
 };
