@@ -1,4 +1,4 @@
-import { ChainId, tokenAddressToString } from "@debridge-finance/dln-client";
+import { ChainId, tokenAddressToString, ZERO_EVM_ADDRESS } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import { clearInterval, clearTimeout } from "timers";
@@ -280,9 +280,13 @@ export class EvmProviderAdapter implements ProviderAdapter {
   }
 
   getBalance(token: Uint8Array): Promise<string> {
+    const tokenAddress = tokenAddressToString(ChainId.Ethereum, token);
+    if (tokenAddress === ZERO_EVM_ADDRESS) {
+      return this.connection.eth.getBalance(this.address)
+    }
     return getEvmAccountBalance(
       this.connection,
-      tokenAddressToString(ChainId.Ethereum, token), // todo
+      tokenAddress,
       this.address
     );
   }
