@@ -8,7 +8,6 @@ services:
     restart: unless-stopped
     environment:
       - LOG_LEVEL=${LOG_LEVEL}
-      - WSS=${WSS}
       - WS_API_KEY=${WS_API_KEY}
       - COINGECKO_API_KEY=${COINGECKO_API_KEY}
       - SENTRY_DSN=${SENTRY_DSN}
