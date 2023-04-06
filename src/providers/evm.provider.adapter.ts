@@ -229,10 +229,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
           reject(message);
           return;
         }
-        tx.gas = estimatedGas * GAS_MULTIPLIER;
+        tx.gas = Math.round(estimatedGas * GAS_MULTIPLIER);
       }
 
-      logger.debug(`sending tx: ${JSON.stringify(tx)}`);
+      logger.info(`sending tx: ${JSON.stringify(tx)}`);
       const errorHandler = (error: any) => {
         logger.error("sending failed");
         logger.error(error);
