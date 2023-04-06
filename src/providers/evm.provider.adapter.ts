@@ -51,7 +51,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
     });
 
     const tx = data as Tx;
-    if (!tx.to || !tx.value || !tx.data) throw new Error('Unexpected tx')
+    if (!tx.to || !tx.data) throw new Error('Unexpected tx')
 
     const nonce = await this.connection.eth.getTransactionCount(
       this.connection.eth.defaultAccount!
@@ -229,8 +229,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
           reject(message);
           return;
         }
-        tx.gas = Math.round(estimatedGas * GAS_MULTIPLIER);
+        tx.gas = estimatedGas * GAS_MULTIPLIER;
       }
+
+      tx.gas = Math.round(tx.gas);
 
       logger.info(`sending tx: ${JSON.stringify(tx)}`);
       const errorHandler = (error: any) => {
