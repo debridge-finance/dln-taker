@@ -21,11 +21,6 @@ export enum PostponingReason {
   NOT_PROFITABLE,
 
   /**
-   * indicates that the estimation was not succeeded, possibly because of third-party service unavailability (e.g., 1inch.io aggregator is unavailable)
-   */
-  ESTIMATION_FAILED,
-
-  /**
    * indicates the inability to ensure the inclusion of the txn into the blockchain (e.g., we were unable to get the txn hash in the reasonable amount of time, or the RPC node is unavailable)
    */
   FULFILLMENT_TX_FAILED,
