@@ -250,7 +250,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         this.hooksEngine.handleOrderPostponed({
           order: orderInfo,
           context,
-          reason: PostponingReason.INTERNAL_ERROR,
+          reason: PostponingReason.UNHANDLED_ERROR,
           message: error.message,
         });
         this.mempoolService.addOrder(params);
@@ -293,7 +293,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     if (bucket === undefined) {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        reason: RejectionReason.UNEXEPECTED_GIVE_TOKEN,
+        reason: RejectionReason.UNEXPECTED_GIVE_TOKEN,
         context,
       });
       logger.info(
@@ -315,12 +315,12 @@ class UniversalProcessor extends BaseOrderProcessor {
       takeOrderStatus?.status !== OrderState.NotSet &&
       takeOrderStatus?.status !== undefined
     ) {
+      logger.info(`order is already handled on the take chain (${ ChainId[ orderInfo.order.take.chainId ] }), actual status: ${takeOrderStatus?.status}`);
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        reason: RejectionReason.ALREADY_FULFILLED,
+        reason: RejectionReason.ALREADY_FULFILLED_OR_CANCELLED,
         context,
       });
-      logger.info("order is already handled on the give chain, skipping");
       return;
     }
 
@@ -332,20 +332,20 @@ class UniversalProcessor extends BaseOrderProcessor {
     );
 
     if (giveOrderStatus?.status === undefined) {
-      logger.info("order is not exists in give chain");
+      logger.info(`order does not exist on the give chain (${ ChainId[ orderInfo.order.give.chainId ] })`);
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        reason: RejectionReason.ALERT_GIVE_MISSING,
+        reason: RejectionReason.MISSING,
         context,
       });
       return;
     }
 
     if (giveOrderStatus?.status !== OrderState.Created) {
-      logger.info("inexistent order, skipping");
+      logger.info(`order has unexpected give status (${ giveOrderStatus?.status }) on the give chain (${ ChainId[ orderInfo.order.give.chainId ] })`);
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
-        reason: RejectionReason.WRONG_GIVE_STATUS,
+        reason: RejectionReason.UNEXPECTED_GIVE_STATUS,
         context,
       });
       return;
@@ -357,11 +357,11 @@ class UniversalProcessor extends BaseOrderProcessor {
     if (orderInfo.status == OrderInfoStatus.Created) {
       const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info;
       if (finalizationInfo == 'Revoked') {
-        logger.info('order has been revoked, cleaning and skipping');
+        logger.info('order has been revoked by the order feed due to chain reorganization, cleaning and skipping');
         this.clearInternalQueues(orderInfo.orderId);
         this.hooksEngine.handleOrderRejected({
           order: orderInfo,
-          reason: RejectionReason.ORDER_REVOKED,
+          reason: RejectionReason.REVOKED,
           context,
         });
         return;
@@ -407,10 +407,10 @@ class UniversalProcessor extends BaseOrderProcessor {
           logger.debug(`usdAmountConfirmationRange found: (${range.usdWorthFrom}, ${range.usdWorthTo}]`)
 
           if (announcedConfirmation < range.minBlockConfirmations) {
-            logger.info("announced block confirmations is less than the block confirmation constraint; skipping the order")
+            logger.info(`announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${ range.minBlockConfirmations } for order worth of $${usdWorth}`)
             this.hooksEngine.handleOrderRejected({
               order: orderInfo,
-              reason: RejectionReason.ANNOUNCED_BLOCK_CONFIRMATIONS_LESS_THAN_CONSTRAINT,
+              reason: RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
               context,
             });
             return;
@@ -420,10 +420,10 @@ class UniversalProcessor extends BaseOrderProcessor {
           }
         }
         else { // range not found: we do not accept this order, let it come finalized
-          logger.debug('non-finalized order is not covered by any custom block confirmation range, skipping')
+          logger.debug(`non-finalized order worth of $${usdWorth} is not covered by any custom block confirmation range, skipping`)
           this.hooksEngine.handleOrderRejected({
             order: orderInfo,
-            reason: RejectionReason.NON_FINALIZED_ORDER,
+            reason: RejectionReason.NOT_YET_FINALIZED,
             context,
           });
           return;
@@ -459,7 +459,8 @@ class UniversalProcessor extends BaseOrderProcessor {
       logger.info(
         `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${roughReserveDstAmount}; postponing it to the mempool`
       );
-      this.mempoolService.addOrder(params);
+      if (allowPlaceToMempool)
+        this.mempoolService.addOrder(params);
       return;
     }
     logger.debug(`enough balance (${accountReserveBalance.toString()}) to cover order (${roughReserveDstAmount.toString()})`)
@@ -522,13 +523,14 @@ class UniversalProcessor extends BaseOrderProcessor {
           logger.error(e);
         }
         const error = e as Error;
-        this.mempoolService.addOrder(params);
         this.hooksEngine.handleOrderPostponed({
           order: orderInfo,
           context,
-          reason: PostponingReason.UNABLE_PRELIMINARY_FULFILL,
+          reason: PostponingReason.FULFILLMENT_EVM_TX_PREESTIMATION_FAILED,
           message: error.message,
         });
+        if (allowPlaceToMempool)
+          this.mempoolService.addOrder(params);
         return;
       }
     }
@@ -601,7 +603,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         estimation: hookEstimation,
         context,
-        reason: PostponingReason.NON_PROFITABLE,
+        reason: PostponingReason.NOT_PROFITABLE,
       });
       if (allowPlaceToMempool)
         this.mempoolService.addOrder(params);
@@ -633,10 +635,6 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
           logger.info(`final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit}); postponing to the mempool `)
-          // reprocess order after 5s delay, but no more than two times in a row
-          const maxFastTrackAttempts = 2; // attempts
-          const fastTrackDelay = 5; // seconds
-          this.mempoolService.addOrder(params, params.attempts < maxFastTrackAttempts ? fastTrackDelay : undefined);
           this.hooksEngine.handleOrderPostponed({
             order: orderInfo,
             estimation: hookEstimation,
@@ -645,21 +643,30 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
               evmFulfillGasLimit,
               evmFulfillGas,
             },
-            reason: PostponingReason.REQUIRE_MORE_GAS_EVM_TX,
+            reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_EXCEEDED_PREESTIMATION,
           });
+
+          if (allowPlaceToMempool) {
+            // reprocess order after 5s delay, but no more than two times in a row
+            const maxFastTrackAttempts = 2; // attempts
+            const fastTrackDelay = 5; // seconds
+            this.mempoolService.addOrder(params, params.attempts < maxFastTrackAttempts ? fastTrackDelay : undefined);
+          }
+
           return;
         }
       }
       catch (e) {
         logger.error(`unable to estimate fullfil tx: ${e}; postponing to the mempool`)
         logger.error(e);
-        this.mempoolService.addOrder(params);
         this.hooksEngine.handleOrderPostponed({
           order: orderInfo,
           estimation: hookEstimation,
           context,
-          reason: PostponingReason.UNABLE_ESTIMATE_EVM_TX,
+          reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
         });
+        if (allowPlaceToMempool)
+          this.mempoolService.addOrder(params);
         return;
       }
 
@@ -686,8 +693,8 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         estimation: hookEstimation,
         context,
         reason: isRevertedError(error)
-            ? PostponingReason.FULFILLMENT_REVERTED
-            : PostponingReason.FULFILLMENT_FAILED,
+            ? PostponingReason.FULFILLMENT_TX_REVERTED
+            : PostponingReason.FULFILLMENT_TX_FAILED,
         message: error.message,
       });
       if (allowPlaceToMempool)
