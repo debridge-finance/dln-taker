@@ -543,8 +543,8 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         return;
       }
 
-      fulfillTx.gas = evmFulfillGasLimit;
-      fulfillTx.cappedGasPrice = evmFulfillCappedGasPrice;
+      (fulfillTx as Tx).gas = evmFulfillGasLimit;
+      (fulfillTx as Tx).cappedGasPrice = evmFulfillCappedGasPrice;
     }
 
     try {
