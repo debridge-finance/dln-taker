@@ -100,6 +100,10 @@ export class WsNextOrder extends GetNextOrder {
 
     this.pingTimer = setTimeout(() => {
       this.logger.error(`WsConnection appears to be stale, reconnecting`);
+      this.timeLastDisconnect = new Date();
+      this.hooksEngine.handleOrderFeedDisconnected({
+        message: `order feed has been disconnected`,
+      });
       this.socket.terminate();
       this.initWs();
     }, this.pingTimeoutMs);
@@ -137,7 +141,7 @@ export class WsNextOrder extends GetNextOrder {
             (new Date().getTime() - this.timeLastDisconnect.getTime()) / 1000;
       }
       this.hooksEngine.handleOrderFeedConnected({
-        timeSinceLastDisconnect,
+        message: `order feed has been connected to ${this.wsArgs[0]}, after ${timeSinceLastDisconnect}s of disconnect`,
       });
       this.heartbeat();
 
@@ -206,8 +210,6 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.socket.on("close", () => {
-      this.timeLastDisconnect = new Date();
-      this.hooksEngine.handleOrderFeedDisconnected();
       this.logger.debug(
         `WsConnection has been closed, retrying reconnection in ${this.pingTimeoutMs}ms`
       );
