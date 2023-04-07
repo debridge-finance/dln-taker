@@ -16,8 +16,8 @@ export class HooksEngine {
         this.process(Hooks.OrderFeedConnected, params);
     }
 
-    handleOrderFeedDisconnected() {
-        this.process(Hooks.OrderFeedDisconnected, {});
+    handleOrderFeedDisconnected(params: HookParams<Hooks.OrderFeedDisconnected>) {
+        this.process(Hooks.OrderFeedDisconnected, params);
     }
 
     handleOrderRejected(params: HookParams<Hooks.OrderRejected>) {
