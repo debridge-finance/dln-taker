@@ -18,7 +18,7 @@ export enum PostponingReason {
   /**
    * indicates that the current order is not profitable at the time of estimation
    */
-  NON_PROFITABLE,
+  NOT_PROFITABLE,
 
   /**
    * indicates that the estimation was not succeeded, possibly because of third-party service unavailability (e.g., 1inch.io aggregator is unavailable)
@@ -28,65 +28,73 @@ export enum PostponingReason {
   /**
    * indicates the inability to ensure the inclusion of the txn into the blockchain (e.g., we were unable to get the txn hash in the reasonable amount of time, or the RPC node is unavailable)
    */
-  FULFILLMENT_FAILED,
+  FULFILLMENT_TX_FAILED,
 
   /**
    * indicates the txn to fulfill the order has been reverted for a reason
    */
-  FULFILLMENT_REVERTED,
+  FULFILLMENT_TX_REVERTED,
 
   /**
    * indicates the unable to estimate preliminary fulfill
    */
-  UNABLE_PRELIMINARY_FULFILL,
+  FULFILLMENT_EVM_TX_PREESTIMATION_FAILED,
 
   /**
    * indicates that unable to estimate fulfill tx
    */
-  UNABLE_ESTIMATE_EVM_TX,
+  FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
 
   /**
    * indicates that final fulfill tx requires more gas units
    */
-  REQUIRE_MORE_GAS_EVM_TX,
+  FULFILLMENT_EVM_TX_ESTIMATION_EXCEEDED_PREESTIMATION,
 
   /**
    * Unexpected error
    */
-  INTERNAL_ERROR,
+  UNHANDLED_ERROR,
 }
 
 export enum RejectionReason {
   /**
    * indicates that the order on the give chain locks a token which is not registered in any token buckets in the executor’s configuration
    */
-  UNEXEPECTED_GIVE_TOKEN,
-  ALREADY_FULFILLED,
-  ALREADY_CANCELLED,
+  UNEXPECTED_GIVE_TOKEN,
+
+  /**
+   * order is already fulfilled
+   */
+  ALREADY_FULFILLED_OR_CANCELLED,
 
   /**
    * indicates that the order on the give chain has non-zero status (e.g., unlocked)
    */
-  WRONG_GIVE_STATUS,
+  UNEXPECTED_GIVE_STATUS,
 
   /**
    * indicates that the order is missing on the give chain.
    * This is extremely unlikely, and indicates protocol discrepancy if happens
    */
-  ALERT_GIVE_MISSING,
+  MISSING,
 
   /**
-   * indicates that the order is revoked.
+   * indicates that the order is revoked due to chain reorg
    */
-  ORDER_REVOKED,
+  REVOKED,
 
   /**
    * indicates that announced block confirmations is less than the block confirmation constraint
    */
-  ANNOUNCED_BLOCK_CONFIRMATIONS_LESS_THAN_CONSTRAINT,
+  NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
+
+  /**
+   * future use: triggered when budget of unconfirmed orders exceeded
+   */
+  UNCONFIRMED_ORDERS_BUDGED_EXCEEDED,
 
   /**
    * indicates that non-finalized order is not covered by any custom block confirmation range
    */
-  NON_FINALIZED_ORDER,
+  NOT_YET_FINALIZED,
 }
