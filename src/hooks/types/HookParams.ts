@@ -9,9 +9,14 @@ import { OrderEstimation } from "./OrderEstimation";
 export type HookParams<T extends Hooks> =
     {} & (T extends Hooks.OrderFeedConnected
     ? {
-        timeSinceLastDisconnect?: number;
+        message: string;
     }
     : {}) &
+    (T extends Hooks.OrderFeedDisconnected
+        ? {
+            message: string;
+        }
+        : {}) &
     (T extends Hooks.OrderFulfilled
         ? {
             order: IncomingOrder<any>;
@@ -22,13 +27,7 @@ export type HookParams<T extends Hooks> =
         ? {
             order: IncomingOrder<any>;
             reason: PostponingReason;
-            message?: string;
-            estimation?: OrderEstimation;
-            gasEstimation?: {
-                evmFulfillGas?: number;
-                evmFulfillGasLimit?: number;
-            },
-            accountReserveBalance?: string;
+            message: string;
             context: OrderProcessorContext;
         }
         : {}) &
@@ -37,7 +36,6 @@ export type HookParams<T extends Hooks> =
             orderIds: string[];
             fromChainId: ChainId;
             toChainId: ChainId;
-            reason: "FAILED" | "REVERTED";
             message: string;
         }
         : {}) &
@@ -53,6 +51,7 @@ export type HookParams<T extends Hooks> =
         ? {
             order: IncomingOrder<any>;
             reason: RejectionReason;
+            message: string;
             context: OrderProcessorContext;
         }
         : {}) &

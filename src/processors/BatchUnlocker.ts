@@ -313,8 +313,7 @@ export class BatchUnlocker {
       this.hooksEngine.handleOrderUnlockFailed({
         fromChainId: this.takeChain.chain,
         toChainId: giveChain.chain,
-        reason: isRevertedError(error) ? "REVERTED" : "FAILED",
-        message: error.message,
+        message: `trying to unlock ${orderIds.length} orders from ${ChainId[this.takeChain.chain] } to ${ ChainId[giveChain.chain] } failed: ${error.message}`,
         orderIds,
       });
       logger.error(`failed to unlock ${orderIds.length} order(s): ${e}`);
@@ -348,8 +347,7 @@ export class BatchUnlocker {
         this.hooksEngine.handleOrderUnlockFailed({
           fromChainId: this.takeChain.chain,
           toChainId: giveChain.chain,
-          reason: isRevertedError(error) ? "REVERTED" : "FAILED",
-          message: error.message,
+          message: `trying to unlock ${orderIds.length} orders from ${ChainId[this.takeChain.chain] } to ${ ChainId[giveChain.chain] } failed: ${error.message}`,
           orderIds: [orderId],
         });
         logger.error(`failed to unlock ${orderId} order: ${e}`);
