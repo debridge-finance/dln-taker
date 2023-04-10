@@ -693,7 +693,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         reason: isRevertedError(error)
             ? PostponingReason.FULFILLMENT_TX_REVERTED
             : PostponingReason.FULFILLMENT_TX_FAILED,
-        message: error.message,
+        message: `fulfill transaction failed: ${error.message}`,
       });
       if (allowPlaceToMempool)
         this.mempoolService.addOrder(params);
