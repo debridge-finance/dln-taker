@@ -9,9 +9,15 @@ import { ExecutorLaunchConfig } from "./src/config";
 import * as environments from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
-import * as filters from "./src/filters";
+import { Hooks } from "./src/hooks/HookEnums";
+import {TelegramNotifier} from "./src/hooks/notification/TelegramNotifier";
+import {orderFeedConnected} from "./src/hooks/handlers/OrderFeedConnectedHookHandler";
+import {orderFeedDisconnected} from "./src/hooks/handlers/OrderFeedDisconnectedHookHandler";
+import {orderPostponed} from "./src/hooks/handlers/OrderPostponedHookHandler";
+import {orderRejected} from "./src/hooks/handlers/OrderRejectedHookHandler";
 
 const environment = !!process.env.USE_MADRID ? environments.PRERELEASE_ENVIRONMENT_CODENAME_MADRID : environments.PRODUCTION;
+const telegramNotifier = new TelegramNotifier(process.env.TG_KEY!, [process.env.TG_CHAT_ID!]);
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(process.env.WSS ?? environment.WSS, {
@@ -19,6 +25,13 @@ const config: ExecutorLaunchConfig = {
       Authorization: process.env.WS_API_KEY ? `Bearer ${process.env.WS_API_KEY}` : undefined,
     },
   } as any),
+
+  hookHandlers: {
+    [Hooks.OrderFeedConnected]: [orderFeedConnected(telegramNotifier)],
+    [Hooks.OrderFeedDisconnected]: [orderFeedDisconnected(telegramNotifier)],
+    [Hooks.OrderPostponed]: [orderPostponed(telegramNotifier)],
+    [Hooks.OrderRejected]: [orderRejected(telegramNotifier)],
+  },
 
   buckets: [
     //
@@ -53,44 +66,6 @@ const config: ExecutorLaunchConfig = {
   }),
 
   chains: [
-    {
-      chain: ChainId.Solana,
-      chainRpc: `${process.env.SOLANA_RPC}`,
-
-      beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
-      takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-    },
-
-    {
-      chain: ChainId.Arbitrum,
-      chainRpc: `${process.env.ARBITRUM_RPC}`,
-
-      beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
-      takerPrivateKey: `${process.env.ARBITRUM_TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.ARBITRUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-
-      constraints: {
-        requiredConfirmationsThresholds: [
-          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
-        ]
-      },
-    },
-
-    {
-      chain: ChainId.Avalanche,
-      chainRpc: `${process.env.AVALANCHE_RPC}`,
-
-      beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
-      takerPrivateKey: `${process.env.AVALANCHE_TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.AVALANCHE_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-
-      constraints: {
-        requiredConfirmationsThresholds: [
-          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
-        ]
-      },
-    },
 
     {
       chain: ChainId.BSC,
@@ -107,20 +82,6 @@ const config: ExecutorLaunchConfig = {
       },
     },
 
-    {
-      chain: ChainId.Ethereum,
-      chainRpc: `${process.env.ETHEREUM_RPC}`,
-
-      beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
-      takerPrivateKey: `${process.env.ETHEREUM_TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.ETHEREUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-
-      constraints: {
-        requiredConfirmationsThresholds: [
-          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
-        ]
-      },
-    },
 
     {
       chain: ChainId.Polygon,
