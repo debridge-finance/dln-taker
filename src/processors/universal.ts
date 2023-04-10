@@ -601,13 +601,12 @@ class UniversalProcessor extends BaseOrderProcessor {
     if (isProfitable) {
       logger.info("order is profitable");
     }
-    //`estimation requires ${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals))} of ${reserveDstToken} reserve token for fulfillment, which gives only ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals))} of ${tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress)} take token, while order requires ${order.take.amount / decimals } amount (${ projectedFulfillAmount * 100 / order.take.amount - 100 }% drop)`
     else {
       logger.info("order is not profitable");
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         context,
-        message: JSON.stringify(estimation),//todo
+        message: `estimation requires ${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toString()} of ${reserveDstToken} reserve token for fulfillment, which gives only ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals))} of ${tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress)} take token, while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals)).toString() } amount (${ new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toNumber() - 100 }% drop)`,
         reason: PostponingReason.NOT_PROFITABLE,
       });
       if (allowPlaceToMempool)
