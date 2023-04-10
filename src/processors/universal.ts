@@ -469,7 +469,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         context,
-        message: `not enough ${pickedBucket.reserveDstToken} reserve token on balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))} actual, but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals))}`,
+        message: `not enough ${tokenAddressToString(this.takeChain.chain, pickedBucket.reserveDstToken)} reserve token on balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))} actual, but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals))}`,
         reason: PostponingReason.NOT_ENOUGH_BALANCE,
       });
       logger.info(
@@ -533,12 +533,12 @@ class UniversalProcessor extends BaseOrderProcessor {
       catch (e) {
         let message;
         if (e instanceof ClientError) {
-          message = `preliminary fullfil tx estimation failed: ${e}, reason: ${e.type}; postponing to the mempool`;
-          logger.error(message);
+          message = `preliminary fullfil tx estimation failed: ${e}, reason: ${e.type}`;
+          logger.error(`${message}; postponing to the mempool`);
         }
         else {
-          message = `unable to estimate preliminary fullfil tx: ${e}; this can be because the order is not profitable; postponing to the mempool`;
-          logger.error(message);
+          message = `unable to estimate preliminary fullfil tx: ${e}; this can be because the order is not profitable`;
+          logger.error(`${message}; postponing to the mempool`);
           logger.error(e);
         }
         const error = e as Error;
@@ -583,6 +583,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       requiredReserveDstAmount,
       isProfitable,
       reserveToTakeSlippageBps,
+      profitableTakeAmount,
     } = estimation;
 
     const hookEstimation = {
@@ -590,7 +591,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       reserveToken: reserveDstToken,
       requiredReserveAmount: requiredReserveDstAmount,
       fulfillToken: orderInfo.order?.take.tokenAddress!,
-      projectedFulfillAmount: orderInfo.order.take.amount!.toString(),
+      projectedFulfillAmount: profitableTakeAmount,
     };
     this.hooksEngine.handleOrderEstimated({
       order: orderInfo,
@@ -606,7 +607,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         context,
-        message: `estimation requires ${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toString()} of ${reserveDstToken} reserve token for fulfillment, which gives only ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals))} of ${tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress)} take token, while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals)).toString() } amount (${ new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toNumber() - 100 }% drop)`,
+        message: `estimation requires ${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toString()} of ${tokenAddressToString(this.takeChain.chain, reserveDstToken)} reserve token for fulfillment, which gives only ${new BigNumber(profitableTakeAmount).div(BigNumber(10).pow(takeTokenDecimals))} of ${tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress)} take token, while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals)).toString() } amount (${new BigNumber(profitableTakeAmount).multipliedBy(100).div(orderInfo.order.take.amount.toString())}% drop)`,
         reason: PostponingReason.NOT_PROFITABLE,
       });
       if (allowPlaceToMempool)

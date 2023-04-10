@@ -139,10 +139,14 @@ export class WsNextOrder extends GetNextOrder {
       if (this.timeLastDisconnect) {
         timeSinceLastDisconnect =
             (new Date().getTime() - this.timeLastDisconnect.getTime()) / 1000;
+        this.hooksEngine.handleOrderFeedConnected({
+          message: `order feed has been connected to ${this.wsArgs[0]}, after ${timeSinceLastDisconnect}s of disconnect`,
+        });
+      } else {
+        this.hooksEngine.handleOrderFeedConnected({
+          message: `order feed has been connected to ${this.wsArgs[0]}`,
+        });
       }
-      this.hooksEngine.handleOrderFeedConnected({
-        message: `order feed has been connected to ${this.wsArgs[0]}, after ${timeSinceLastDisconnect}s of disconnect`,
-      });
       this.heartbeat();
 
       // Subscribe to all new orders
