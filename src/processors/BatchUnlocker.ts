@@ -28,6 +28,7 @@ export class BatchUnlocker {
   private isBatchUnlockLocked: boolean = false;
   private readonly logger: Logger;
   private executor: IExecutor;
+  private readonly retryTimeout = 5 * 1000; // 5s
 
   constructor(
     logger: Logger,
@@ -147,6 +148,10 @@ export class BatchUnlocker {
       const batchSucceeded = await this.performBatchUnlock(giveChainId);
       if (!batchSucceeded) {
         this.logger.error("batch unlock failed, stopping");
+        setTimeout(() => {
+          this.logger.debug(`retrying is started for chainId ${giveChainId}`);
+          this.tryUnlock(giveChainId!);
+        }, this.retryTimeout);
         break;
       }
     }
