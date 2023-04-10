@@ -15,6 +15,8 @@ import {orderFeedConnected} from "./src/hooks/handlers/OrderFeedConnectedHookHan
 import {orderFeedDisconnected} from "./src/hooks/handlers/OrderFeedDisconnectedHookHandler";
 import {orderPostponed} from "./src/hooks/handlers/OrderPostponedHookHandler";
 import {orderRejected} from "./src/hooks/handlers/OrderRejectedHookHandler";
+import {orderUnlockFailed} from "./src/hooks/handlers/OrderUnlockFailedHookHandler";
+import {orderUnlockSent} from "./src/hooks/handlers/OrderUnlockSentHookHandler";
 
 const environment = !!process.env.USE_MADRID ? environments.PRERELEASE_ENVIRONMENT_CODENAME_MADRID : environments.PRODUCTION;
 const telegramNotifier = new TelegramNotifier(process.env.TG_KEY!, [process.env.TG_CHAT_ID!]);
@@ -31,6 +33,8 @@ const config: ExecutorLaunchConfig = {
     [Hooks.OrderFeedDisconnected]: [orderFeedDisconnected(telegramNotifier)],
     [Hooks.OrderPostponed]: [orderPostponed(telegramNotifier)],
     [Hooks.OrderRejected]: [orderRejected(telegramNotifier)],
+    [Hooks.OrderUnlockFailed]: [orderUnlockFailed(telegramNotifier)],
+    [Hooks.OrderUnlockSent]: [orderUnlockSent(telegramNotifier)],
   },
 
   buckets: [
