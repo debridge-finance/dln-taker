@@ -11,7 +11,7 @@ export const orderRejected = (
         const logger = arg.context.logger.child({
             handlerName,
         });
-        const message = `Order #${arg.order.orderId} has been rejected`;
+        const message = `Order #${arg.order.orderId} has been rejected because of ${ RejectionReason[arg.reason] }: ${ arg.message }`
         await notifier.notify(message, { logger });
     };
 };

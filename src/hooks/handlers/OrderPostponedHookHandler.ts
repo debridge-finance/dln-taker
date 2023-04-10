@@ -1,6 +1,6 @@
 import { HookHandler } from "../HookHandler";
 import {Notifier} from "../notification/Notifier";
-import {Hooks} from "../HookEnums";
+import {Hooks, PostponingReason} from "../HookEnums";
 import {HookParams} from "../types/HookParams";
 
 export const orderPostponed = (
@@ -11,7 +11,7 @@ export const orderPostponed = (
         const logger = arg.context.logger.child({
             handlerName,
         });
-        const message = `Order #${arg.order.orderId} has been postponed, message: ${arg.message}`;
+        const message = `Order #${arg.order.orderId} has been postponed because of ${PostponingReason[arg.reason]}: ${arg.message}`;
         await notifier.notify(message, { logger });
     };
 };
