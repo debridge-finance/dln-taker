@@ -467,7 +467,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     const batchSize =
       orderInfo.order.give.chainId === ChainId.Solana ||
-      orderInfo.order.take.chainId === ChainId.Solana
+        orderInfo.order.take.chainId === ChainId.Solana
         ? null
         : this.params.batchUnlockSize;
 
@@ -592,6 +592,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       const wallet = (this.takeChain.fulfillProvider as SolanaProviderAdapter)
         .wallet.publicKey;
       const solanaFullFillTxPayload: PreswapFulfillOrderPayload<ChainId.Solana> = {
+        ...fullFillTxPayload,
         taker: wallet
       }
       fullFillTxPayload = solanaFullFillTxPayload;
