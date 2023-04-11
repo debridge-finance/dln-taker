@@ -617,7 +617,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         context,
-        message: `estimation requires ${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toString()} of ${tokenAddressToString(this.takeChain.chain, reserveDstToken)} reserve token for fulfillment, which gives only ${new BigNumber(profitableTakeAmount).div(BigNumber(10).pow(takeTokenDecimals))} of ${tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress)} take token, while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals)).toString() } amount (${new BigNumber(profitableTakeAmount).multipliedBy(100).div(orderInfo.order.take.amount.toString())}% drop)`,
+        message: `estimation requires ${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toString()} of ${tokenAddressToString(this.takeChain.chain, reserveDstToken)} reserve token for fulfillment, which gives only ${new BigNumber(profitableTakeAmount).div(BigNumber(10).pow(takeTokenDecimals))} of ${tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress)} take token, while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals)).toString() } amount (${100 - (new BigNumber(profitableTakeAmount).multipliedBy(100).div(orderInfo.order.take.amount.toString())).toNumber()}% drop)`,
         reason: PostponingReason.NOT_PROFITABLE,
         attempts: params.attempts,
       });
