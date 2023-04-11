@@ -19,7 +19,14 @@ import {orderUnlockFailed} from "./src/hooks/handlers/OrderUnlockFailedHookHandl
 import {orderUnlockSent} from "./src/hooks/handlers/OrderUnlockSentHookHandler";
 
 const environment = !!process.env.USE_MADRID ? environments.PRERELEASE_ENVIRONMENT_CODENAME_MADRID : environments.PRODUCTION;
-const telegramNotifier = new TelegramNotifier(process.env.TG_KEY!, [process.env.TG_CHAT_ID!]);
+
+if (!process.env.TG_KEY) {
+  throw new Error('TG_KEY is missing');
+}
+if (!process.env.TG_CHAT_ID) {
+  throw new Error('TG_CHAT_ID is missing');
+}
+const telegramNotifier = new TelegramNotifier(process.env.TG_KEY, [process.env.TG_CHAT_ID]);
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(process.env.WSS ?? environment.WSS, {
