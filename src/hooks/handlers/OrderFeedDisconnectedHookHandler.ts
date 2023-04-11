@@ -14,7 +14,7 @@ export const orderFeedDisconnected = (
         const logger = context!.logger.child({
             handlerName,
         });
-        const message = `Websocket connection is lost!`;
+        const message = `Websocket disconnected!`;
         await notifier.notify(message, { logger });
     };
 };

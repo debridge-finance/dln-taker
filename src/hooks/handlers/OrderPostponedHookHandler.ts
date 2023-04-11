@@ -14,7 +14,7 @@ export const orderPostponed = (
         const logger = arg.context.logger.child({
             handlerName,
         });
-        if (arg.attempts > 5) {
+        if (arg.attempts > 1) {
             return;
         }
         const order = arg.order.order;
@@ -24,9 +24,10 @@ export const orderPostponed = (
             arg.context.config.client.getTokenSymbol(order.give.chainId, order.give.tokenAddress, arg.context.giveChain.fulfillProvider.connection as Web3),
             arg.context.config.client.getTokenSymbol(order.take.chainId, order.take.tokenAddress, arg.context.config.chains[order.take.chainId]?.fulfillProvider.connection as Web3),
         ]);
-        const giveInfo = `${new BigNumber(order.give.amount.toString()).div(new BigNumber(10).pow(giveDecimals))} ${giveTokenSymbol}@${ChainId[order.give.chainId]}`;
-        const takeInfo = `${new BigNumber(order.take.amount.toString()).div(new BigNumber(10).pow(takeDecimals))} ${takeTokenSymbol}@${ChainId[order.take.chainId]}`;
-        const message = `Order #<a href="https://dln.debridge.finance/order?orderId=${arg.order.orderId}">${arg.order.orderId}</a>(attempt: ${arg.attempts})(${giveInfo} -> ${takeInfo}) has been postponed because of ${PostponingReason[arg.reason]}: ${arg.message}`;
+        const giveInfo = `${new BigNumber(order.give.amount.toString()).div(new BigNumber(10).pow(giveDecimals))} ${giveTokenSymbol} @ ${ChainId[order.give.chainId]}`;
+        const takeInfo = `${new BigNumber(order.take.amount.toString()).div(new BigNumber(10).pow(takeDecimals))} ${takeTokenSymbol} @ ${ChainId[order.take.chainId]}`;
+        const attempts = arg.attempts > 0 ? ` (attempt: ${arg.attempts + 1})` : ''
+        const message = `Order #<a href="https://dln.debridge.finance/order?orderId=${arg.order.orderId}">${arg.order.orderId}</a>${attempts} (${giveInfo} -> ${takeInfo}) has been postponed because of ${PostponingReason[arg.reason]}: ${arg.message}`;
         await notifier.notify(message, { logger });
     };
 };
