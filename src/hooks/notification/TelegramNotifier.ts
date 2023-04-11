@@ -17,6 +17,7 @@ export class TelegramNotifier extends Notifier {
       await axios.post(`https://api.telegram.org/bot${this.tgKey}/sendMessage`, {
         chat_id: chatId,
         text: message,
+        parse_mode: "HTML"
       });
       logger.debug(`Notification ${message} is sent`);
     }
