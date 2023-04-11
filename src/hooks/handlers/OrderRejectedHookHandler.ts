@@ -24,8 +24,8 @@ export const orderRejected = (
             arg.context.config.client.getTokenSymbol(order.give.chainId, order.give.tokenAddress, arg.context.giveChain.fulfillProvider.connection as Web3),
             arg.context.config.client.getTokenSymbol(order.take.chainId, order.take.tokenAddress, arg.context.config.chains[order.take.chainId]?.fulfillProvider.connection as Web3),
         ]);
-        const giveInfo = `${new BigNumber(order.give.amount.toString()).div(new BigNumber(10).pow(giveDecimals))} ${ChainId[order.give.chainId]}@${giveTokenSymbol}`;
-        const takeInfo = `${new BigNumber(order.take.amount.toString()).div(new BigNumber(10).pow(takeDecimals))} ${ChainId[order.take.chainId]}@${takeTokenSymbol}`;
+        const giveInfo = `${new BigNumber(order.give.amount.toString()).div(new BigNumber(10).pow(giveDecimals))} ${giveTokenSymbol}@${ChainId[order.give.chainId]}`;
+        const takeInfo = `${new BigNumber(order.take.amount.toString()).div(new BigNumber(10).pow(takeDecimals))} ${takeTokenSymbol}@${ChainId[order.take.chainId]}`;
         const message = `Order #<a href="https://dln.debridge.finance/order?orderId=${arg.order.orderId}">${arg.order.orderId}</a>(attempt: ${arg.attempts})(${giveInfo} -> ${takeInfo}) has been rejected because of ${ RejectionReason[arg.reason] }: ${ arg.message }`
         await notifier.notify(message, { logger });
     };
