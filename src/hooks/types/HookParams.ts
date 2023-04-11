@@ -28,6 +28,7 @@ export type HookParams<T extends Hooks> =
             order: IncomingOrder<any>;
             reason: PostponingReason;
             message: string;
+            attempts: number;
             context: OrderProcessorContext;
         }
         : {}) &
@@ -52,6 +53,7 @@ export type HookParams<T extends Hooks> =
             order: IncomingOrder<any>;
             reason: RejectionReason;
             message: string;
+            attempts: number;
             context: OrderProcessorContext;
         }
         : {}) &
