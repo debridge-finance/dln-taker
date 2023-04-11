@@ -251,6 +251,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           order: orderInfo,
           context,
           reason: PostponingReason.UNHANDLED_ERROR,
+          attempts: params.attempts,
           message: `trying to process order ${orderId} failed with unhandled error: ${error.message}`,
         });
         this.mempoolService.addOrder(params);
@@ -297,6 +298,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         reason: RejectionReason.UNEXPECTED_GIVE_TOKEN,
         context,
+        attempts: params.attempts,
         message: `no bucket found to cover order's give token: ${tokenAddressToString(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress)}`
       });
       logger.info(
@@ -324,6 +326,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         reason: RejectionReason.ALREADY_FULFILLED_OR_CANCELLED,
         context,
+        attempts: params.attempts,
         message,
       });
       return;
@@ -343,6 +346,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         order: orderInfo,
         reason: RejectionReason.MISSING,
         context,
+        attempts: params.attempts,
         message
       });
       return;
@@ -354,6 +358,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
         reason: RejectionReason.UNEXPECTED_GIVE_STATUS,
+        attempts: params.attempts,
         context,
         message,
       });
@@ -372,6 +377,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         this.hooksEngine.handleOrderRejected({
           order: orderInfo,
           reason: RejectionReason.REVOKED,
+          attempts: params.attempts,
           context,
           message,
         });
@@ -423,6 +429,7 @@ class UniversalProcessor extends BaseOrderProcessor {
             this.hooksEngine.handleOrderRejected({
               order: orderInfo,
               reason: RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
+              attempts: params.attempts,
               context,
               message,
             });
@@ -439,6 +446,7 @@ class UniversalProcessor extends BaseOrderProcessor {
             order: orderInfo,
             reason: RejectionReason.NOT_YET_FINALIZED,
             context,
+            attempts: params.attempts,
             message,
           });
           return;
@@ -471,6 +479,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         context,
         message: `not enough ${tokenAddressToString(this.takeChain.chain, pickedBucket.reserveDstToken)} reserve token on balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))} actual, but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals))}`,
         reason: PostponingReason.NOT_ENOUGH_BALANCE,
+        attempts: params.attempts,
       });
       logger.info(
         `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${roughReserveDstAmount}; postponing it to the mempool`
@@ -547,6 +556,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           context,
           reason: PostponingReason.FULFILLMENT_EVM_TX_PREESTIMATION_FAILED,
           message,
+          attempts: params.attempts,
         });
         if (allowPlaceToMempool)
           this.mempoolService.addOrder(params);
@@ -609,6 +619,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         context,
         message: `estimation requires ${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toString()} of ${tokenAddressToString(this.takeChain.chain, reserveDstToken)} reserve token for fulfillment, which gives only ${new BigNumber(profitableTakeAmount).div(BigNumber(10).pow(takeTokenDecimals))} of ${tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress)} take token, while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals)).toString() } amount (${new BigNumber(profitableTakeAmount).multipliedBy(100).div(orderInfo.order.take.amount.toString())}% drop)`,
         reason: PostponingReason.NOT_PROFITABLE,
+        attempts: params.attempts,
       });
       if (allowPlaceToMempool)
         this.mempoolService.addOrder(params);
@@ -644,6 +655,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
             context,
             message: `final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit})`,
             reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_EXCEEDED_PREESTIMATION,
+            attempts: params.attempts,
           });
 
           if (allowPlaceToMempool) {
@@ -664,6 +676,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
           context,
           message: `unable to estimate fullfil tx: ${e}`,
           reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
+          attempts: params.attempts,
         });
         if (allowPlaceToMempool)
           this.mempoolService.addOrder(params);
@@ -695,6 +708,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
             ? PostponingReason.FULFILLMENT_TX_REVERTED
             : PostponingReason.FULFILLMENT_TX_FAILED,
         message: `fulfill transaction failed: ${error.message}`,
+        attempts: params.attempts,
       });
       if (allowPlaceToMempool)
         this.mempoolService.addOrder(params);
