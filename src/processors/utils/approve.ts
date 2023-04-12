@@ -25,16 +25,16 @@ export const approve = (
 };
 
 export const isApproved = async (
-  web3: Web3,
-  tokenAddress: string,
-  contractAddress: string
+    provider: EvmProviderAdapter,
+    tokenAddress: string,
+    contractAddress: string
 ) => {
   if (contractAddress === ZERO_EVM_ADDRESS) return;
-  const contract = new web3.eth.Contract(IERC20.abi as any, tokenAddress);
+  const contract = new provider.connection.eth.Contract(IERC20.abi as any, tokenAddress);
 
   const approvedCount = new BigNumber(
     await contract.methods
-      .allowance(web3.eth.defaultAccount, contractAddress)
+      .allowance(provider.address, contractAddress)
       .call()
   );
 
@@ -57,7 +57,7 @@ export const approveToken = async (
     return Promise.resolve();
   }
   const tokenIsApproved = await isApproved(
-    connection,
+    provider,
     tokenAddress,
     contractAddress
   );

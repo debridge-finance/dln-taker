@@ -32,16 +32,23 @@ export class EvmProviderAdapter implements ProviderAdapter {
   private staleTx?: Tx;
 
   private rebroadcast: EvmRebroadcastAdapterOpts = {};
+  private readonly _address: string;
+  public readonly connection: Web3;
 
   constructor(
-    public readonly connection: Web3,
+    rpc: string,
+    public readonly privateKey: string,
     rebroadcast?: EvmRebroadcastAdapterOpts
   ) {
+    this.connection = new Web3(rpc);
+    const accountEvmFromPrivateKey =
+        this.connection.eth.accounts.privateKeyToAccount(privateKey);
+    this._address = accountEvmFromPrivateKey.address;
     this.fillDefaultVariables(rebroadcast);
   }
 
   public get address(): string {
-    return this.connection.eth.defaultAccount!;
+    return this._address;
   }
 
   async sendTransaction(data: unknown, context: SendTransactionContext) {
@@ -54,7 +61,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
     if (!tx.to || !tx.data) throw new Error('Unexpected tx')
 
     const nonce = await this.connection.eth.getTransactionCount(
-      this.connection.eth.defaultAccount!
+      this.address
     );
     let nextGasPrice = await this.connection.eth.getGasPrice();
 
@@ -217,7 +224,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
   private async sendTx(tx: Tx, logger: Logger): Promise<string> {
     return new Promise(async (resolve, reject) => {
-      tx.from = this.connection.eth.defaultAccount!;
+      tx.from = this.address;
 
       if (!tx.gas) {
         let estimatedGas: number = 0;
@@ -243,10 +250,12 @@ export class EvmProviderAdapter implements ProviderAdapter {
         reject(error);
       }
 
-      // kinda weird code below: THREE checks
-      try { // this is needed because sendTransaction() may throw an error during tx preparation (e.g., incorrect gas value)
+      try {
+        const signedTx = await this.connection.eth.accounts.signTransaction(tx, this.privateKey);
+        logger.info("Signed tx", signedTx);
+
         this.connection.eth
-          .sendTransaction(tx)
+          .sendSignedTransaction(signedTx.rawTransaction!)
           .on("error", errorHandler) // this is needed of RPC node raises an error
           .once("transactionHash", (hash: string) => {
             logger.debug(`tx sent, txHash: ${hash}`);

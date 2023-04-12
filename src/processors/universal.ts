@@ -553,6 +553,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           to: fulfillTx.tx.to,
           data: fulfillTx.tx.data,
           value: fulfillTx.tx.value.toString(),
+          from: this.takeChain.fulfillProvider.address,
         });
         logger.debug(`estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${evmFulfillGasLimit} gas units`);
 
@@ -689,7 +690,10 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     );
     if (getEngineByChainId(orderInfo.order.take.chainId) === ChainEngine.EVM) {
       try {
-        const evmFulfillGas = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas(fulfillTx as Tx);
+        const evmFulfillGas = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas({
+          ...fulfillTx as Tx,
+          from: this.takeChain.fulfillProvider.address,
+        });
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
           const message = `final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit})`;
