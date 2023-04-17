@@ -36,11 +36,14 @@ const config: ExecutorLaunchConfig = {
       [ChainId.Solana]: ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
     }),
     //
-    // Setting the ETH bucket
+    // Setting the ETH/wETH bucket
     //
     new TokensBucket({
       [ChainId.Arbitrum]: ['0x0000000000000000000000000000000000000000'],
-      [ChainId.Ethereum]: ['0x0000000000000000000000000000000000000000']
+      [ChainId.Avalanche]: ['0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB'],
+      [ChainId.BSC]: ['0x2170Ed0880ac9A755fd29B2688956BD959F933F8'],
+      [ChainId.Ethereum]: ['0x0000000000000000000000000000000000000000'],
+      [ChainId.Polygon]: ['0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619']
     }),
   ],
 
