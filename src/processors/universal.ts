@@ -468,7 +468,8 @@ class UniversalProcessor extends BaseOrderProcessor {
     ]);
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
-    let roughReserveDstAmount = BigNumber(orderInfo.order.give.amount.toString()).div(BigNumber(10).pow(reserveSrcTokenDecimals - reserveDstTokenDecimals)).integerValue();
+    const roughReserveDstDecimals = reserveSrcTokenDecimals - reserveDstTokenDecimals
+    let roughReserveDstAmount = BigNumber(orderInfo.order.give.amount.toString()).div(BigNumber(10).pow(roughReserveDstDecimals)).integerValue();
     logger.debug(`expressed order give amount (${orderInfo.order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(orderInfo.order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[orderInfo.order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
 
     const accountReserveBalance =
@@ -477,7 +478,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         context,
-        message: `not enough ${tokenAddressToString(this.takeChain.chain, pickedBucket.reserveDstToken)} reserve token on balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))} actual, but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals))}`,
+        message: `not enough ${tokenAddressToString(this.takeChain.chain, pickedBucket.reserveDstToken)} reserve token on balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))} actual, but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(roughReserveDstDecimals))}`,
         reason: PostponingReason.NOT_ENOUGH_BALANCE,
         attempts: params.attempts,
       });
