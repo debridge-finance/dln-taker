@@ -134,7 +134,8 @@ The core on-chain DLN protocol is designed to work with arbitrary tokens on eith
 
 As for now, deBridge uses two buckets of tokens for asset routing:
 1. the USDC token, emitted by Circle Inc. on every DLN supported chain, and
-2. the ETH coin, on Ethereum and Arbitrum
+1. the ETH coin, on Ethereum and Arbitrum, and
+1. the wETH token, on Avalanche, BNB Chain and Polygon
 
 Both buckets are explicitly defined in the sample configuration file [here](./sample.config.ts)), so every taker is required to **load theirs address with enough USDC and ETH on every chain you are willing to fulfill orders on**.
 
@@ -144,6 +145,7 @@ For every chain you as a taker would like to support:
 - Register the reserves-keeping address (its private key must be set as a `takerPrivateKey` in the configuration file) and load it with:
   - a given amount of USDC tokens (e.g., 100,000 USDC),
   - a given amount of ETH (e.g. 60 ETH) on Ethereum and Arbitrum,
+  - a given amount of wETH tokens (e.g. 60 wETH) on Avalanche, BNB Chain and Polygon,
   - a reasonable amount of native blockchain currency (e.g., 1 ETH on Ethereum) to pay gas for fulfillment transactions.
 - Register the unlock authority address (its private key must be set as an `unlockAuthorityPrivateKey` in the configuration file) and load it with:
   - a reasonable amount of native blockchain currency (e.g. 1 ETH on Ethereum) to pay gas for order unlocking transactions.
