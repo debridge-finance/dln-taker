@@ -6,16 +6,19 @@ import {
   ClientError,
   evm,
   EvmChains,
+  findExpectedBucket,
   getEngineByChainId,
   OrderData,
   OrderState,
-  pickReserveToken,
   PreswapFulfillOrderPayload,
   tokenAddressToString,
   tokenStringToBuffer,
   ZERO_EVM_ADDRESS,
 } from "@debridge-finance/dln-client";
-import { SwapConnectorRequest, SwapConnectorResult } from "@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
+import {
+  SwapConnectorRequest,
+  SwapConnectorResult
+} from "@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import Web3 from "web3";
@@ -25,12 +28,7 @@ import { createClientLogger } from "../logger";
 import { EvmProviderAdapter, Tx } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
-import {
-  BaseOrderProcessor,
-  OrderProcessorContext,
-  OrderProcessorInitContext,
-  OrderProcessorInitializer,
-} from "./base";
+import { BaseOrderProcessor, OrderProcessorContext, OrderProcessorInitContext, OrderProcessorInitializer } from "./base";
 import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
 import { approveToken } from "./utils/approve";
@@ -382,7 +380,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
 
     // perform rough estimation: assuming order.give.amount is what we need on balance
-    const pickedBucket = pickReserveToken(orderInfo.order, context.config.buckets);
+    const pickedBucket = findExpectedBucket(orderInfo.order, context.config.buckets);
     const [reserveSrcTokenDecimals, reserveDstTokenDecimals] = await Promise.all([
       context.config.client.getDecimals(orderInfo.order.give.chainId, pickedBucket.reserveSrcToken, context.giveChain.fulfillProvider.connection as Web3),
       context.config.client.getDecimals(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, this.takeChain.fulfillProvider.connection as Web3),
