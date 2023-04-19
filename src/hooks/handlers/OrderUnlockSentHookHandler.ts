@@ -15,7 +15,7 @@ export const orderUnlockSent = (
         const logger = context!.logger.child({
             handlerName,
         });
-        const message = `${args.orderIds.length} orders were send for unlock from ${ChainId[args.fromChainId]} to ${ChainId[args.toChainId]}}, txhash: ${args.txHash}`;
+        const message = `${args.orderIds.length} orders were send for unlock from ${ChainId[args.fromChainId]} to ${ChainId[args.toChainId]}, txhash: ${args.txHash}`;
         await notifier.notify(message, { logger });
     };
 };
