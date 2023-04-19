@@ -1,10 +1,11 @@
-import { HookHandler } from "../HookHandler";
+import {HookHandler} from "../HookHandler";
 import {Notifier} from "../notification/Notifier";
 import {Hooks, PostponingReason} from "../HookEnums";
 import {HookParams} from "../types/HookParams";
 import Web3 from "web3";
-import {ChainId, tokenAddressToString} from "@debridge-finance/dln-client";
+import { ChainId } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
+import { OrderInfoStatus } from "../../interfaces";
 
 export const orderPostponed = (
     notifier: Notifier,
@@ -14,6 +15,9 @@ export const orderPostponed = (
         const logger = arg.context.logger.child({
             handlerName,
         });
+        if (arg.order.status !== OrderInfoStatus.Created) {
+            return;
+        }
         if (arg.attempts > 1) {
             return;
         }

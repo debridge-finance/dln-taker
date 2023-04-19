@@ -5,6 +5,7 @@ import {HookParams} from "../types/HookParams";
 import {ChainId, tokenAddressToString} from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import Web3 from "web3";
+import { OrderInfoStatus } from "../../interfaces";
 
 export const orderRejected = (
     notifier: Notifier
@@ -14,6 +15,9 @@ export const orderRejected = (
         const logger = arg.context.logger.child({
             handlerName,
         });
+        if (arg.order.status !== OrderInfoStatus.Created) {
+            return;
+        }
         if (arg.attempts > 1) {
             return;
         }
