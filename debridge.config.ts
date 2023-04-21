@@ -9,9 +9,24 @@ import { ExecutorLaunchConfig } from "./src/config";
 import * as environments from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
-import * as filters from "./src/filters";
+import { Hooks } from "./src/hooks/HookEnums";
+import {TelegramNotifier} from "./src/hooks/notification/TelegramNotifier";
+import {orderFeedConnected} from "./src/hooks/handlers/OrderFeedConnectedHookHandler";
+import {orderFeedDisconnected} from "./src/hooks/handlers/OrderFeedDisconnectedHookHandler";
+import {orderPostponed} from "./src/hooks/handlers/OrderPostponedHookHandler";
+import {orderRejected} from "./src/hooks/handlers/OrderRejectedHookHandler";
+import {orderUnlockFailed} from "./src/hooks/handlers/OrderUnlockFailedHookHandler";
+import {orderUnlockSent} from "./src/hooks/handlers/OrderUnlockSentHookHandler";
 
 const environment = !!process.env.USE_MADRID ? environments.PRERELEASE_ENVIRONMENT_CODENAME_MADRID : environments.PRODUCTION;
+
+if (!process.env.TG_KEY) {
+  throw new Error('TG_KEY is missing');
+}
+if (!process.env.TG_CHAT_ID) {
+  throw new Error('TG_CHAT_ID is missing');
+}
+const telegramNotifier = new TelegramNotifier(process.env.TG_KEY, [process.env.TG_CHAT_ID]);
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(process.env.WSS ?? environment.WSS, {
@@ -19,6 +34,15 @@ const config: ExecutorLaunchConfig = {
       Authorization: process.env.WS_API_KEY ? `Bearer ${process.env.WS_API_KEY}` : undefined,
     },
   } as any),
+
+  hookHandlers: {
+    [Hooks.OrderFeedConnected]: [orderFeedConnected(telegramNotifier)],
+    [Hooks.OrderFeedDisconnected]: [orderFeedDisconnected(telegramNotifier)],
+    [Hooks.OrderPostponed]: [orderPostponed(telegramNotifier)],
+    [Hooks.OrderRejected]: [orderRejected(telegramNotifier)],
+    [Hooks.OrderUnlockFailed]: [orderUnlockFailed(telegramNotifier)],
+    [Hooks.OrderUnlockSent]: [orderUnlockSent(telegramNotifier)],
+  },
 
   buckets: [
     //
