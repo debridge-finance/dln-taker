@@ -241,9 +241,9 @@ class UniversalProcessor extends BaseOrderProcessor {
     try {
       await this.processOrder(orderId);
     } catch (e) {
-      logger.error(`processing order failed with error: ${e}`);
+      const message = `processing order failed with an unhandled error: ${e}`;
+      logger.error(message);
       logger.error(e);
-      const error = e as Error;
       const params = this.incomingOrdersMap.get(orderId);
       if (params) {
         const { context, orderInfo } = params;
@@ -252,11 +252,11 @@ class UniversalProcessor extends BaseOrderProcessor {
           context,
           reason: PostponingReason.UNHANDLED_ERROR,
           attempts: params.attempts,
-          message: `trying to process order ${orderId} failed with unhandled error: ${error.message}`,
+          message,
         });
         this.mempoolService.addOrder(params);
       } else {
-        logger.debug(`There is no params for order ${orderId}`);
+        logger.debug(`order data is not presented in the map`);
       }
     }
     this.isLocked = false;
@@ -294,19 +294,15 @@ class UniversalProcessor extends BaseOrderProcessor {
         bucket.findFirstToken(orderInfo.order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
+      const message = `no bucket found to cover order's give token: ${tokenAddressToString(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress)}`;
+      logger.info(message);
       this.hooksEngine.handleOrderRejected({
         order: orderInfo,
         reason: RejectionReason.UNEXPECTED_GIVE_TOKEN,
         context,
         attempts: params.attempts,
-        message: `no bucket found to cover order's give token: ${tokenAddressToString(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress)}`
+        message
       });
-      logger.info(
-        `no bucket found to cover order's give token: ${tokenAddressToString(
-          orderInfo.order.give.chainId,
-          orderInfo.order.give.tokenAddress
-        )}, skipping`
-      );
       return;
     }
 
@@ -371,9 +367,10 @@ class UniversalProcessor extends BaseOrderProcessor {
     if (orderInfo.status == OrderInfoStatus.Created) {
       const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info;
       if (finalizationInfo == 'Revoked') {
-        const message = 'order has been revoked by the order feed due to chain reorganization';
-        logger.info(`${message}, cleaning and skipping`);
         this.clearInternalQueues(orderInfo.orderId);
+
+        const message = 'order has been revoked by the order feed due to chain reorganization';
+        logger.info(message);
         this.hooksEngine.handleOrderRejected({
           order: orderInfo,
           reason: RejectionReason.REVOKED,
@@ -424,7 +421,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           logger.debug(`usdAmountConfirmationRange found: (${range.usdWorthFrom}, ${range.usdWorthTo}]`)
 
           if (announcedConfirmation < range.minBlockConfirmations) {
-            const message = `announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${range.minBlockConfirmations} for order worth of $${usdWorth}`;
+            const message = `announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${range.minBlockConfirmations} for order worth of $${usdWorth.toFixed(2)}`;
             logger.info(message)
             this.hooksEngine.handleOrderRejected({
               order: orderInfo,
@@ -440,8 +437,8 @@ class UniversalProcessor extends BaseOrderProcessor {
           }
         }
         else { // range not found: we do not accept this order, let it come finalized
-          const message = `non-finalized order worth of $${usdWorth} is not covered by any custom block confirmation range`;
-          logger.debug(`${message}, skipping`);
+          const message = `non-finalized order worth of $${usdWorth.toFixed(2)} is not covered by any custom block confirmation range`;
+          logger.debug(message);
           this.hooksEngine.handleOrderRejected({
             order: orderInfo,
             reason: RejectionReason.NOT_YET_FINALIZED,
@@ -475,16 +472,19 @@ class UniversalProcessor extends BaseOrderProcessor {
     const accountReserveBalance =
       await this.takeChain.fulfillProvider.getBalance(pickedBucket.reserveDstToken);
     if (new BigNumber(accountReserveBalance).lt(roughReserveDstAmount)) {
+      const message = [
+        `not enough funds of the reserve token (${tokenAddressToString(this.takeChain.chain, pickedBucket.reserveDstToken)}); `,
+        `actual balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))}, `,
+        `but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(roughReserveDstDecimals))}`
+      ].join('');
+      logger.info(message);
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         context,
-        message: `not enough ${tokenAddressToString(this.takeChain.chain, pickedBucket.reserveDstToken)} reserve token on balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))} actual, but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(roughReserveDstDecimals))}`,
+        message,
         reason: PostponingReason.NOT_ENOUGH_BALANCE,
         attempts: params.attempts,
       });
-      logger.info(
-        `not enough reserve token on balance: ${accountReserveBalance} actual, but expected ${roughReserveDstAmount}; postponing it to the mempool`
-      );
       if (allowPlaceToMempool)
         this.mempoolService.addOrder(params);
       return;
@@ -544,14 +544,13 @@ class UniversalProcessor extends BaseOrderProcessor {
         let message;
         if (e instanceof ClientError) {
           message = `preliminary fullfil tx estimation failed: ${e}, reason: ${e.type}`;
-          logger.error(`${message}; postponing to the mempool`);
+          logger.error(message);
         }
         else {
           message = `unable to estimate preliminary fullfil tx: ${e}; this can be because the order is not profitable`;
-          logger.error(`${message}; postponing to the mempool`);
+          logger.error(message);
           logger.error(e);
         }
-        const error = e as Error;
         this.hooksEngine.handleOrderPostponed({
           order: orderInfo,
           context,
@@ -614,11 +613,27 @@ class UniversalProcessor extends BaseOrderProcessor {
       logger.info("order is profitable");
     }
     else {
-      logger.info("order is not profitable");
-      let message = `estimation requires ${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals)).toString()} of ${tokenAddressToString(this.takeChain.chain, reserveDstToken)} reserve token for fulfillment, which gives only ${new BigNumber(profitableTakeAmount).div(BigNumber(10).pow(takeTokenDecimals))} of ${tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress)} take token, while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals)).toString() } amount (${100 - (new BigNumber(profitableTakeAmount).multipliedBy(100).div(orderInfo.order.take.amount.toString())).toNumber()}% drop)`;
+      let message = 'order is not profitable';
       if (new BigNumber(requiredReserveDstAmount).isEqualTo('0')) {
         message = 'not enough give amount to cover operating expenses';
       }
+      else {
+        const takeAmountDrop = new BigNumber(profitableTakeAmount).multipliedBy(100).div(orderInfo.order.take.amount.toString());
+        const takeAmountDropShare = BigNumber(100).minus(takeAmountDrop).toFixed(2);
+
+        const reserveTokenDesc = tokenAddressToString(this.takeChain.chain, reserveDstToken);
+        const takeTokenDesc = tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress);
+        message = [
+          `order is estimated to be profitable when supplying `,
+          `${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals))} `,
+          `of reserve token (${reserveTokenDesc}) during fulfillment, `,
+          `which gives only ${new BigNumber(profitableTakeAmount).div(BigNumber(10).pow(takeTokenDecimals))} `,
+          `of take token (${takeTokenDesc}), `,
+          `while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals))} of take amount `,
+          `(${takeAmountDropShare}% drop)`
+        ].join("");
+      }
+      logger.info(`order is not profitable: ${message}`);
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         context,
@@ -654,11 +669,12 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         const evmFulfillGas = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas(fulfillTx as Tx);
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
-          logger.info(`final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit}); postponing to the mempool `)
+          const message = `final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit})`;
+          logger.info(message)
           this.hooksEngine.handleOrderPostponed({
             order: orderInfo,
             context,
-            message: `final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit})`,
+            message,
             reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_EXCEEDED_PREESTIMATION,
             attempts: params.attempts,
           });
@@ -674,12 +690,13 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         }
       }
       catch (e) {
-        logger.error(`unable to estimate fullfil tx: ${e}; postponing to the mempool`)
+        const message = `unable to estimate fullfil tx: ${e}`;
+        logger.error(message)
         logger.error(e);
         this.hooksEngine.handleOrderPostponed({
           order: orderInfo,
           context,
-          message: `unable to estimate fullfil tx: ${e}`,
+          message,
           reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
           attempts: params.attempts,
         });
@@ -697,22 +714,22 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         fulfillTx,
         { logger }
       );
+      logger.info(`fulfill tx broadcasted, txhash: ${txFulfill}`);
       this.hooksEngine.handleOrderFulfilled({
         order: orderInfo,
         txHash: txFulfill,
       });
-      logger.info(`fulfill tx broadcasted, txhash: ${txFulfill}`);
     } catch (e) {
-      logger.error(`fulfill transaction failed: ${e}`);
+      const message = `fulfill transaction failed: ${e}`;
+      logger.error(message);
       logger.error(e);
-      const error = e as Error;
       this.hooksEngine.handleOrderPostponed({
         order: orderInfo,
         context,
-        reason: isRevertedError(error)
+        reason: isRevertedError(e as Error)
             ? PostponingReason.FULFILLMENT_TX_REVERTED
             : PostponingReason.FULFILLMENT_TX_FAILED,
-        message: `fulfill transaction failed: ${error.message}`,
+        message,
         attempts: params.attempts,
       });
       if (allowPlaceToMempool)
