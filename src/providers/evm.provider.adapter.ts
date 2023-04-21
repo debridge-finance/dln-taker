@@ -97,12 +97,12 @@ export class EvmProviderAdapter implements ProviderAdapter {
         );
         this.staleTx = currentTx;
         clearTimers();
-        reject(message);
+        reject(new Error(message));
       };
 
       const fail = (message: string) => {
         clearTimers();
-        reject(message);
+        reject(new Error(message));
       };
 
       try {
@@ -151,6 +151,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
               );
 
               failWithUndeterminedBehavior(`rebroadcasting aborted`);
+              return;
             }
 
             // pick gas price for bumping
@@ -175,6 +176,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
                 `picked gas price for bump (${nextGasPrice}) reached max bumped gas price (${tx.cappedGasPrice})`
               );
               failWithUndeterminedBehavior(`rebroadcasting aborted`);
+              return;
             }
 
             // run re-broadcast
@@ -226,7 +228,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
           logger.error(message);
           logger.error(error);
           logger.error(`tx which caused estimation failure: ${JSON.stringify(tx)}`)
-          reject(message);
+          reject(new Error(message));
           return;
         }
         tx.gas = estimatedGas * GAS_MULTIPLIER;
