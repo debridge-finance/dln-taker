@@ -6,6 +6,7 @@ import {
   OneInchConnector,
   PMMClient,
   PriceTokenService,
+  setSlippageOverloader,
   Solana,
   SwapConnector,
   SwapConnectorImpl,
@@ -28,6 +29,7 @@ import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { HooksEngine } from "../hooks/HooksEngine";
+import {SlippageOverrideService} from "../services/SlippageOverrideService";
 
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
@@ -85,10 +87,18 @@ export class Executor implements IExecutor {
 
   private isInitialized = false;
   private readonly url1Inch = "https://nodes.debridge.finance";
+  private slippageOverrideService: SlippageOverrideService;
   constructor(private readonly logger: Logger) { }
 
   async init(config: ExecutorLaunchConfig) {
+    if (this.slippageOverrideService) {
+      const slippageOverloader = this.slippageOverrideService.createSlippageOverloaderFunc();
+      setSlippageOverloader(slippageOverloader);
+    }
+
     if (this.isInitialized) return;
+
+
 
     this.tokenPriceService =
       config.tokenPriceService || new CoingeckoPriceFeed();
@@ -415,5 +425,9 @@ export class Executor implements IExecutor {
     });
 
     return true;
+  }
+
+  setSlippageOverloader(slippageOverrideService: SlippageOverrideService) {
+    this.slippageOverrideService = slippageOverrideService;
   }
 }

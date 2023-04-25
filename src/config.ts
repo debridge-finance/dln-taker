@@ -10,6 +10,7 @@ import { GetNextOrder } from "./interfaces";
 import { OrderProcessorInitializer } from "./processors";
 import { Hooks } from "./hooks/HookEnums";
 import { HookHandler } from "./hooks/HookHandler";
+import { DlnPreFulfillSwapSlippageOverridesTokenInInfo } from "./types/DlnPreFulfillSwapSlippageOverrides";
 
 type address = string;
 
@@ -129,6 +130,22 @@ export interface ChainDefinition {
      * ```
      */
     requiredConfirmationsThresholds?: Array<{thresholdAmountInUSD: number, minBlockConfirmations: number}>;
+
+    /**
+     * Defines default minimal slippage buffer (in bps) for pre-fulfill swaps, to reduce the number of potential swap reverts, for this particular chain
+     */
+    defaultPreFulfillSwapSlippageBpsBuffer?: number;
+
+    /**
+     * Defines custom slippage overrides for pre-fulfill swaps between given
+     * input tokens (described as tokenIn) as given output tokens (described as
+     * tokensOut). For every tokenIn/tokenOut pair you can define custom slippages
+     * that would be used by the order estimation engine instead of using slippage
+     * calculated by the internal deterministic algorithm
+     */
+    preFulfillSwapSlippageOverrides?: {
+      [tokenIn in string]: DlnPreFulfillSwapSlippageOverridesTokenInInfo
+    }
   }
 
   //
@@ -208,4 +225,14 @@ export interface ExecutorLaunchConfig {
    * Defines buckets of tokens that have equal value and near-zero re-balancing costs across supported chains
    */
   buckets: TokensBucket[];
+
+  /**
+   * Defines constraints imposed on all orders coming
+   */
+  constraints?: {
+   /**
+     * Defines default minimal slippage buffer (in bps) for pre-fulfill swaps, to reduce the number of potential swap reverts
+     */
+    defaultPreFulfillSwapSlippageBpsBuffer?: number;
+  }
 }

@@ -1,7 +1,7 @@
 {
   "name": "@debridge-finance/dln-executor",
   "description": "DLN executor is the rule-based daemon service developed to automatically execute orders placed on the deSwap Liquidity Network (DLN) across supported blockchains",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "author": "deBridge",
   "license": "GPL-3.0-only",
   "homepage": "https://debridge.finance",
@@ -24,9 +24,9 @@
   },
   "devDependencies": {
     "@types/amqplib": "0.10.1",
-    "@types/chai": "4.3.3",
+    "@types/chai": "4.3.4",
     "@types/mocha": "9.1.1",
-    "@types/node": "18.11.9",
+    "@types/node": "18.16.0",
     "assert": "2.0.0",
     "eslint": "8.23.1",
     "eslint-config-prettier": "8.5.0",

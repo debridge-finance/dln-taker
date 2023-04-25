@@ -6,6 +6,8 @@ import { createWriteStream } from "pino-sentry";
 import { ExecutorLaunchConfig } from "../config";
 
 import { Executor } from "./executor";
+import { SlippageOverrideService } from "../services/SlippageOverrideService";
+import { baseConstraints } from "../defaults/baseConstraints";
 
 config();
 
@@ -19,7 +21,29 @@ export class ExecutorEngine {
   }
 
   async init() {
+    this.executor.setSlippageOverloader(this.createSlippageOverrideService());
     return this.executor.init(this.executorConfig);
+  }
+
+  createSlippageOverrideService(): SlippageOverrideService {
+    const localConfig = {
+      slippageBps: this.executorConfig.constraints?.defaultPreFulfillSwapSlippageBpsBuffer,
+      perChain: this.executorConfig.chains?.reduce((res, chain) => {
+        res[chain.chain] = {
+          slippageBps: chain.constraints?.defaultPreFulfillSwapSlippageBpsBuffer,
+          perTokenIn: chain.constraints?.preFulfillSwapSlippageOverrides,
+        };
+        return res;
+      }, {} as any)
+    };
+    let baseConfig = {};
+    if (baseConstraints.preFulfillSwapSlippageBuffer) {
+      baseConfig = {
+        slippageBps: baseConstraints.preFulfillSwapSlippageBuffer.slippageBps,
+        perChain: baseConstraints.preFulfillSwapSlippageBuffer.perChain,
+      };
+    }
+    return new SlippageOverrideService(localConfig, baseConfig);
   }
 
   private createLogger() {
