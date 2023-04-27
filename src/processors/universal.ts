@@ -34,6 +34,7 @@ import {
   SwapConnectorRequest,
   SwapConnectorResult
 } from "@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
+import { UnconfirmedOrdersBudgetController } from "./UnconfirmedOrdersBudgetController";
 
 // reasonable multiplier for gas estimated for the fulfill txn to define max
 // gas we are willing to estimate
@@ -91,6 +92,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   private incomingOrdersMap = new Map<string, IncomingOrderContext>(); // key orderid, contains incoming order from order feed
   private isLocked: boolean = false;
   private batchUnlocker: BatchUnlocker;
+  private unconfirmedOrdersBudgetController: UnconfirmedOrdersBudgetController;
 
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
@@ -120,6 +122,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.chainId = chainId;
     this.takeChain = context.takeChain;
     this.hooksEngine = context.hooksEngine;
+    this.unconfirmedOrdersBudgetController = new UnconfirmedOrdersBudgetController(context.takeChain.unconfirmedOrdersBudgetInUSD)
 
     const logger = context.logger.child({
       processor: "universal",
@@ -375,6 +378,29 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     let allowPlaceToMempool = true;
 
+    // calculate USD worth of order
+    const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
+      context.config.tokenPriceService.getPrice(
+        orderInfo.order.give.chainId,
+        buffersAreEqual(orderInfo.order.give.tokenAddress, tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS)) ? null : orderInfo.order.give.tokenAddress,
+        {
+          logger: createClientLogger(context.logger)
+        }
+      ),
+      context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress, context.giveChain.fulfillProvider.connection as Web3)
+    ]);
+    logger.debug(`usd rate for give token: ${giveTokenUsdRate}`);
+    logger.debug(`decimals for give token: ${giveTokenDecimals}`);
+
+    // converting give amount
+    const usdWorth = BigNumber(giveTokenUsdRate)
+      .multipliedBy(orderInfo.order.give.amount.toString())
+      .dividedBy(new BigNumber(10).pow(giveTokenDecimals))
+      .toNumber();
+    logger.debug(`order worth in usd: ${usdWorth}`);
+
+    let orderIsConfirmed = false;
+
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status == OrderInfoStatus.Created) {
       const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info;
@@ -395,33 +421,13 @@ class UniversalProcessor extends BaseOrderProcessor {
       else if ('Confirmed' in finalizationInfo) {
         // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
         // to avoid data discrepancy and rely on WS instead
+        orderIsConfirmed = true;
         const announcedConfirmation = finalizationInfo.Confirmed.confirmation_blocks_count;
         logger.info(`order announced with custom finality, announced confirmation: ${announcedConfirmation}`);
 
         // we don't want this order to be put to mempool because we don't query actual block confirmations
         allowPlaceToMempool = false;
-        logger.debug(`order won't appear in the mempool`)
-
-        // calculate USD worth of order
-        const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
-          context.config.tokenPriceService.getPrice(
-            orderInfo.order.give.chainId,
-            buffersAreEqual(orderInfo.order.give.tokenAddress, tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS)) ? null : orderInfo.order.give.tokenAddress,
-            {
-              logger: createClientLogger(context.logger)
-            }
-          ),
-          context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress, context.giveChain.fulfillProvider.connection as Web3)
-        ]);
-        logger.debug(`usd rate for give token: ${giveTokenUsdRate}`)
-        logger.debug(`decimals for give token: ${giveTokenDecimals}`)
-
-        // converting give amount
-        const usdWorth = BigNumber(giveTokenUsdRate)
-          .multipliedBy(orderInfo.order.give.amount.toString())
-          .dividedBy(new BigNumber(10).pow(giveTokenDecimals))
-          .toNumber();
-        logger.debug(`order worth in usd: ${usdWorth}`)
+        logger.debug(`order won't appear in the mempool`);
 
         // find appropriate range corresponding to this USD worth
         const range = context.config.chains[orderInfo.order.give.chainId]!.usdAmountConfirmations.find(
@@ -464,7 +470,8 @@ class UniversalProcessor extends BaseOrderProcessor {
       }
       else if ('Finalized' in finalizationInfo) {
         // do nothing: order have stable finality according to the WS
-        logger.debug('order source announced this order as finalized')
+        logger.debug('order source announced this order as finalized');
+        this.unconfirmedOrdersBudgetController.removeOrder(orderId, logger);
       }
     }
 
@@ -477,7 +484,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     ]);
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
-    const roughReserveDstDecimals = reserveSrcTokenDecimals - reserveDstTokenDecimals
+    const roughReserveDstDecimals = reserveSrcTokenDecimals - reserveDstTokenDecimals;
     let roughReserveDstAmount = BigNumber(orderInfo.order.give.amount.toString()).div(BigNumber(10).pow(roughReserveDstDecimals)).integerValue();
     logger.debug(`expressed order give amount (${orderInfo.order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(orderInfo.order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[orderInfo.order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
 
@@ -730,6 +737,9 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       (fulfillTx as Tx).cappedGasPrice = evmFulfillCappedGasPrice;
     }
 
+    if (orderIsConfirmed) {
+      this.unconfirmedOrdersBudgetController.validateOrder(orderId, usdWorth, logger);
+    }
     try {
       const txFulfill = await this.takeChain.fulfillProvider.sendTransaction(
         fulfillTx,
@@ -756,6 +766,10 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       if (allowPlaceToMempool)
         this.mempoolService.addOrder(params);
       return;
+    }
+
+    if (orderIsConfirmed) {
+      this.unconfirmedOrdersBudgetController.validateAndAddOrder(orderId, usdWorth, logger);
     }
 
     await this.waitIsOrderFulfilled(orderInfo.orderId, orderInfo.order, context, logger);

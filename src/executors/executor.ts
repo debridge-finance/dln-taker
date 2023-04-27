@@ -46,6 +46,7 @@ export type ExecutorInitializingChain = {
   unlockProvider: ProviderAdapter;
   fulfillProvider: ProviderAdapter;
   client: Solana.PmmClient | Evm.PmmEvmClient;
+  unconfirmedOrdersBudgetInUSD?: number;
 };
 
 type UsdWorthBlockConfirmationConstraints = Array<{
@@ -209,6 +210,7 @@ export class Executor implements IExecutor {
         chainRpc: chain.chainRpc,
         unlockProvider,
         fulfillProvider: fulfillProvider,
+        unconfirmedOrdersBudgetInUSD: chain.constraints?.unconfirmedOrdersBudgetInUSD,
         client,
       };
       const orderProcessor = await processorInitializer(chain.chain, {

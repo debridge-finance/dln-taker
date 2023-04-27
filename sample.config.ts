@@ -87,6 +87,9 @@ const config: ExecutorLaunchConfig = {
       // Warn! base58 representation of a private key.
       // Warn! For security reasons, put it to the .env file
       unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+      constraints: {
+        unconfirmedOrdersBudgetInUSD: 1000,
+      }
     },
 
     {
@@ -101,7 +104,8 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (15)
-        ]
+        ],
+        unconfirmedOrdersBudgetInUSD: 1000,
       },
 
       // if the order is created on Ethereum and fulfilled on another chain (e.g. Solana),
@@ -144,7 +148,8 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (15)
-        ]
+        ],
+        unconfirmedOrdersBudgetInUSD: 1000,
       },
 
       beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
@@ -162,7 +167,8 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (15)
-        ]
+        ],
+        unconfirmedOrdersBudgetInUSD: 1000,
       },
 
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
@@ -180,7 +186,8 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (15)
-        ]
+        ],
+        unconfirmedOrdersBudgetInUSD: 1000,
       },
 
       beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
@@ -198,7 +205,8 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
 
           // worth >$100: guaranteed block confirmations (256)
-        ]
+        ],
+        unconfirmedOrdersBudgetInUSD: 1000,
       },
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,

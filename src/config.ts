@@ -130,6 +130,13 @@ export interface ChainDefinition {
      * ```
      */
     requiredConfirmationsThresholds?: Array<{thresholdAmountInUSD: number, minBlockConfirmations: number}>;
+
+    /**
+     * Defines the hard cap of all succesfully fulfilled orders' worth expressed in dollars that were not reached sufficient block confirmations at the given point in time.
+     * For example, if you have allowed to fulfill orders worth $1 after 1 block confirmation, and there are accidentaly 100,000 orders worth $1 are generated, you would want to prevent this by setting the budget for uncofirmed orders.
+     * If you set unconfirmedOrdersBudgetInUSD=100, than only first 100 orders would be attempted to be fulfilled, and all other orders would be pulled to the internal queue and would be pulled one by one as soon as fulfilled orders are being confirmed.
+     */
+    unconfirmedOrdersBudgetInUSD?: number;
   }
 
   //
