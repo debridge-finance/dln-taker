@@ -1,4 +1,5 @@
 import {
+  BPS_DENOMINATOR,
   buffersAreEqual,
   calculateExpectedTakeAmount,
   ChainEngine,
@@ -43,6 +44,9 @@ const EVM_FULFILL_GAS_MULTIPLIER = 1.25;
 // bump until
 const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.3;
 
+// dummy slippage used before any estimetions are performed, this is needed only for estimation purposes
+const DUMMY_SLIPPAGE_BPS = 400; // 4%
+
 export type UniversalProcessorParams = {
   /**
    * desired profitability. Setting a higher value would prevent executor from fulfilling most orders because
@@ -69,6 +73,16 @@ export type UniversalProcessorParams = {
    *     your unlock costs and thus reduces order profitability, making them unprofitable most of the time.
    */
   batchUnlockSize: number;
+
+  /**
+   * Min slippage that can be used for swap from reserveToken to takeToken when calculated automatically
+   */
+  preFulfillSwapMinAllowedSlippageBps: number;
+
+  /**
+   * Max slippage that can be used for swap from reserveToken to takeToken when calculated automatically
+   */
+  preFulfillSwapMaxAllowedSlippageBps: number;
 };
 
 class UniversalProcessor extends BaseOrderProcessor {
@@ -84,6 +98,8 @@ class UniversalProcessor extends BaseOrderProcessor {
     mempoolInterval: 60,
     mempoolMaxDelayStep: 30,
     batchUnlockSize: 10,
+    preFulfillSwapMinAllowedSlippageBps: 5,
+    preFulfillSwapMaxAllowedSlippageBps: 400,
   };
 
   constructor(params?: Partial<UniversalProcessorParams>) {
@@ -495,17 +511,25 @@ class UniversalProcessor extends BaseOrderProcessor {
     let evmFulfillCappedGasPrice: BigNumber | undefined;
     let preswapTx: SwapConnectorResult<EvmChains> | undefined;
     if (getEngineByChainId(this.takeChain.chain) == ChainEngine.EVM) {
-      // when performing estimation, we need to set some slippage for the swap. Let's set it reasonably high, because
-      // we don't care right now
-
-      const reasonableDummySlippage = 500; // 5%
+      // we need to perform fulfill estimation (to obtain planned gasLimit),
+      // but we don't know yet how much reserveAmount should we pass. So, we simply pick
+      // as much as giveAmount (without even subtracting operating expenses or fees) because we
+      // don't care about profitability right now. This has two consequences:
+      // 1. if underlying swap from giveAmount to takeToken does not give us enough takeAmount, the order is 100% non-profitable
+      // 2. if txn estimation reverts, there can be a plenty of reasons: rebase token, corrupted swap route, order handled
+      // If estimation succeeds, we have pretty realistic gasLimit and thus can do very good estimation
+      // use takeAmount + dummySlippage as evaluatedTakeAmount
+      const roughlyEvaluatedTakeAmount =
+        orderInfo.order.take.amount + (
+          orderInfo.order.take.amount * BigInt(BPS_DENOMINATOR - DUMMY_SLIPPAGE_BPS) / BigInt(BPS_DENOMINATOR)
+        );
       try {
         const fulfillTx = await this.createOrderFullfillTx<ChainId.Ethereum>(
           orderInfo.orderId,
           orderInfo.order,
           pickedBucket.reserveDstToken,
           roughReserveDstAmount.toString(),
-          reasonableDummySlippage,
+          roughlyEvaluatedTakeAmount,
           undefined,
           context,
           logger
@@ -592,7 +616,6 @@ class UniversalProcessor extends BaseOrderProcessor {
       reserveDstToken,
       requiredReserveDstAmount,
       isProfitable,
-      reserveToTakeSlippageBps,
       profitableTakeAmount,
     } = estimation;
 
@@ -659,7 +682,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       orderInfo.order,
       reserveDstToken,
       requiredReserveDstAmount,
-      reserveToTakeSlippageBps,
+      BigInt(profitableTakeAmount),
       preswapTx,
       context,
       logger
@@ -741,10 +764,14 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
 
     // order is fulfilled, remove it from queues (the order may have come again thru WS)
     this.clearInternalQueues(orderInfo.orderId);
-    logger.info(`order fulfilled: ${orderId}`)
+    logger.info(`order fulfilled: ${orderId}`);
+  }
 
-    // unlocking
-    this.batchUnlocker.addOrder(orderInfo.orderId, orderInfo.order, context);
+  private getPreFulfillSlippage(evaluatedTakeAmount: bigint, takeAmount: bigint): number {
+    const calculatedSlippageBps = (evaluatedTakeAmount - takeAmount) * BigInt(BPS_DENOMINATOR) / evaluatedTakeAmount;
+    if (calculatedSlippageBps < this.params.preFulfillSwapMinAllowedSlippageBps) return this.params.preFulfillSwapMinAllowedSlippageBps;
+    if (calculatedSlippageBps > this.params.preFulfillSwapMaxAllowedSlippageBps) return this.params.preFulfillSwapMaxAllowedSlippageBps;
+    return Number(calculatedSlippageBps);
   }
 
   private async createOrderFullfillTx<T extends ChainId>(
@@ -752,13 +779,15 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     order: OrderData,
     reserveDstToken: Uint8Array,
     reservedAmount: string,
-    reserveToTakeSlippageBps: number | null,
+    evaluatedTakeAmount: bigint,
     preferEstimation: SwapConnectorRequest['preferEstimation'] | undefined,
     context: OrderProcessorContext,
     logger: Logger
   ) {
     let fullFillTxPayload: PreswapFulfillOrderPayload<any> = {
-      slippageBps: reserveToTakeSlippageBps || undefined,
+      slippageBps: buffersAreEqual(reserveDstToken, order.take.tokenAddress)
+        ? undefined
+        : this.getPreFulfillSlippage(evaluatedTakeAmount, order.take.amount),
       swapConnector: context.config.swapConnector,
       reservedAmount: reservedAmount,
       loggerInstance: createClientLogger(logger),
