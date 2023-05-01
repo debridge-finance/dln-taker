@@ -6,6 +6,7 @@ import {
   OneInchConnector,
   PMMClient,
   PriceTokenService,
+  setSlippageOverloader,
   Solana,
   SwapConnector,
   SwapConnectorImpl,
@@ -292,6 +293,9 @@ export class Executor implements IExecutor {
       points: chain.usdAmountConfirmations.map(t => t.minBlockConfirmations)
     }))
     orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds, hooksEngine);
+
+    // Override internal slippage calculation: do not reserve slippage buffer for pre-fulfill swap
+    setSlippageOverloader(() => 0);
 
     this.isInitialized = true;
   }

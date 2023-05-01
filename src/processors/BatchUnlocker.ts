@@ -89,7 +89,7 @@ export class BatchUnlocker {
     return this.addOrder(orderId, order, context);
   }
 
-  async addOrder(
+  private async addOrder(
     orderId: string,
     order: OrderData,
     context: OrderProcessorContext) {
