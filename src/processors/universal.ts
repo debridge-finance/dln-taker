@@ -687,7 +687,6 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       try {
         const evmFulfillGas = await (this.takeChain.fulfillProvider as EvmProviderAdapter).estimateGas({
           ...fulfillTx as Tx,
-          from: this.takeChain.fulfillProvider.address,
         });
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
