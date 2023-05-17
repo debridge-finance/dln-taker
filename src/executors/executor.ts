@@ -171,8 +171,8 @@ export class Executor implements IExecutor {
           this.logger.info(`Solana Address Lookup Table (ALT) already exists`)
         }
       } else {
-        unlockProvider = new EvmProviderAdapter(chain.chainRpc, chain.unlockAuthorityPrivateKey);
-        fulfillProvider = new EvmProviderAdapter(chain.chainRpc, chain.takerPrivateKey, chain.environment?.evm?.evmRebroadcastAdapterOpts);
+        unlockProvider = new EvmProviderAdapter(chain.chain, chain.chainRpc, chain.unlockAuthorityPrivateKey);
+        fulfillProvider = new EvmProviderAdapter(chain.chain, chain.chainRpc, chain.takerPrivateKey, chain.environment?.evm?.evmRebroadcastAdapterOpts);
 
         client = new Evm.PmmEvmClient({
           enableContractsCache: true,

@@ -8,6 +8,7 @@ import { EvmRebroadcastAdapterOpts } from "../config";
 
 import { ProviderAdapter, SendTransactionContext } from "./provider.adapter";
 import { getEvmAccountBalance } from "./utils/getEvmAccountBalance";
+import { approve, isApproved} from "./utils/approve";
 
 // reasonable multiplier for gas estimated before txn is being broadcasted
 export const GAS_MULTIPLIER = 1.1;
@@ -15,7 +16,7 @@ export const GAS_MULTIPLIER = 1.1;
 export class Tx {
   data: string;
   to: string;
-  value: number;
+  value: string;
 
   from?: string;
   gasPrice?: string;
@@ -25,30 +26,33 @@ export class Tx {
   cappedGasPrice?: BigNumber;
 }
 
-
 export class EvmProviderAdapter implements ProviderAdapter {
   wallet: never;
 
   private staleTx?: Tx;
 
   private rebroadcast: EvmRebroadcastAdapterOpts = {};
-  private readonly _address: string;
   public readonly connection: Web3;
 
+  readonly #address: string;
+  readonly #privateKey: string;
+
   constructor(
+    private readonly chainId: ChainId,
     rpc: string,
-    public readonly privateKey: string,
+    privateKey: string,
     rebroadcast?: EvmRebroadcastAdapterOpts
   ) {
     this.connection = new Web3(rpc);
     const accountEvmFromPrivateKey =
         this.connection.eth.accounts.privateKeyToAccount(privateKey);
-    this._address = accountEvmFromPrivateKey.address;
+    this.#address = accountEvmFromPrivateKey.address;
+    this.#privateKey = accountEvmFromPrivateKey.privateKey;
     this.fillDefaultVariables(rebroadcast);
   }
 
   public get address(): string {
-    return this._address;
+    return this.#address;
   }
 
   async sendTransaction(data: unknown, context: SendTransactionContext) {
@@ -250,12 +254,16 @@ export class EvmProviderAdapter implements ProviderAdapter {
         reject(error);
       }
 
-      try {
-        const signedTx = await this.connection.eth.accounts.signTransaction(tx, this.privateKey);
+      // kinda weird code below: THREE checks
+      try { // this is needed because sendSignedTransaction() may throw an error during tx preparation (e.g., incorrect gas value)
+        const signedTx = await this.connection.eth.accounts.signTransaction(tx, this.#privateKey);
         logger.info("Signed tx", signedTx);
 
+        if (!signedTx.rawTransaction) {
+          throw new Error(`The raw signed transaction data is empty`);
+        }
         this.connection.eth
-          .sendSignedTransaction(signedTx.rawTransaction!)
+          .sendSignedTransaction(signedTx.rawTransaction)
           .on("error", errorHandler) // this is needed of RPC node raises an error
           .once("transactionHash", (hash: string) => {
             logger.debug(`tx sent, txHash: ${hash}`);
@@ -304,5 +312,43 @@ export class EvmProviderAdapter implements ProviderAdapter {
       tokenAddress,
       this.address
     );
+  }
+
+  async approveToken(tokenAddress: string,
+              contractAddress: string,
+              logger: Logger) {
+    if (this.chainId === ChainId.Solana) return Promise.resolve();
+
+    logger.debug(
+      `Verifying approval given by ${this.address} to ${contractAddress} to trade on ${tokenAddress} on ${ChainId[this.chainId]}`
+    );
+    if (tokenAddress === '0x0000000000000000000000000000000000000000') {
+      return Promise.resolve();
+    }
+    const tokenIsApproved = await isApproved(
+      this.connection,
+      this.address,
+      tokenAddress,
+      contractAddress
+    );
+    if (!tokenIsApproved) {
+      logger.debug(`Approving ${tokenAddress} on ${ChainId[this.chainId]}`);
+      const data = approve(this.connection, tokenAddress, contractAddress);
+      await this.sendTransaction(data, { logger });
+      logger.debug(
+        `Setting approval for ${tokenAddress} on ${ChainId[this.chainId]} succeeded`
+      );
+    } else {
+      logger.debug(`${tokenAddress} already approved on ${ChainId[this.chainId]}`);
+    }
+
+    return Promise.resolve();
+  }
+
+  estimateGas(tx: Tx): Promise<number> {
+    return this.connection.eth.estimateGas({
+      ...tx,
+      from: this.address,
+    });
   }
 }
