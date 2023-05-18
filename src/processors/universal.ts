@@ -28,7 +28,6 @@ import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { BaseOrderProcessor, OrderProcessorContext, OrderProcessorInitContext, OrderProcessorInitializer } from "./base";
 import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
-import { approveToken } from "./utils/approve";
 import { PostponingReason, RejectionReason } from "../hooks/HookEnums";
 import { isRevertedError } from "./utils/isRevertedError";
 import {
@@ -150,23 +149,20 @@ class UniversalProcessor extends BaseOrderProcessor {
       });
 
       const client = this.takeChain.client as evm.PmmEvmClient;
+      const evmProvider = this.takeChain.fulfillProvider as EvmProviderAdapter
       for (const token of tokens) {
-        await approveToken(
-          chainId,
+        await evmProvider.approveToken(
           token,
           client.getContractAddress(
             chainId,
             evm.ServiceType.CrosschainForwarder
           ),
-          this.takeChain.fulfillProvider as EvmProviderAdapter,
           logger
         );
 
-        await approveToken(
-          chainId,
+        await evmProvider.approveToken(
           token,
           client.getContractAddress(chainId, evm.ServiceType.Destination),
-          this.takeChain.fulfillProvider as EvmProviderAdapter,
           logger
         );
       }
@@ -549,7 +545,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         //
         // predicting gas limit
         //
-        evmFulfillGasLimit = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas({
+        evmFulfillGasLimit = await (this.takeChain.fulfillProvider as EvmProviderAdapter).estimateGas({
           to: fulfillTx.tx.to,
           data: fulfillTx.tx.data,
           value: fulfillTx.tx.value.toString(),
@@ -689,7 +685,9 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     );
     if (getEngineByChainId(orderInfo.order.take.chainId) === ChainEngine.EVM) {
       try {
-        const evmFulfillGas = await (this.takeChain.fulfillProvider.connection as Web3).eth.estimateGas(fulfillTx as Tx);
+        const evmFulfillGas = await (this.takeChain.fulfillProvider as EvmProviderAdapter).estimateGas({
+          ...fulfillTx as Tx,
+        });
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
           const message = `final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit})`;

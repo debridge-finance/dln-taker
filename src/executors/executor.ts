@@ -24,7 +24,6 @@ import { OrderFilter } from "../filters";
 import { GetNextOrder, IncomingOrder, OrderInfoStatus } from "../interfaces";
 import { WsNextOrder } from "../orderFeeds/ws.order.feed";
 import * as processors from "../processors";
-import { createWeb3WithPrivateKey } from "../processors/utils/create.web3.with.private.key";
 import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
@@ -172,20 +171,8 @@ export class Executor implements IExecutor {
           this.logger.info(`Solana Address Lookup Table (ALT) already exists`)
         }
       } else {
-        const web3UnlockAuthority = createWeb3WithPrivateKey(
-          chain.chainRpc,
-          chain.unlockAuthorityPrivateKey
-        );
-        unlockProvider = new EvmProviderAdapter(web3UnlockAuthority);
-
-        const web3Fulfill = createWeb3WithPrivateKey(
-          chain.chainRpc,
-          chain.takerPrivateKey
-        );
-        fulfillProvider = new EvmProviderAdapter(
-          web3Fulfill,
-          chain.environment?.evm?.evmRebroadcastAdapterOpts
-        );
+        unlockProvider = new EvmProviderAdapter(chain.chain, chain.chainRpc, chain.unlockAuthorityPrivateKey);
+        fulfillProvider = new EvmProviderAdapter(chain.chain, chain.chainRpc, chain.takerPrivateKey, chain.environment?.evm?.evmRebroadcastAdapterOpts);
 
         client = new Evm.PmmEvmClient({
           enableContractsCache: true,
