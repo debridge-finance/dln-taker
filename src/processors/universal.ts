@@ -200,6 +200,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       case OrderInfoStatus.Fulfilled: {
         this.clearInternalQueues(orderId);
         context.logger.debug(`deleted from queues`);
+        this.unconfirmedOrdersBudgetController.removeOrder(orderId, params.context.logger);
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
         return;
       }
@@ -399,7 +400,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       .toNumber();
     logger.debug(`order worth in usd: ${usdWorth}`);
 
-    let orderIsConfirmed = false;
+    let notFinalizedOrder = false;
 
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status == OrderInfoStatus.Created) {
@@ -421,7 +422,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       else if ('Confirmed' in finalizationInfo) {
         // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
         // to avoid data discrepancy and rely on WS instead
-        orderIsConfirmed = true;
+        notFinalizedOrder = true;
         const announcedConfirmation = finalizationInfo.Confirmed.confirmation_blocks_count;
         logger.info(`order announced with custom finality, announced confirmation: ${announcedConfirmation}`);
 
@@ -433,6 +434,8 @@ class UniversalProcessor extends BaseOrderProcessor {
         const range = context.config.chains[orderInfo.order.give.chainId]!.usdAmountConfirmations.find(
           usdWorthRange => usdWorthRange.usdWorthFrom < usdWorth && usdWorth <= usdWorthRange.usdWorthTo
         );
+
+        this.unconfirmedOrdersBudgetController.validateOrder(orderId, usdWorth, logger);
 
         // range found, ensure current block confirmation >= expected
         if (range?.minBlockConfirmations) {
@@ -737,9 +740,6 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       (fulfillTx as Tx).cappedGasPrice = evmFulfillCappedGasPrice;
     }
 
-    if (orderIsConfirmed) {
-      this.unconfirmedOrdersBudgetController.validateOrder(orderId, usdWorth, logger);
-    }
     try {
       const txFulfill = await this.takeChain.fulfillProvider.sendTransaction(
         fulfillTx,
@@ -768,7 +768,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       return;
     }
 
-    if (orderIsConfirmed) {
+    if (notFinalizedOrder) {
       this.unconfirmedOrdersBudgetController.validateAndAddOrder(orderId, usdWorth, logger);
     }
 
