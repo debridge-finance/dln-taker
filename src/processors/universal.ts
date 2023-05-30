@@ -604,7 +604,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           batchSize,
           evmFulfillGasLimit,
           evmFulfillCappedGasPrice: evmFulfillCappedGasPrice ? BigInt(evmFulfillCappedGasPrice.integerValue().toString()) : undefined,
-          swapEstimationPreference: preswapTx
+          swapEstimationPreference: preswapTx,
         }
     );
 

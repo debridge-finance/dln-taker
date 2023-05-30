@@ -122,6 +122,19 @@ const config: ExecutorLaunchConfig = {
     },
 
     {
+      chain: ChainId.Fantom,
+      chainRpc: `${process.env.FANTOM_RPC}`,
+
+      beneficiary: `${process.env.FANTOM_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.FANTOM_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.FANTOM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+
+      orderProcessor: processors.universalProcessor({
+        minProfitabilityBps: 300,
+      }),
+    },
+
+    {
       chain: ChainId.Avalanche,
       chainRpc: `${process.env.AVALANCHE_RPC}`,
 

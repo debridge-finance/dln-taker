@@ -19,7 +19,8 @@ export enum SupportedChain {
   BSC = ChainId.BSC,
   Ethereum = ChainId.Ethereum,
   Polygon = ChainId.Polygon,
-  Solana = ChainId.Solana
+  Solana = ChainId.Solana,
+  Fantom = ChainId.Fantom
 }
 
 export class EvmRebroadcastAdapterOpts {
@@ -103,10 +104,10 @@ export interface ChainDefinition {
    */
   disabled?: boolean;
 
-  //
-  // chain context related
-  //
 
+  /**
+  * chain context related
+  */
   environment?: ChainEnvironment;
 
   /**
