@@ -18,7 +18,7 @@
 
 - Grab the source code:
 ```sh
-git clone --depth 1 --single-branch --branch v2.2-latest git@github.com:debridge-finance/dln-taker.git
+git clone --depth 1 --single-branch --branch v2.3-latest git@github.com:debridge-finance/dln-taker.git
 ```
 - `cd` to the directory and install necessary production dependencies:
 ```sh
@@ -59,10 +59,10 @@ From the high level perspective, `dln-taker` automates the process of order esti
 
 ## Installation
 
-Fetch the source code from Github, picking the given revision (current: `v2.2-latest`):
+Fetch the source code from Github, picking the given revision (current: `v2.3-latest`):
 
 ```sh
-git clone --depth 1 --single-branch --branch v2.2-latest git@github.com:debridge-finance/dln-taker.git
+git clone --depth 1 --single-branch --branch v2.3-latest git@github.com:debridge-finance/dln-taker.git
 ```
 
 `cd` to the directory and install necessary production dependencies:
