@@ -82,6 +82,13 @@ export type UniversalProcessorParams = {
    * Max slippage that can be used for swap from reserveToken to takeToken when calculated automatically
    */
   preFulfillSwapMaxAllowedSlippageBps: number;
+
+  /**
+   * The profitability that should be used for order created in configured chain instead of minProfitabilityBps
+   */
+  customGiveMinProfitabilityBps: {
+    [key in ChainId]?: number
+  }
 };
 
 class UniversalProcessor extends BaseOrderProcessor {
@@ -93,6 +100,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   private batchUnlocker: BatchUnlocker;
 
   private params: UniversalProcessorParams = {
+    customGiveMinProfitabilityBps: {},
     minProfitabilityBps: 4,
     mempoolInterval: 60,
     mempoolMaxDelayStep: 30,
@@ -590,9 +598,12 @@ class UniversalProcessor extends BaseOrderProcessor {
         ? null
         : this.params.batchUnlockSize;
 
+    const minMarginBps = this.params.customGiveMinProfitabilityBps[orderInfo.order.give.chainId]
+      || this.params.minProfitabilityBps;
+
     const estimation = await calculateExpectedTakeAmount(
         orderInfo.order,
-        this.params.minProfitabilityBps,
+        minMarginBps,
         {
           client: context.config.client,
           giveConnection: context.giveChain.fulfillProvider.connection as Web3,

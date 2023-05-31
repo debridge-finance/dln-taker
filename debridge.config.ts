@@ -49,6 +49,9 @@ const config: ExecutorLaunchConfig = {
 
   orderProcessor: processors.universalProcessor({
     minProfitabilityBps: 4,
+    customGiveMinProfitabilityBps: {
+      [ChainId.Fantom]: 300,
+    }
   }),
 
   chains: [

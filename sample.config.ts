@@ -67,6 +67,11 @@ const config: ExecutorLaunchConfig = {
     // assuming that the order would be unlocked in a batch of size=10. Reducing the batch size to a lower value increases
     // your unlock costs and thus reduces order profitability, making them unprofitable most of the time.
     batchUnlockSize: 10,
+
+    //The profitability that should be used for order created in configured chain instead of minProfitabilityBps
+    customGiveMinProfitabilityBps: {
+      [ChainId.Fantom]: 300,
+    }
   }),
 
   chains: [
@@ -128,10 +133,6 @@ const config: ExecutorLaunchConfig = {
       beneficiary: `${process.env.FANTOM_BENEFICIARY}`,
       takerPrivateKey: `${process.env.FANTOM_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.FANTOM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-
-      orderProcessor: processors.universalProcessor({
-        minProfitabilityBps: 300,
-      }),
     },
 
     {
