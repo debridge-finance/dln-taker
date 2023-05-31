@@ -37,7 +37,7 @@ const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Ethereum]: 12,
   [SupportedChain.Polygon]: 256,
   [SupportedChain.Solana]: 32,
-  [SupportedChain.Fantom]: 15,//todo
+  [SupportedChain.Fantom]: 15,
 }
 
 export type ExecutorInitializingChain = {
