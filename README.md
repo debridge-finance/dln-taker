@@ -97,6 +97,7 @@ The [`sample.config.ts` file](./sample.config.ts) already defines all blockchain
 1. Ethereum
 1. Polygon
 1. Solana
+1. Fantom
 
 so you don't have to describe them explicitly. However, the sample config uses references to the environment variables (via the `${process.env.*}` notation) where sensitive or private data is involved: for example, an API key to access deBridge-managed websocket, or private keys to wallets with reserve funds for order fulfillment are designed to be accessed by the configuration file as environment variables.
 
@@ -160,6 +161,7 @@ Executing cross-chain transactions is all about managing risks properly: no one 
 | Avalanche | 15                  |
 | BNB Chain | 15                  |
 | Ethereum  | 15                  |
+| Fantom    | 15                  |
 | Polygon   | 256                 |
 
 However, DLN is an open market with natural competitiveness, where some takers may be willing to put more risk on small amounts of their funds attempting to fulfill orders with lesser block confirmations to get ahead of other takers. For example, some may be willing to fulfill orders under $100 as soon as they appear on blockchains (after 1 block confirmation), because the reward of being the first no matter what beats the risk of losing this amount of money.

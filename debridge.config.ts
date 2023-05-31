@@ -9,7 +9,6 @@ import { ExecutorLaunchConfig } from "./src/config";
 import * as environments from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
-import * as filters from "./src/filters";
 
 const environment = !!process.env.USE_MADRID ? environments.PRERELEASE_ENVIRONMENT_CODENAME_MADRID : environments.PRODUCTION;
 
@@ -56,7 +55,6 @@ const config: ExecutorLaunchConfig = {
     {
       chain: ChainId.Solana,
       chainRpc: `${process.env.SOLANA_RPC}`,
-
       beneficiary: `${process.env.SOLANA_BENEFICIARY}`,
       takerPrivateKey: `${process.env.SOLANA_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.SOLANA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
@@ -69,6 +67,25 @@ const config: ExecutorLaunchConfig = {
       beneficiary: `${process.env.ARBITRUM_BENEFICIARY}`,
       takerPrivateKey: `${process.env.ARBITRUM_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.ARBITRUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+
+      constraints: {
+        requiredConfirmationsThresholds: [
+          {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
+        ]
+      },
+    },
+
+    {
+      chain: ChainId.Fantom,
+      chainRpc: `${process.env.FANTOM_RPC}`,
+
+      beneficiary: `${process.env.FANTOM_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.FANTOM_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.FANTOM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+
+      orderProcessor: processors.universalProcessor({
+        minProfitabilityBps: 300,
+      }),
 
       constraints: {
         requiredConfirmationsThresholds: [
