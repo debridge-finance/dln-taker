@@ -27,17 +27,25 @@ export class SolanaProviderAdapter implements ProviderAdapter {
       currentChainId: ChainId.Solana,
     });
 
-    const txid = await helpers.sendAll(
+
+    const tx = data as Transaction | VersionedTransaction;
+    const [txid] = await helpers.sendAll(
       this.connection,
       this.wallet,
-      [data as Transaction | VersionedTransaction],
-      undefined,
-      undefined,
-      false,
-      true
+      tx,
+      {
+        rpcCalls: 3,
+        skipPreflight: false,
+        logger: logger.debug, // sendAll will log base64 tx data sent to blockchain
+      },
     );
-    logger.debug(`tx confirmed: ${txid}`);
-    return txid[0];
+
+    // after 30 seconds tx should either be finalized or dropped
+    await helpers.sleep(30_000)
+    const chainData = await this.connection.getTransaction(txid, {  commitment: "finalized", maxSupportedTransactionVersion: 1 });
+    if (chainData === null) throw new Error(`Failed to get transaction ${txid} from chain`);
+
+    return txid;
   }
 
   async getBalance(token: Uint8Array): Promise<string> {
