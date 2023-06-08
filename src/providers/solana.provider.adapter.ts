@@ -40,11 +40,6 @@ export class SolanaProviderAdapter implements ProviderAdapter {
       },
     );
 
-    // after 30 seconds tx should either be finalized or dropped
-    await helpers.sleep(30_000)
-    const chainData = await this.connection.getTransaction(txid, {  commitment: "finalized", maxSupportedTransactionVersion: 1 });
-    if (chainData === null) throw new Error(`Failed to get transaction ${txid} from chain`);
-
     return txid;
   }
 
