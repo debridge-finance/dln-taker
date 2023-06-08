@@ -36,7 +36,7 @@ export class SolanaProviderAdapter implements ProviderAdapter {
       {
         rpcCalls: 3,
         skipPreflight: false,
-        logger: logger.debug, // sendAll will log base64 tx data sent to blockchain
+        logger: (...args: any) => logger.debug(args), // sendAll will log base64 tx data sent to blockchain
       },
     );
 
