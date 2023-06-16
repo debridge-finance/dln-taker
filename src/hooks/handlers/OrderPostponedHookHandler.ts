@@ -35,7 +35,7 @@ export const orderPostponed = (
         ]);
         const giveInfo = `${new BigNumber(order.give.amount.toString()).div(new BigNumber(10).pow(giveDecimals)).toFixed(3)} ${giveTokenSymbol} @ ${ChainId[order.give.chainId]}`;
         const takeInfo = `${new BigNumber(order.take.amount.toString()).div(new BigNumber(10).pow(takeDecimals)).toFixed(3)} ${takeTokenSymbol} @ ${ChainId[order.take.chainId]}`;
-        const message = `🤑 Order #<a href="https://dln.debridge.finance/order?orderId=${arg.order.orderId}">${arg.order.orderId}</a>
+        const message = `🤑 Order #<a href="https://app.debridge.finance/order?orderId=${arg.order.orderId}">${arg.order.orderId}</a>
 ${giveInfo} ➡️ ${takeInfo}
 
 📫 postponed because: ${PostponingReason[arg.reason]}
