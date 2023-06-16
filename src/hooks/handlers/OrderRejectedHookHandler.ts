@@ -1,11 +1,11 @@
-import { HookHandler } from "../HookHandler";
+import {HookHandler} from "../HookHandler";
 import {Notifier} from "../notification/Notifier";
 import {Hooks, RejectionReason} from "../HookEnums";
 import {HookParams} from "../types/HookParams";
 import {ChainId} from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import Web3 from "web3";
-import { OrderInfoStatus } from "../../interfaces";
+import {OrderInfoStatus} from "../../interfaces";
 
 export const orderRejected = (
     notifier: Notifier
@@ -26,6 +26,10 @@ export const orderRejected = (
             return;
         }
 
+        if ([RejectionReason.ALREADY_FULFILLED_OR_CANCELLED, RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH].includes(arg.reason)) {
+            return;
+        }
+
         const order = arg.order.order;
         const [giveDecimals, takeDecimals, giveTokenSymbol, takeTokenSymbol] = await Promise.all([
             arg.context.config.client.getDecimals(order.give.chainId, order.give.tokenAddress, arg.context.giveChain.fulfillProvider.connection as Web3),
@@ -35,7 +39,7 @@ export const orderRejected = (
         ]);
         const giveInfo = `${new BigNumber(order.give.amount.toString()).div(new BigNumber(10).pow(giveDecimals)).toFixed(3)} ${giveTokenSymbol} @ ${ChainId[order.give.chainId]}`;
         const takeInfo = `${new BigNumber(order.take.amount.toString()).div(new BigNumber(10).pow(takeDecimals)).toFixed(3)} ${takeTokenSymbol} @ ${ChainId[order.take.chainId]}`;
-        const message = `🤑 Order #<a href="https://dln.debridge.finance/order?orderId=${arg.order.orderId}">${arg.order.orderId}</a>
+        const message = `🤑 Order #<a href="https://app.debridge.finance/order?orderId=${arg.order.orderId}">${arg.order.orderId}</a>
 ${giveInfo} ➡️ ${takeInfo}
 
 ⛔️ rejected because: ${RejectionReason[arg.reason]}
