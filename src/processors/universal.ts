@@ -319,61 +319,6 @@ class UniversalProcessor extends BaseOrderProcessor {
       return;
     }
 
-    // validate that order is not fullfilled
-    const takeOrderStatus = await context.config.client.getTakeOrderStatus(
-      orderInfo.orderId,
-      orderInfo.order.take.chainId,
-      { web3: this.takeChain.fulfillProvider.connection as Web3 }
-    );
-    if (
-      takeOrderStatus?.status !== OrderState.NotSet &&
-      takeOrderStatus?.status !== undefined
-    ) {
-      const message = `order is already handled on the take chain (${ ChainId[ orderInfo.order.take.chainId ] }), actual status: ${takeOrderStatus?.status}`;
-      logger.info(message);
-      this.hooksEngine.handleOrderRejected({
-        order: orderInfo,
-        reason: RejectionReason.ALREADY_FULFILLED_OR_CANCELLED,
-        context,
-        attempts: params.attempts,
-        message,
-      });
-      return;
-    }
-
-    // validate that order is created
-    const giveOrderStatus = await context.config.client.getGiveOrderStatus(
-      orderInfo.orderId,
-      orderInfo.order.give.chainId,
-      { web3: context.giveChain.fulfillProvider.connection as Web3 }
-    );
-
-    if (giveOrderStatus?.status === undefined) {
-      const message = `order does not exist on the give chain (${ChainId[orderInfo.order.give.chainId]})`;
-      logger.info(message);
-      this.hooksEngine.handleOrderRejected({
-        order: orderInfo,
-        reason: RejectionReason.MISSING,
-        context,
-        attempts: params.attempts,
-        message
-      });
-      return;
-    }
-
-    if (giveOrderStatus?.status !== OrderState.Created) {
-      const message = `order has unexpected give status (${giveOrderStatus?.status}) on the give chain (${ChainId[ orderInfo.order.give.chainId]})`;
-      logger.info(message);
-      this.hooksEngine.handleOrderRejected({
-        order: orderInfo,
-        reason: RejectionReason.UNEXPECTED_GIVE_STATUS,
-        attempts: params.attempts,
-        context,
-        message,
-      });
-      return;
-    }
-
     // calculate USD worth of order
     const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
       context.config.tokenPriceService.getPrice(
@@ -479,6 +424,63 @@ class UniversalProcessor extends BaseOrderProcessor {
         logger.debug('order source announced this order as finalized');
         context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
       }
+    }
+
+    // validate that order is not fullfilled
+    // This must be done after 'Finalized' in finalizationInfo is checked because we may want to remove the order
+    // from the nonFinalizedOrdersBudgetController
+    const takeOrderStatus = await context.config.client.getTakeOrderStatus(
+      orderInfo.orderId,
+      orderInfo.order.take.chainId,
+      { web3: this.takeChain.fulfillProvider.connection as Web3 }
+    );
+    if (
+      takeOrderStatus?.status !== OrderState.NotSet &&
+      takeOrderStatus?.status !== undefined
+    ) {
+      const message = `order is already handled on the take chain (${ ChainId[ orderInfo.order.take.chainId ] }), actual status: ${takeOrderStatus?.status}`;
+      logger.info(message);
+      this.hooksEngine.handleOrderRejected({
+        order: orderInfo,
+        reason: RejectionReason.ALREADY_FULFILLED_OR_CANCELLED,
+        context,
+        attempts: params.attempts,
+        message,
+      });
+      return;
+    }
+
+    // validate that order is created
+    const giveOrderStatus = await context.config.client.getGiveOrderStatus(
+      orderInfo.orderId,
+      orderInfo.order.give.chainId,
+      { web3: context.giveChain.fulfillProvider.connection as Web3 }
+    );
+
+    if (giveOrderStatus?.status === undefined) {
+      const message = `order does not exist on the give chain (${ChainId[orderInfo.order.give.chainId]})`;
+      logger.info(message);
+      this.hooksEngine.handleOrderRejected({
+        order: orderInfo,
+        reason: RejectionReason.MISSING,
+        context,
+        attempts: params.attempts,
+        message
+      });
+      return;
+    }
+
+    if (giveOrderStatus?.status !== OrderState.Created) {
+      const message = `order has unexpected give status (${giveOrderStatus?.status}) on the give chain (${ChainId[ orderInfo.order.give.chainId]})`;
+      logger.info(message);
+      this.hooksEngine.handleOrderRejected({
+        order: orderInfo,
+        reason: RejectionReason.UNEXPECTED_GIVE_STATUS,
+        attempts: params.attempts,
+        context,
+        message,
+      });
+      return;
     }
 
     // perform rough estimation: assuming order.give.amount is what we need on balance
