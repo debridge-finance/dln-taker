@@ -1,7 +1,7 @@
 {
   "name": "@debridge-finance/dln-executor",
   "description": "DLN executor is the rule-based daemon service developed to automatically execute orders placed on the deSwap Liquidity Network (DLN) across supported blockchains",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "author": "deBridge",
   "license": "GPL-3.0-only",
   "homepage": "https://debridge.finance",
@@ -17,7 +17,7 @@
   "scripts": {
     "lint:fix": "prettier --write 'src/**/*.{js,ts}' 'tests/**/*.{js,ts}' sample.config.ts && tslint --fix --config tslint.json --project tsconfig.json",
     "lint": "tslint --config tslint.json --project tsconfig.json",
-    "test": "mocha -r ts-node/register -b -t 100000 ./tests/proto.test.ts",
+    "test": "mocha -r ts-node/register -b -t 100000 ./tests/**/*.test.ts",
     "loop": "node -r ts-node/register ./src/index.ts",
     "conv": "mocha -r ts-node/register -b -t 100000 ./tests/conversions.test.ts",
     "executor": "node -r ts-node/register ./src/index.ts"

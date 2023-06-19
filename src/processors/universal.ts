@@ -34,7 +34,6 @@ import {
   SwapConnectorRequest,
   SwapConnectorResult
 } from "@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
-import { UnconfirmedOrdersBudgetController } from "./UnconfirmedOrdersBudgetController";
 
 // reasonable multiplier for gas estimated for the fulfill txn to define max
 // gas we are willing to estimate
@@ -92,7 +91,6 @@ class UniversalProcessor extends BaseOrderProcessor {
   private incomingOrdersMap = new Map<string, IncomingOrderContext>(); // key orderid, contains incoming order from order feed
   private isLocked: boolean = false;
   private batchUnlocker: BatchUnlocker;
-  private unconfirmedOrdersBudgetController: UnconfirmedOrdersBudgetController;
 
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
@@ -122,7 +120,6 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.chainId = chainId;
     this.takeChain = context.takeChain;
     this.hooksEngine = context.hooksEngine;
-    this.unconfirmedOrdersBudgetController = new UnconfirmedOrdersBudgetController(context.takeChain.unconfirmedOrdersBudgetInUSD)
 
     const logger = context.logger.child({
       processor: "universal",
@@ -200,7 +197,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       case OrderInfoStatus.Fulfilled: {
         this.clearInternalQueues(orderId);
         context.logger.debug(`deleted from queues`);
-        this.unconfirmedOrdersBudgetController.removeOrder(orderId, params.context.logger);
+        context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
         return;
       }
@@ -377,8 +374,6 @@ class UniversalProcessor extends BaseOrderProcessor {
       return;
     }
 
-    let allowPlaceToMempool = true;
-
     // calculate USD worth of order
     const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
       context.config.tokenPriceService.getPrice(
@@ -400,7 +395,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       .toNumber();
     logger.debug(`order worth in usd: ${usdWorth}`);
 
-    let notFinalizedOrder = false;
+    let isFinalizedOrder = true;
 
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status == OrderInfoStatus.Created) {
@@ -422,20 +417,28 @@ class UniversalProcessor extends BaseOrderProcessor {
       else if ('Confirmed' in finalizationInfo) {
         // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
         // to avoid data discrepancy and rely on WS instead
-        notFinalizedOrder = true;
+        isFinalizedOrder = false;
         const announcedConfirmation = finalizationInfo.Confirmed.confirmation_blocks_count;
-        logger.info(`order announced with custom finality, announced confirmation: ${announcedConfirmation}`);
+        logger.info(`order arrived with non-guaranteed finality, announced confirmation: ${announcedConfirmation}`);
 
-        // we don't want this order to be put to mempool because we don't query actual block confirmations
-        allowPlaceToMempool = false;
-        logger.debug(`order won't appear in the mempool`);
+        // ensure we can afford fulfilling this order and thus increasing our TVL
+        if (!context.giveChain.nonFinalizedOrdersBudgetController.isFitsBudget(orderId, usdWorth)) {
+          const message = 'order does not fit the budget, rejecting';
+          logger.info(message);
+          this.hooksEngine.handleOrderRejected({
+            order: orderInfo,
+            reason: RejectionReason.NON_FINALIZED_ORDERS_BUDGET_EXCEEDED,
+            attempts: params.attempts,
+            context,
+            message,
+          });
+          return;
+        }
 
         // find appropriate range corresponding to this USD worth
-        const range = context.config.chains[orderInfo.order.give.chainId]!.usdAmountConfirmations.find(
+        const range = context.giveChain.usdAmountConfirmations.find(
           usdWorthRange => usdWorthRange.usdWorthFrom < usdWorth && usdWorth <= usdWorthRange.usdWorthTo
         );
-
-        this.unconfirmedOrdersBudgetController.validateOrder(orderId, usdWorth, logger);
 
         // range found, ensure current block confirmation >= expected
         if (range?.minBlockConfirmations) {
@@ -474,7 +477,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       else if ('Finalized' in finalizationInfo) {
         // do nothing: order have stable finality according to the WS
         logger.debug('order source announced this order as finalized');
-        this.unconfirmedOrdersBudgetController.removeOrder(orderId, logger);
+        context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
       }
     }
 
@@ -507,7 +510,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         reason: PostponingReason.NOT_ENOUGH_BALANCE,
         attempts: params.attempts,
       });
-      if (allowPlaceToMempool)
+      if (isFinalizedOrder)
         this.mempoolService.addOrder(params);
       return;
     }
@@ -588,7 +591,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           message,
           attempts: params.attempts,
         });
-        if (allowPlaceToMempool)
+        if (isFinalizedOrder)
           this.mempoolService.addOrder(params);
         return;
       }
@@ -670,7 +673,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         reason: PostponingReason.NOT_PROFITABLE,
         attempts: params.attempts,
       });
-      if (allowPlaceToMempool)
+      if (isFinalizedOrder)
         this.mempoolService.addOrder(params);
       return;
     }
@@ -710,7 +713,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
             attempts: params.attempts,
           });
 
-          if (allowPlaceToMempool) {
+          if (isFinalizedOrder) {
             // reprocess order after 5s delay, but no more than two times in a row
             const maxFastTrackAttempts = 2; // attempts
             const fastTrackDelay = 5; // seconds
@@ -731,7 +734,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
           reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
           attempts: params.attempts,
         });
-        if (allowPlaceToMempool)
+        if (isFinalizedOrder)
           this.mempoolService.addOrder(params);
         return;
       }
@@ -741,6 +744,14 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     }
 
     try {
+      // we add this order to the budget controller right before the txn is broadcasted
+      // Mind that in case of an error (see the catch{} block below) we don't remove it from the
+      // controller because the error may occur because the txn was stuck in the mempool and reside there
+      // for a long period of time
+      if (!isFinalizedOrder) {
+        context.giveChain.nonFinalizedOrdersBudgetController.addOrder(orderId, usdWorth);
+      }
+
       const txFulfill = await this.takeChain.fulfillProvider.sendTransaction(
         fulfillTx,
         { logger }
@@ -763,13 +774,10 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         message,
         attempts: params.attempts,
       });
-      if (allowPlaceToMempool)
+
+      if (isFinalizedOrder)
         this.mempoolService.addOrder(params);
       return;
-    }
-
-    if (notFinalizedOrder) {
-      this.unconfirmedOrdersBudgetController.validateAndAddOrder(orderId, usdWorth, logger);
     }
 
     await this.waitIsOrderFulfilled(orderInfo.orderId, orderInfo.order, context, logger);

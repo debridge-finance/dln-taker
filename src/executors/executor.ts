@@ -28,6 +28,7 @@ import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
 import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { HooksEngine } from "../hooks/HooksEngine";
+import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOrdersBudgetController";
 
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
@@ -40,14 +41,13 @@ const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Fantom]: 15,
 }
 
-export type ExecutorInitializingChain = {
+export type ExecutorInitializingChain = Readonly<{
   chain: ChainId;
   chainRpc: string;
   unlockProvider: ProviderAdapter;
   fulfillProvider: ProviderAdapter;
   client: Solana.PmmClient | Evm.PmmEvmClient;
-  unconfirmedOrdersBudgetInUSD?: number;
-};
+}>;
 
 type UsdWorthBlockConfirmationConstraints = Array<{
   usdWorthFrom: number,
@@ -61,6 +61,7 @@ export type ExecutorSupportedChain = {
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
   usdAmountConfirmations: UsdWorthBlockConfirmationConstraints;
+  nonFinalizedOrdersBudgetController: NonFinalizedOrdersBudgetController;
   orderProcessor: processors.IOrderProcessor;
   unlockProvider: ProviderAdapter;
   fulfillProvider: ProviderAdapter;
@@ -210,7 +211,7 @@ export class Executor implements IExecutor {
         chainRpc: chain.chainRpc,
         unlockProvider,
         fulfillProvider: fulfillProvider,
-        unconfirmedOrdersBudgetInUSD: chain.constraints?.unconfirmedOrdersBudgetInUSD,
+        nonFinalizedTVLBudget: chain.constraints?.nonFinalizedTVLBudget,
         client,
       };
       const orderProcessor = await processorInitializer(chain.chain, {
@@ -251,7 +252,12 @@ export class Executor implements IExecutor {
         dstFilters,
         orderProcessor,
         unlockProvider,
-        fulfillProvider: fulfillProvider,
+        fulfillProvider,
+        nonFinalizedOrdersBudgetController: new NonFinalizedOrdersBudgetController(
+          chain.chain,
+          chain.constraints?.nonFinalizedTVLBudget || 0,
+          this.logger
+        ),
         client,
         usdAmountConfirmations: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain),
         beneficiary: chain.beneficiary,
