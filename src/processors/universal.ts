@@ -197,6 +197,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       case OrderInfoStatus.Fulfilled: {
         this.clearInternalQueues(orderId);
         context.logger.debug(`deleted from queues`);
+        context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
         return;
       }
@@ -318,7 +319,116 @@ class UniversalProcessor extends BaseOrderProcessor {
       return;
     }
 
+    // calculate USD worth of order
+    const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
+      context.config.tokenPriceService.getPrice(
+        orderInfo.order.give.chainId,
+        buffersAreEqual(orderInfo.order.give.tokenAddress, tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS)) ? null : orderInfo.order.give.tokenAddress,
+        {
+          logger: createClientLogger(context.logger)
+        }
+      ),
+      context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress, context.giveChain.fulfillProvider.connection as Web3)
+    ]);
+    logger.debug(`usd rate for give token: ${giveTokenUsdRate}`);
+    logger.debug(`decimals for give token: ${giveTokenDecimals}`);
+
+    // converting give amount
+    const usdWorth = BigNumber(giveTokenUsdRate)
+      .multipliedBy(orderInfo.order.give.amount.toString())
+      .dividedBy(new BigNumber(10).pow(giveTokenDecimals))
+      .toNumber();
+    logger.debug(`order worth in usd: ${usdWorth}`);
+
+    let isFinalizedOrder = true;
+
+    // compare worthiness of the order against block confirmation thresholds
+    if (orderInfo.status == OrderInfoStatus.Created) {
+      const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info;
+      if (finalizationInfo == 'Revoked') {
+        this.clearInternalQueues(orderInfo.orderId);
+
+        const message = 'order has been revoked by the order feed due to chain reorganization';
+        logger.info(message);
+        this.hooksEngine.handleOrderRejected({
+          order: orderInfo,
+          reason: RejectionReason.REVOKED,
+          attempts: params.attempts,
+          context,
+          message,
+        });
+        return;
+      }
+      else if ('Confirmed' in finalizationInfo) {
+        // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
+        // to avoid data discrepancy and rely on WS instead
+        isFinalizedOrder = false;
+        const announcedConfirmation = finalizationInfo.Confirmed.confirmation_blocks_count;
+        logger.info(`order arrived with non-guaranteed finality, announced confirmation: ${announcedConfirmation}`);
+
+        // ensure we can afford fulfilling this order and thus increasing our TVL
+        if (!context.giveChain.nonFinalizedOrdersBudgetController.isFitsBudget(orderId, usdWorth)) {
+          const message = 'order does not fit the budget, rejecting';
+          logger.info(message);
+          this.hooksEngine.handleOrderRejected({
+            order: orderInfo,
+            reason: RejectionReason.NON_FINALIZED_ORDERS_BUDGET_EXCEEDED,
+            attempts: params.attempts,
+            context,
+            message,
+          });
+          return;
+        }
+
+        // find appropriate range corresponding to this USD worth
+        const range = context.giveChain.usdAmountConfirmations.find(
+          usdWorthRange => usdWorthRange.usdWorthFrom < usdWorth && usdWorth <= usdWorthRange.usdWorthTo
+        );
+
+        // range found, ensure current block confirmation >= expected
+        if (range?.minBlockConfirmations) {
+          logger.debug(`usdAmountConfirmationRange found: (${range.usdWorthFrom}, ${range.usdWorthTo}]`)
+
+          if (announcedConfirmation < range.minBlockConfirmations) {
+            const message = `announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${range.minBlockConfirmations} for order worth of $${usdWorth.toFixed(2)}`;
+            logger.info(message)
+            this.hooksEngine.handleOrderRejected({
+              order: orderInfo,
+              reason: RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
+              attempts: params.attempts,
+              context,
+              message,
+            });
+            return;
+          }
+          else {
+            logger.debug("accepting order for execution")
+          }
+        }
+        else { // range not found: we do not accept this order, let it come finalized
+          const message = `non-finalized order worth of $${usdWorth.toFixed(2)} is not covered by any custom block confirmation range`;
+          logger.debug(message);
+          this.hooksEngine.handleOrderRejected({
+            order: orderInfo,
+            reason: RejectionReason.NOT_YET_FINALIZED,
+            context,
+            attempts: params.attempts,
+            message,
+          });
+          return;
+        }
+
+      }
+      else if ('Finalized' in finalizationInfo) {
+        // do nothing: order have stable finality according to the WS
+        logger.debug('order source announced this order as finalized');
+        context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
+      }
+    }
+
     // validate that order is not fullfilled
+    // This must be done after 'Finalized' in finalizationInfo is checked because we may want to remove the order
+    // from the nonFinalizedOrdersBudgetController
     const takeOrderStatus = await context.config.client.getTakeOrderStatus(
       orderInfo.orderId,
       orderInfo.order.take.chainId,
@@ -373,101 +483,6 @@ class UniversalProcessor extends BaseOrderProcessor {
       return;
     }
 
-    let allowPlaceToMempool = true;
-
-    // compare worthiness of the order against block confirmation thresholds
-    if (orderInfo.status == OrderInfoStatus.Created) {
-      const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info;
-      if (finalizationInfo == 'Revoked') {
-        this.clearInternalQueues(orderInfo.orderId);
-
-        const message = 'order has been revoked by the order feed due to chain reorganization';
-        logger.info(message);
-        this.hooksEngine.handleOrderRejected({
-          order: orderInfo,
-          reason: RejectionReason.REVOKED,
-          attempts: params.attempts,
-          context,
-          message,
-        });
-        return;
-      }
-      else if ('Confirmed' in finalizationInfo) {
-        // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
-        // to avoid data discrepancy and rely on WS instead
-        const announcedConfirmation = finalizationInfo.Confirmed.confirmation_blocks_count;
-        logger.info(`order announced with custom finality, announced confirmation: ${announcedConfirmation}`);
-
-        // we don't want this order to be put to mempool because we don't query actual block confirmations
-        allowPlaceToMempool = false;
-        logger.debug(`order won't appear in the mempool`)
-
-        // calculate USD worth of order
-        const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
-          context.config.tokenPriceService.getPrice(
-            orderInfo.order.give.chainId,
-            buffersAreEqual(orderInfo.order.give.tokenAddress, tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS)) ? null : orderInfo.order.give.tokenAddress,
-            {
-              logger: createClientLogger(context.logger)
-            }
-          ),
-          context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress, context.giveChain.fulfillProvider.connection as Web3)
-        ]);
-        logger.debug(`usd rate for give token: ${giveTokenUsdRate}`)
-        logger.debug(`decimals for give token: ${giveTokenDecimals}`)
-
-        // converting give amount
-        const usdWorth = BigNumber(giveTokenUsdRate)
-          .multipliedBy(orderInfo.order.give.amount.toString())
-          .dividedBy(new BigNumber(10).pow(giveTokenDecimals))
-          .toNumber();
-        logger.debug(`order worth in usd: ${usdWorth}`)
-
-        // find appropriate range corresponding to this USD worth
-        const range = context.config.chains[orderInfo.order.give.chainId]!.usdAmountConfirmations.find(
-          usdWorthRange => usdWorthRange.usdWorthFrom < usdWorth && usdWorth <= usdWorthRange.usdWorthTo
-        );
-
-        // range found, ensure current block confirmation >= expected
-        if (range?.minBlockConfirmations) {
-          logger.debug(`usdAmountConfirmationRange found: (${range.usdWorthFrom}, ${range.usdWorthTo}]`)
-
-          if (announcedConfirmation < range.minBlockConfirmations) {
-            const message = `announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${range.minBlockConfirmations} for order worth of $${usdWorth.toFixed(2)}`;
-            logger.info(message)
-            this.hooksEngine.handleOrderRejected({
-              order: orderInfo,
-              reason: RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
-              attempts: params.attempts,
-              context,
-              message,
-            });
-            return;
-          }
-          else {
-            logger.debug("accepting order for execution")
-          }
-        }
-        else { // range not found: we do not accept this order, let it come finalized
-          const message = `non-finalized order worth of $${usdWorth.toFixed(2)} is not covered by any custom block confirmation range`;
-          logger.debug(message);
-          this.hooksEngine.handleOrderRejected({
-            order: orderInfo,
-            reason: RejectionReason.NOT_YET_FINALIZED,
-            context,
-            attempts: params.attempts,
-            message,
-          });
-          return;
-        }
-
-      }
-      else if ('Finalized' in finalizationInfo) {
-        // do nothing: order have stable finality according to the WS
-        logger.debug('order source announced this order as finalized')
-      }
-    }
-
     // perform rough estimation: assuming order.give.amount is what we need on balance
     const pickedBucket = findExpectedBucket(orderInfo.order, context.config.buckets);
     const [reserveSrcTokenDecimals, reserveDstTokenDecimals, takeTokenDecimals] = await Promise.all([
@@ -477,7 +492,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     ]);
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
-    const roughReserveDstDecimals = reserveSrcTokenDecimals - reserveDstTokenDecimals
+    const roughReserveDstDecimals = reserveSrcTokenDecimals - reserveDstTokenDecimals;
     let roughReserveDstAmount = BigNumber(orderInfo.order.give.amount.toString()).div(BigNumber(10).pow(roughReserveDstDecimals)).integerValue();
     logger.debug(`expressed order give amount (${orderInfo.order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(orderInfo.order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[orderInfo.order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
 
@@ -497,7 +512,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         reason: PostponingReason.NOT_ENOUGH_BALANCE,
         attempts: params.attempts,
       });
-      if (allowPlaceToMempool)
+      if (isFinalizedOrder)
         this.mempoolService.addOrder(params);
       return;
     }
@@ -578,7 +593,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           message,
           attempts: params.attempts,
         });
-        if (allowPlaceToMempool)
+        if (isFinalizedOrder)
           this.mempoolService.addOrder(params);
         return;
       }
@@ -660,7 +675,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         reason: PostponingReason.NOT_PROFITABLE,
         attempts: params.attempts,
       });
-      if (allowPlaceToMempool)
+      if (isFinalizedOrder)
         this.mempoolService.addOrder(params);
       return;
     }
@@ -700,7 +715,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
             attempts: params.attempts,
           });
 
-          if (allowPlaceToMempool) {
+          if (isFinalizedOrder) {
             // reprocess order after 5s delay, but no more than two times in a row
             const maxFastTrackAttempts = 2; // attempts
             const fastTrackDelay = 5; // seconds
@@ -721,7 +736,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
           reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
           attempts: params.attempts,
         });
-        if (allowPlaceToMempool)
+        if (isFinalizedOrder)
           this.mempoolService.addOrder(params);
         return;
       }
@@ -731,6 +746,14 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
     }
 
     try {
+      // we add this order to the budget controller right before the txn is broadcasted
+      // Mind that in case of an error (see the catch{} block below) we don't remove it from the
+      // controller because the error may occur because the txn was stuck in the mempool and reside there
+      // for a long period of time
+      if (!isFinalizedOrder) {
+        context.giveChain.nonFinalizedOrdersBudgetController.addOrder(orderId, usdWorth);
+      }
+
       const txFulfill = await this.takeChain.fulfillProvider.sendTransaction(
         fulfillTx,
         { logger }
@@ -753,7 +776,8 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         message,
         attempts: params.attempts,
       });
-      if (allowPlaceToMempool)
+
+      if (isFinalizedOrder)
         this.mempoolService.addOrder(params);
       return;
     }

@@ -111,7 +111,7 @@ export interface ChainDefinition {
   environment?: ChainEnvironment;
 
   /**
-   * Defines constraints imposed on all orders coming from/to this chain
+   * Defines constraints imposed on all orders coming from this chain
    */
   constraints?: {
     /**
@@ -130,6 +130,19 @@ export interface ChainDefinition {
      * ```
      */
     requiredConfirmationsThresholds?: Array<{thresholdAmountInUSD: number, minBlockConfirmations: number}>;
+
+    /**
+     * Defines a budget (a hard cap) of all successfully fulfilled orders' value (expressed in USD) that
+     * were not reached yet a guaranteed finality at the given point in time.
+     * For example, if you have allowed to fulfill orders worth $1 from this chain after 1 block confirmation
+     * (using the neighboring `requiredConfirmationsThresholds` property, while the guaranteed finalization is known
+     * to be 12 blocks), and there is an accidental flood of 100,000 orders worth $1 occurs, you probably want to
+     * prevent this by setting the budget for non-finalized orders.
+     * If you set `nonFinalizedTVLBudget` to "100", than only first hundred of one-dollar orders would be attempted
+     * to be fulfilled, and all other orders would be postponed to the internal queue where they would be pulled
+     * one by one as soon as fulfilled orders are being finalized.
+     */
+    nonFinalizedTVLBudget?: number;
   }
 
   //

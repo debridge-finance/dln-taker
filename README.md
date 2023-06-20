@@ -10,6 +10,8 @@
   - [Understanding reserve funds](#understanding-reserve-funds)
   - [Deploying reserve funds](#deploying-reserve-funds)
 - [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
+  - [Reducing transaction finality constraint](#reducing-transaction-finality-constraint)
+  - [Setting a budget for non-finalized orders](#setting-a-budget-for-non-finalized-orders)
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
   - [Restricting orders from fulfillment](#restricting-orders-from-fulfillment)
   - [Placing new orders](#placing-new-orders)
@@ -153,6 +155,8 @@ For every chain you as a taker would like to support:
 
 ## Managing cross-chain risk/reward ratio
 
+### Reducing transaction finality constraint
+
 Executing cross-chain transactions is all about managing risks properly: no one wants to perform actions on the destination chain triggered from the source chain and later face a huge network reorg event which vanishes the triggering transaction. Thus, we at deBridge rely on safe block confirmations which ensure guaranteed transaction finality and help anyone avoid losing funds by fulfilling orders that get unexpectedly vanished:
 
 | Chain     | Guaranteed block confirmations |
@@ -185,6 +189,38 @@ constraints: {
   ]
 },
 ```
+
+### Setting a budget for non-finalized orders
+
+Imagine, you have allowed to fulfill orders worth $1 from this chain after 1 block confirmation:
+
+```ts
+      constraints: {
+        requiredConfirmationsThresholds: [
+           // worth <$100: 1+ block confirmation
+           {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
+        ],
+        // worth >$100: guaranteed block confirmations (12)
+     }
+```
+
+and there is an accidental flood of 100,000 orders worth $1 occurs, you probably want to prevent this by setting the budget for non-finalized orders. If you set `nonFinalizedTVLBudget` to "100", than only first hundred of one-dollar orders would be attempted to be fulfilled, and all other orders would be postponed to the internal queue where they would be pulled one by one as soon as fulfilled orders are being finalized:
+
+
+```ts
+      constraints: {
+        requiredConfirmationsThresholds: [
+           // worth <$100: 1+ block confirmation
+           {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
+        ],
+        // worth >$100: guaranteed block confirmations (12)
+
+        // Defines a TVL hard cap for orders coming from this chain that were fulfilled before getting guaranteedly finalized.
+        nonFinalizedTVLBudget: 100,
+     }
+```
+
+This budged is a hard cap for orders that were not yet finalized after your `dln-taker`'s instance have successfully fulfilled them. As soon as such orders got a finalization status, they got removed effectively releasing the room for other non-finalized orders that can be attempted to be fulfulled.
 
 ## Testing the order execution flow in the wild
 

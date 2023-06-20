@@ -84,9 +84,9 @@ export enum RejectionReason {
   NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
 
   /**
-   * future use: triggered when budget of unconfirmed orders exceeded
+   * triggered when budget of unconfirmed orders exceeded
    */
-  UNCONFIRMED_ORDERS_BUDGED_EXCEEDED,
+  NON_FINALIZED_ORDERS_BUDGET_EXCEEDED,
 
   /**
    * indicates that non-finalized order is not covered by any custom block confirmation range
