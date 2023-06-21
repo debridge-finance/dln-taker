@@ -49,25 +49,29 @@ export type ExecutorInitializingChain = Readonly<{
   client: Solana.PmmClient | Evm.PmmEvmClient;
 }>;
 
-type UsdWorthBlockConfirmationConstraints = Array<{
+type ConstraintsPerOrderValue = Readonly<{
   usdWorthFrom: number,
   usdWorthTo: number,
   minBlockConfirmations: number,
-}>;
+  customFulfillmentDelay: number
+}>
 
-export type ExecutorSupportedChain = {
+export type ExecutorSupportedChain = Readonly<{
   chain: ChainId;
   chainRpc: string;
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
-  usdAmountConfirmations: UsdWorthBlockConfirmationConstraints;
   nonFinalizedOrdersBudgetController: NonFinalizedOrdersBudgetController;
+  constraints: Readonly<{
+    defaultFulfillmentDelay: number,
+    byUsdValue: Array<ConstraintsPerOrderValue>
+  }>,
   orderProcessor: processors.IOrderProcessor;
   unlockProvider: ProviderAdapter;
   fulfillProvider: ProviderAdapter;
   beneficiary: string;
   client: Solana.PmmClient | Evm.PmmEvmClient;
-};
+}>;
 
 export interface IExecutor {
   readonly tokenPriceService: PriceTokenService;
@@ -259,8 +263,11 @@ export class Executor implements IExecutor {
           this.logger
         ),
         client,
-        usdAmountConfirmations: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain),
         beneficiary: chain.beneficiary,
+        constraints: {
+          defaultFulfillmentDelay: chain.constraints?.defaultFulfillmentDelay || 0,
+          byUsdValue: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain),
+        }
       };
 
       clients[chain.chain] = client;
@@ -286,7 +293,7 @@ export class Executor implements IExecutor {
     });
     const minConfirmationThresholds = Object.values(this.chains).map(chain => ({
       chainId: chain.chain,
-      points: chain.usdAmountConfirmations.map(t => t.minBlockConfirmations)
+      points: chain.constraints.byUsdValue.map(t => t.minBlockConfirmations)
     }))
     orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds, hooksEngine);
 
@@ -296,8 +303,8 @@ export class Executor implements IExecutor {
     this.isInitialized = true;
   }
 
-  private getConfirmationRanges(chain: SupportedChain, definition: ChainDefinition): UsdWorthBlockConfirmationConstraints {
-    const ranges: UsdWorthBlockConfirmationConstraints = [];
+  private getConfirmationRanges(chain: SupportedChain, definition: ChainDefinition): Array<ConstraintsPerOrderValue> {
+    const ranges: ConstraintsPerOrderValue[] = [];
     const requiredConfirmationsThresholds = definition.constraints?.requiredConfirmationsThresholds || [];
     requiredConfirmationsThresholds
       .sort((a, b) => a.thresholdAmountInUSD < b.thresholdAmountInUSD ? -1 : 1) // sort by usdWorth ASC
@@ -314,7 +321,8 @@ export class Executor implements IExecutor {
         ranges.push({
           usdWorthFrom: prev.thresholdAmountInUSD,
           usdWorthTo: threshold.thresholdAmountInUSD,
-          minBlockConfirmations: threshold.minBlockConfirmations
+          minBlockConfirmations: threshold.minBlockConfirmations,
+          customFulfillmentDelay: threshold.fulfillmentDelay || 0
         })
       });
 
@@ -411,7 +419,6 @@ export class Executor implements IExecutor {
         config: this,
         giveChain,
       },
-      attempts: 0
     });
 
     return true;

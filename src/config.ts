@@ -128,8 +128,12 @@ export interface ChainDefinition {
      *  {thresholdAmountInUSD: 1_000, minBlockConfirmations: 6},   // worth <$1,000: 6+ block confirmations
      * ]
      * ```
+     *
+     * Optional `fulfillmentDelay` defines a custom delay (in seconds) the dln-taker should wait before starting
+     * to process each new (non-archival) order that satisfies the given `thresholdAmountInUSD` after it first saw it. This
+     * property has precedence over higher order `defaultFulfillmentDelay` property.
      */
-    requiredConfirmationsThresholds?: Array<{thresholdAmountInUSD: number, minBlockConfirmations: number}>;
+    requiredConfirmationsThresholds?: Array<{thresholdAmountInUSD: number, minBlockConfirmations: number, fulfillmentDelay?: number}>;
 
     /**
      * Defines a budget (a hard cap) of all successfully fulfilled orders' value (expressed in USD) that
@@ -143,6 +147,13 @@ export interface ChainDefinition {
      * one by one as soon as fulfilled orders are being finalized.
      */
     nonFinalizedTVLBudget?: number;
+
+    /**
+     * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order after it first saw it.
+     * Mind that this property can be overridden by the `fulfillmentDelay` in one of the `requiredConfirmationsThresholds` for specific
+     * `thresholdAmountInUSD`.
+     */
+    defaultFulfillmentDelay?: number;
   }
 
   //

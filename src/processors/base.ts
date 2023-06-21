@@ -16,6 +16,8 @@ import {
 import { IncomingOrderContext } from "../interfaces";
 import { HooksEngine } from "../hooks/HooksEngine";
 
+export type OrderId = string;
+
 export class OrderProcessorContext {
   logger: Logger;
   config: IExecutor;

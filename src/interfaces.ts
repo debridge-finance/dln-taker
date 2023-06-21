@@ -1,7 +1,7 @@
 import { ChainId, OrderData } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
-import { OrderProcessorContext } from "./processors/base";
+import { OrderId, OrderProcessorContext } from "./processors/base";
 import { HooksEngine } from "./hooks/HooksEngine";
 
 export enum OrderInfoStatus {
@@ -35,12 +35,11 @@ export type IncomingOrder<T extends OrderInfoStatus> = {
 ) & (T extends OrderInfoStatus.Fulfilled ? { unlockAuthority: string } : {}
 ) & (T extends OrderInfoStatus.Created ? { finalization_info: FinalizationInfo } : {})
 
-export type ProcessOrder = (params: IncomingOrderContext) => Promise<void>;
+export type ProcessOrder = (orderId: OrderId) => Promise<void>;
 
 export type IncomingOrderContext = {
   orderInfo: IncomingOrder<OrderInfoStatus>;
   context: OrderProcessorContext;
-  attempts: number;
 };
 
 export type OrderProcessorFunc = (order: IncomingOrder<any>) => Promise<void>;

@@ -12,6 +12,7 @@
 - [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
   - [Reducing transaction finality constraint](#reducing-transaction-finality-constraint)
   - [Setting a budget for non-finalized orders](#setting-a-budget-for-non-finalized-orders)
+  - [Delayed fulfillments](#delayed-fulfillments)
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
   - [Restricting orders from fulfillment](#restricting-orders-from-fulfillment)
   - [Placing new orders](#placing-new-orders)
@@ -221,6 +222,34 @@ and there is an accidental flood of 100,000 orders worth $1 occurs, you probably
 ```
 
 This budged is a hard cap for orders that were not yet finalized after your `dln-taker`'s instance have successfully fulfilled them. As soon as such orders got a finalization status, they got removed effectively releasing the room for other non-finalized orders that can be attempted to be fulfulled.
+
+### Delayed fulfillments
+
+Sometimes you may be willing to run several instances of dln-taker to reduce risks of managing a full bag of assets under one roof, or create a virtual fault tolerant cluster of `dln-taker`'s in which second instance catches up with the new orders when the first instance runs out money.
+
+To avoid a race when all of the instances are attempting to fulfill the same order simultaneously and thus burning each other's gas, there is an opt-in feature that allows configuring delayed fulfillments. This gives the ability to make specific instance wait the given amount of time before starting its attempt to fulfill newly arrived order.
+
+For example, when you want your instance#1 to delay the fulfillment of orders under $1000 by 30s, and all other orders by 60s, you may use `constraints.requiredConfirmationsThresholds[].fulfillmentDelay` and `constraints.defaultFulfillmentDelay` accordingly for each source chain:
+
+```ts
+{
+  chain: ChainId.Avalanche,
+  chainRpc: `${process.env.AVALANCHE_RPC}`,
+
+  constraints: {
+    requiredConfirmationsThresholds: [
+      // sets fulfillmentDelay=30s for orders under $1000
+      {thresholdAmountInUSD: 1000, minBlockConfirmations: 1, fulfillmentDelay: 30},
+      {thresholdAmountInUSD: 10_000, minBlockConfirmations: 6},
+    ],
+
+    // sets fulfillmentDelay=60s for all other orders (>$1000)
+    defaultFulfillmentDelay: 60
+  },
+},
+```
+
+At the same time, instance#2 may be configured without such timeouts, so if it goes offline or runs out of money, your instance#1 will catch up with the orders missed by instance#2 after the given time frame.
 
 ## Testing the order execution flow in the wild
 
