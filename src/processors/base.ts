@@ -22,6 +22,7 @@ export class OrderProcessorContext {
   logger: Logger;
   config: IExecutor;
   giveChain: ExecutorSupportedChain;
+  takeChain: ExecutorSupportedChain;
 }
 
 export class OrderProcessorInitContext {

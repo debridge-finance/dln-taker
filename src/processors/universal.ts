@@ -402,13 +402,17 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status == OrderInfoStatus.Created) {
-      // find appropriate range corresponding to this USD worth
-      const orderValueConstraints = context.giveChain.constraints.byUsdValue.find(
-        usdWorthRange => usdWorthRange.usdWorthFrom < usdWorth && usdWorth <= usdWorthRange.usdWorthTo
-      );
+      // find corresponding srcConstraints
+      const srcConstraintsByValue = context.giveChain.srcConstraints.perOrderValue.find(srcConstraints => usdWorth <= srcConstraints.upperThreshold);
+      const srcConstraints = srcConstraintsByValue || context.giveChain.srcConstraints;
+
+      // find corresponding dstConstraints (they may supersede srcConstraints)
+      const dstConstraintsByValue =
+        context.takeChain.dstConstraints.perOrderValue.find(dstConstraints => usdWorth <= dstConstraints.upperThreshold)
+        || context.takeChain.dstConstraints;
 
       // determine if we should postpone the order
-      const fulfillmentDelay = orderValueConstraints?.customFulfillmentDelay || context.giveChain.constraints.defaultFulfillmentDelay;
+      const fulfillmentDelay = dstConstraintsByValue.fulfillmentDelay || srcConstraints.fulfillmentDelay;
       const remainingDelay = this.getOrderRemainingDelay(metadata.arrivedAt, fulfillmentDelay);
       if (remainingDelay > 0) {
         const message = `order should be delayed by ${remainingDelay}s (why: fulfillment delay is set to ${fulfillmentDelay}s)`;
@@ -436,11 +440,11 @@ class UniversalProcessor extends BaseOrderProcessor {
         }
 
         // range found, ensure current block confirmation >= expected
-        if (orderValueConstraints?.minBlockConfirmations) {
-          logger.debug(`usdAmountConfirmationRange found: (${orderValueConstraints.usdWorthFrom}, ${orderValueConstraints.usdWorthTo}]`)
+        if (srcConstraintsByValue?.minBlockConfirmations) {
+          logger.debug(`usdAmountConfirmationRange found: <=$${srcConstraintsByValue.upperThreshold}`)
 
-          if (announcedConfirmation < orderValueConstraints.minBlockConfirmations) {
-            const message = `announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${orderValueConstraints.minBlockConfirmations} for order worth of $${usdWorth.toFixed(2)}`;
+          if (announcedConfirmation < srcConstraintsByValue.minBlockConfirmations) {
+            const message = `announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${srcConstraintsByValue.minBlockConfirmations} for order worth of $${usdWorth.toFixed(2)}`;
             return this.rejectOrder(metadata, message, RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH)
           }
           else {

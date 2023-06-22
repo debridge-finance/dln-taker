@@ -81,6 +81,22 @@ export type ChainEnvironment = {
   };
 };
 
+export type DstOrderConstraints = {
+    /**
+     * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
+     * coming to this chain after it first saw it.
+     */
+    fulfillmentDelay?: number;
+}
+
+export type SrcOrderConstraints = {
+    /**
+     * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
+     * coming from this chain after it first saw it.
+     */
+    fulfillmentDelay?: number;
+}
+
 /**
  * Represents a chain configuration where orders can be fulfilled.
  */
@@ -113,7 +129,7 @@ export interface ChainDefinition {
   /**
    * Defines constraints imposed on all orders coming from this chain
    */
-  constraints?: {
+  constraints?: SrcOrderConstraints & {
     /**
      * Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
      * For example, you may want to fulfill orders coming from Ethereum:
@@ -128,12 +144,11 @@ export interface ChainDefinition {
      *  {thresholdAmountInUSD: 1_000, minBlockConfirmations: 6},   // worth <$1,000: 6+ block confirmations
      * ]
      * ```
-     *
-     * Optional `fulfillmentDelay` defines a custom delay (in seconds) the dln-taker should wait before starting
-     * to process each new (non-archival) order that satisfies the given `thresholdAmountInUSD` after it first saw it. This
-     * property has precedence over higher order `defaultFulfillmentDelay` property.
      */
-    requiredConfirmationsThresholds?: Array<{thresholdAmountInUSD: number, minBlockConfirmations: number, fulfillmentDelay?: number}>;
+    requiredConfirmationsThresholds?: Array<SrcOrderConstraints & {
+      thresholdAmountInUSD: number,
+      minBlockConfirmations?: number,
+    }>;
 
     /**
      * Defines a budget (a hard cap) of all successfully fulfilled orders' value (expressed in USD) that
@@ -147,14 +162,21 @@ export interface ChainDefinition {
      * one by one as soon as fulfilled orders are being finalized.
      */
     nonFinalizedTVLBudget?: number;
+  },
 
+  /**
+   * Defines constraints imposed on all orders coming to this chain
+   */
+  dstConstraints?: DstOrderConstraints & {
     /**
-     * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order after it first saw it.
-     * Mind that this property can be overridden by the `fulfillmentDelay` in one of the `requiredConfirmationsThresholds` for specific
-     * `thresholdAmountInUSD`.
+     * Defines custom constraints for orders falling into the given upper thresholds expressed in US dollars.
+     *
+     * Mind that these constraints have precedence over higher order constraints
      */
-    defaultFulfillmentDelay?: number;
-  }
+    perOrderValueUpperThreshold?: Array<DstOrderConstraints & {
+      upperThreshold: number
+    }>
+  },
 
   //
   // taker related

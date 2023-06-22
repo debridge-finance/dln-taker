@@ -29,7 +29,7 @@ import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { HooksEngine } from "../hooks/HooksEngine";
 import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOrdersBudgetController";
-
+import { DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Avalanche]: 15,
@@ -49,12 +49,26 @@ export type ExecutorInitializingChain = Readonly<{
   client: Solana.PmmClient | Evm.PmmEvmClient;
 }>;
 
-type ConstraintsPerOrderValue = Readonly<{
-  usdWorthFrom: number,
-  usdWorthTo: number,
-  minBlockConfirmations: number,
-  customFulfillmentDelay: number
+type DstOrderConstraints = Readonly<{
+  fulfillmentDelay: number;
 }>
+
+type DstConstraintsPerOrderValue = Array<
+    DstOrderConstraints & Readonly<{
+      upperThreshold: number;
+  }>
+>;
+
+type SrcOrderConstraints = Readonly<{
+  fulfillmentDelay: number;
+}>
+
+type SrcConstraintsPerOrderValue = Array<
+  SrcOrderConstraints & Readonly<{
+      upperThreshold: number;
+      minBlockConfirmations: number;
+  }>
+>;
 
 export type ExecutorSupportedChain = Readonly<{
   chain: ChainId;
@@ -62,9 +76,11 @@ export type ExecutorSupportedChain = Readonly<{
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
   nonFinalizedOrdersBudgetController: NonFinalizedOrdersBudgetController;
-  constraints: Readonly<{
-    defaultFulfillmentDelay: number,
-    byUsdValue: Array<ConstraintsPerOrderValue>
+  srcConstraints: Readonly<SrcOrderConstraints & {
+    perOrderValue: SrcConstraintsPerOrderValue
+  }>,
+  dstConstraints: Readonly<DstOrderConstraints & {
+    perOrderValue: DstConstraintsPerOrderValue
   }>,
   orderProcessor: processors.IOrderProcessor;
   unlockProvider: ProviderAdapter;
@@ -264,9 +280,13 @@ export class Executor implements IExecutor {
         ),
         client,
         beneficiary: chain.beneficiary,
-        constraints: {
-          defaultFulfillmentDelay: chain.constraints?.defaultFulfillmentDelay || 0,
-          byUsdValue: this.getConfirmationRanges(chain.chain as unknown as SupportedChain, chain),
+        srcConstraints: {
+          ...this.getSrcConstraints(chain.constraints || {}),
+          perOrderValue: this.getSrcConstraintsPerOrderValue(chain.chain as unknown as SupportedChain, chain.constraints || {})
+        },
+        dstConstraints: {
+          ...this.getDstConstraints(chain.dstConstraints || {}),
+          perOrderValue: this.getDstConstraintsPerOrderValue(chain.dstConstraints || {}),
         }
       };
 
@@ -291,10 +311,14 @@ export class Executor implements IExecutor {
         address: chain.unlockProvider.address as string,
       };
     });
-    const minConfirmationThresholds = Object.values(this.chains).map(chain => ({
-      chainId: chain.chain,
-      points: chain.constraints.byUsdValue.map(t => t.minBlockConfirmations)
-    }))
+    const minConfirmationThresholds = Object.values(this.chains)
+      .map(chain => ({
+        chainId: chain.chain,
+        points: chain.srcConstraints.perOrderValue
+          .map(t => t.minBlockConfirmations)
+          .filter(t => t > 0) // skip empty block confirmations
+      }))
+      .filter(range => range.points.length > 0); // skip chains without necessary confirmation points
     orderFeed.init(this.execute.bind(this), unlockAuthorities, minConfirmationThresholds, hooksEngine);
 
     // Override internal slippage calculation: do not reserve slippage buffer for pre-fulfill swap
@@ -303,30 +327,43 @@ export class Executor implements IExecutor {
     this.isInitialized = true;
   }
 
-  private getConfirmationRanges(chain: SupportedChain, definition: ChainDefinition): Array<ConstraintsPerOrderValue> {
-    const ranges: ConstraintsPerOrderValue[] = [];
-    const requiredConfirmationsThresholds = definition.constraints?.requiredConfirmationsThresholds || [];
-    requiredConfirmationsThresholds
-      .sort((a, b) => a.thresholdAmountInUSD < b.thresholdAmountInUSD ? -1 : 1) // sort by usdWorth ASC
-      .forEach((threshold, index, thresholdsSortedByUsdWorth) => {
-        const prev = index === 0 ? {minBlockConfirmations: 0, thresholdAmountInUSD: 0} : thresholdsSortedByUsdWorth[index - 1];
+  private getDstConstraintsPerOrderValue(configDstConstraints: ChainDefinition['dstConstraints']): DstConstraintsPerOrderValue {
+    return (configDstConstraints?.perOrderValueUpperThreshold || [])
+      .map(constraint => ({
+        upperThreshold: constraint.upperThreshold,
+        ...this.getDstConstraints(constraint, configDstConstraints)
+      }))
+      // important to sort by upper bound ASC for easier finding of the corresponding range
+      .sort((constraintA, constraintB) => constraintA.upperThreshold - constraintB.upperThreshold);
+  }
 
-        if (threshold.minBlockConfirmations <= prev.minBlockConfirmations) {
-          throw new Error(`Unable to set required confirmation threshold for $${threshold.thresholdAmountInUSD} on ${SupportedChain[chain]}: minBlockConfirmations (${threshold.minBlockConfirmations}) must be greater than ${prev.minBlockConfirmations}`)
+  private getDstConstraints(primaryConstraints: RawDstOrderConstraints, defaultConstraints?: RawDstOrderConstraints): DstOrderConstraints {
+    return {
+      fulfillmentDelay: primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0
+    }
+  }
+
+  private getSrcConstraintsPerOrderValue(chain: SupportedChain, configDstConstraints: ChainDefinition['constraints']): SrcConstraintsPerOrderValue {
+    return (configDstConstraints?.requiredConfirmationsThresholds || [])
+      .map(constraint => {
+        if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= (constraint.minBlockConfirmations || 0)) {
+          throw new Error(`Unable to set required confirmation threshold for $${constraint.thresholdAmountInUSD} on ${SupportedChain[chain]}: minBlockConfirmations (${constraint.minBlockConfirmations}) must be less than max block confirmations (${BLOCK_CONFIRMATIONS_HARD_CAPS[chain]})`);
         }
-        if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= threshold.minBlockConfirmations) {
-          throw new Error(`Unable to set required confirmation threshold for $${threshold.thresholdAmountInUSD} on ${SupportedChain[chain]}: minBlockConfirmations (${threshold.minBlockConfirmations}) must be less than max block confirmations (${BLOCK_CONFIRMATIONS_HARD_CAPS[chain]})`)
-        }
 
-        ranges.push({
-          usdWorthFrom: prev.thresholdAmountInUSD,
-          usdWorthTo: threshold.thresholdAmountInUSD,
-          minBlockConfirmations: threshold.minBlockConfirmations,
-          customFulfillmentDelay: threshold.fulfillmentDelay || 0
-        })
-      });
+        return {
+          upperThreshold: constraint.thresholdAmountInUSD,
+          minBlockConfirmations: constraint.minBlockConfirmations || 0,
+          ...this.getSrcConstraints(constraint, configDstConstraints)
+          }
+      })
+      // important to sort by upper bound ASC for easier finding of the corresponding range
+      .sort((constraintA, constraintB) => constraintA.upperThreshold - constraintB.upperThreshold);
+  }
 
-    return ranges;
+  private getSrcConstraints(primaryConstraints: RawSrcOrderConstraints, defaultConstraints?: RawSrcOrderConstraints): SrcOrderConstraints {
+    return {
+      fulfillmentDelay: primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0
+    }
   }
 
   async execute(nextOrderInfo: IncomingOrder<any>) {
@@ -418,6 +455,7 @@ export class Executor implements IExecutor {
         logger,
         config: this,
         giveChain,
+        takeChain
       },
     });
 
