@@ -165,7 +165,7 @@ export interface ChainDefinition {
   },
 
   /**
-   * Defines constraints imposed on all orders coming to this chain
+   * Defines constraints imposed on all orders coming to this chain. These properties have precedence over `constraints` property
    */
   dstConstraints?: DstOrderConstraints & {
     /**
