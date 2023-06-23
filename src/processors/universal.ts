@@ -25,7 +25,7 @@ import { createClientLogger } from "../logger";
 import { EvmProviderAdapter, Tx } from "../providers/evm.provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 
-import { BaseOrderProcessor, OrderProcessorContext, OrderProcessorInitContext, OrderProcessorInitializer } from "./base";
+import { BaseOrderProcessor, OrderId, OrderProcessorContext, OrderProcessorInitContext, OrderProcessorInitializer } from "./base";
 import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
 import { PostponingReason, RejectionReason } from "../hooks/HookEnums";
@@ -43,7 +43,7 @@ const EVM_FULFILL_GAS_MULTIPLIER = 1.25;
 // bump until
 const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.3;
 
-// dummy slippage used before any estimetions are performed, this is needed only for estimation purposes
+// dummy slippage used before any estimations are performed, this is needed only for estimation purposes
 const DUMMY_SLIPPAGE_BPS = 400; // 4%
 
 export type UniversalProcessorParams = {
@@ -84,13 +84,22 @@ export type UniversalProcessorParams = {
   preFulfillSwapMaxAllowedSlippageBps: number;
 };
 
+// Represents all necessary information about Created order during its internal lifecycle
+type CreatedOrderMetadata = {
+  readonly orderId: OrderId,
+  readonly arrivedAt: Date,
+  attempts: number,
+  context: IncomingOrderContext
+};
+
 class UniversalProcessor extends BaseOrderProcessor {
   private mempoolService: MempoolService;
-  private priorityQueue = new Set<string>(); // queue of orderid for processing created order
-  private queue = new Set<string>(); // queue of orderid for retry processing order
-  private incomingOrdersMap = new Map<string, IncomingOrderContext>(); // key orderid, contains incoming order from order feed
+  private priorityQueue = new Set<OrderId>(); // queue of orderid for processing created order
+  private queue = new Set<OrderId>(); // queue of orderid for retry processing order
   private isLocked: boolean = false;
   private batchUnlocker: BatchUnlocker;
+
+  readonly #createdOrdersMetadata = new Map<OrderId, CreatedOrderMetadata>()
 
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
@@ -135,7 +144,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     this.mempoolService = new MempoolService(
       logger.child({ takeChainId: chainId }),
-      this.process.bind(this),
+      this.tryProcess.bind(this),
       this.params.mempoolInterval
     );
 
@@ -179,11 +188,25 @@ class UniversalProcessor extends BaseOrderProcessor {
     });
 
     switch (orderInfo.status) {
-      case OrderInfoStatus.ArchivalCreated:
-      case OrderInfoStatus.Created: {
-        // must remove this order from all queues bc new order can be an updated version
-        this.incomingOrdersMap.set(orderInfo.orderId, params);
-        return this.tryProcess(orderInfo.orderId);
+      case OrderInfoStatus.Created:
+      case OrderInfoStatus.ArchivalCreated: {
+
+        if (!this.#createdOrdersMetadata.has(orderId)) {
+          this.#createdOrdersMetadata.set(orderId, {
+            orderId,
+            arrivedAt: new Date(),
+            attempts: 0,
+            context: params
+          })
+        }
+
+        // dequeue everything? right now I don't see any possible side effect of not dequeueing
+        // this.clearInternalQueues(orderId);
+
+        // override order params because there can be refreshed data (patches, newer confirmations, etc)
+        this.#createdOrdersMetadata.get(orderId)!.context = params;
+
+        return this.tryProcess(orderId);
       }
       case OrderInfoStatus.ArchivalFulfilled: {
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
@@ -191,13 +214,17 @@ class UniversalProcessor extends BaseOrderProcessor {
       }
       case OrderInfoStatus.Cancelled: {
         this.clearInternalQueues(orderId);
+        this.clearOrderStore(orderId);
         context.logger.debug(`deleted from queues`);
         return;
       }
       case OrderInfoStatus.Fulfilled: {
-        this.clearInternalQueues(orderId);
-        context.logger.debug(`deleted from queues`);
         context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
+
+        this.clearInternalQueues(orderId);
+        this.clearOrderStore(orderId);
+        context.logger.debug(`deleted from queues`);
+
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
         return;
       }
@@ -213,13 +240,16 @@ class UniversalProcessor extends BaseOrderProcessor {
   private clearInternalQueues(orderId: string): void {
     this.queue.delete(orderId);
     this.priorityQueue.delete(orderId);
-    this.incomingOrdersMap.delete(orderId)
     this.mempoolService.delete(orderId);
   }
 
+  private clearOrderStore(orderId: string): void {
+    this.#createdOrdersMetadata.delete(orderId)
+  }
+
   private async tryProcess(orderId: string): Promise<void> {
-    const params = this.incomingOrdersMap.get(orderId);
-    if (!params) throw new Error("Unexpected: missing data for order");
+    const metadata = this.getCreatedOrderMetadata(orderId);
+    const params = metadata.context
 
     const logger = params.context.logger;
     const orderInfo = params.orderInfo;
@@ -252,37 +282,25 @@ class UniversalProcessor extends BaseOrderProcessor {
     // process this order
     this.isLocked = true;
     try {
-      await this.processOrder(orderId);
+      await this.processOrder(metadata);
     } catch (e) {
       const message = `processing order failed with an unhandled error: ${e}`;
       logger.error(message);
       logger.error(e);
-      const params = this.incomingOrdersMap.get(orderId);
-      if (params) {
-        const { context, orderInfo } = params;
-        this.hooksEngine.handleOrderPostponed({
-          order: orderInfo,
-          context,
-          reason: PostponingReason.UNHANDLED_ERROR,
-          attempts: params.attempts,
-          message,
-        });
-        this.mempoolService.addOrder(params);
-      } else {
-        logger.debug(`order data is not presented in the map`);
-      }
+      this.postponeOrder(metadata, message, PostponingReason.UNHANDLED_ERROR, true);
     }
+    metadata.attempts++;
     this.isLocked = false;
 
     // forward to the next order
     // TODO try to get rid of recursion here. Use setInterval?
-    const nextOrder = this.pickNextOrder();
-    if (nextOrder) {
-      this.tryProcess(nextOrder);
+    const nextOrderId = this.pickNextOrderId();
+    if (nextOrderId) {
+      this.tryProcess(nextOrderId);
     }
   }
 
-  private pickNextOrder(): string | undefined {
+  private pickNextOrderId(): OrderId | undefined {
     const nextOrderId =
       this.priorityQueue.values().next().value ||
       this.queue.values().next().value;
@@ -295,10 +313,58 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
   }
 
-  private async processOrder(orderId: string): Promise<void | never> {
-    const params = this.incomingOrdersMap.get(orderId);
-    if (!params) throw new Error("Unexpected: missing data for order");
-    const { context, orderInfo } = params;
+  // gets the amount of sec to additionally wait until this order can be processed
+  private getOrderRemainingDelay(firstSeen: Date, delay: number): number {
+    if (delay > 0) {
+      const delayMs = delay * 1000;
+
+      const orderKnownFor = new Date().getTime() - firstSeen.getTime();
+
+      if (delayMs > orderKnownFor) {
+        return (delayMs - orderKnownFor) / 1000
+      }
+    }
+
+    return 0;
+  }
+
+  private getCreatedOrderMetadata(orderId: OrderId): CreatedOrderMetadata {
+    if (!this.#createdOrdersMetadata.has(orderId)) throw new Error(`Unexpected: missing created order data`)
+    return this.#createdOrdersMetadata.get(orderId)!;
+  }
+
+  private postponeOrder(metadata: CreatedOrderMetadata, message: string, reason: PostponingReason, addToMempool: boolean = true, remainingDelay?: number) {
+    const { attempts, context: { context, orderInfo } } = metadata;
+
+    context.logger.info(message);
+    this.hooksEngine.handleOrderPostponed({
+      order: orderInfo,
+      context,
+      message,
+      reason,
+      attempts,
+    });
+
+    if (addToMempool)
+      this.mempoolService.addOrder(metadata.orderId, remainingDelay, attempts)
+  }
+
+  private rejectOrder(metadata: CreatedOrderMetadata, message: string, reason: RejectionReason) {
+    const { attempts, context: { context, orderInfo } } = metadata;
+
+    context.logger.info(message);
+    this.hooksEngine.handleOrderRejected({
+      order: orderInfo,
+      context,
+      message,
+      reason,
+      attempts,
+    });
+  }
+
+  private async processOrder(metadata: CreatedOrderMetadata): Promise<void | never> {
+    const { context, orderInfo } = metadata.context;
+    const orderId = orderInfo.orderId;
     const logger = context.logger;
 
     const bucket = context.config.buckets.find(
@@ -308,15 +374,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     );
     if (bucket === undefined) {
       const message = `no bucket found to cover order's give token: ${tokenAddressToString(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress)}`;
-      logger.info(message);
-      this.hooksEngine.handleOrderRejected({
-        order: orderInfo,
-        reason: RejectionReason.UNEXPECTED_GIVE_TOKEN,
-        context,
-        attempts: params.attempts,
-        message
-      });
-      return;
+      return this.rejectOrder(metadata, message, RejectionReason.UNEXPECTED_GIVE_TOKEN);
     }
 
     // calculate USD worth of order
@@ -344,20 +402,29 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status == OrderInfoStatus.Created) {
+      // find corresponding srcConstraints
+      const srcConstraintsByValue = context.giveChain.srcConstraints.perOrderValue.find(srcConstraints => usdWorth <= srcConstraints.upperThreshold);
+      const srcConstraints = srcConstraintsByValue || context.giveChain.srcConstraints;
+
+      // find corresponding dstConstraints (they may supersede srcConstraints)
+      const dstConstraintsByValue =
+        context.takeChain.dstConstraints.perOrderValue.find(dstConstraints => usdWorth <= dstConstraints.upperThreshold)
+        || context.takeChain.dstConstraints;
+
+      // determine if we should postpone the order
+      const fulfillmentDelay = dstConstraintsByValue.fulfillmentDelay || srcConstraints.fulfillmentDelay;
+      const remainingDelay = this.getOrderRemainingDelay(metadata.arrivedAt, fulfillmentDelay);
+      if (remainingDelay > 0) {
+        const message = `order should be delayed by ${remainingDelay}s (why: fulfillment delay is set to ${fulfillmentDelay}s)`;
+        return this.postponeOrder(metadata, message, PostponingReason.FORCED_DELAY, true, remainingDelay);
+      }
+
       const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info;
       if (finalizationInfo == 'Revoked') {
         this.clearInternalQueues(orderInfo.orderId);
 
         const message = 'order has been revoked by the order feed due to chain reorganization';
-        logger.info(message);
-        this.hooksEngine.handleOrderRejected({
-          order: orderInfo,
-          reason: RejectionReason.REVOKED,
-          attempts: params.attempts,
-          context,
-          message,
-        });
-        return;
+        return this.rejectOrder(metadata, message, RejectionReason.REVOKED);
       }
       else if ('Confirmed' in finalizationInfo) {
         // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
@@ -369,37 +436,16 @@ class UniversalProcessor extends BaseOrderProcessor {
         // ensure we can afford fulfilling this order and thus increasing our TVL
         if (!context.giveChain.nonFinalizedOrdersBudgetController.isFitsBudget(orderId, usdWorth)) {
           const message = 'order does not fit the budget, rejecting';
-          logger.info(message);
-          this.hooksEngine.handleOrderRejected({
-            order: orderInfo,
-            reason: RejectionReason.NON_FINALIZED_ORDERS_BUDGET_EXCEEDED,
-            attempts: params.attempts,
-            context,
-            message,
-          });
-          return;
+          return this.rejectOrder(metadata, message, RejectionReason.NON_FINALIZED_ORDERS_BUDGET_EXCEEDED)
         }
 
-        // find appropriate range corresponding to this USD worth
-        const range = context.giveChain.usdAmountConfirmations.find(
-          usdWorthRange => usdWorthRange.usdWorthFrom < usdWorth && usdWorth <= usdWorthRange.usdWorthTo
-        );
-
         // range found, ensure current block confirmation >= expected
-        if (range?.minBlockConfirmations) {
-          logger.debug(`usdAmountConfirmationRange found: (${range.usdWorthFrom}, ${range.usdWorthTo}]`)
+        if (srcConstraintsByValue?.minBlockConfirmations) {
+          logger.debug(`usdAmountConfirmationRange found: <=$${srcConstraintsByValue.upperThreshold}`)
 
-          if (announcedConfirmation < range.minBlockConfirmations) {
-            const message = `announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${range.minBlockConfirmations} for order worth of $${usdWorth.toFixed(2)}`;
-            logger.info(message)
-            this.hooksEngine.handleOrderRejected({
-              order: orderInfo,
-              reason: RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
-              attempts: params.attempts,
-              context,
-              message,
-            });
-            return;
+          if (announcedConfirmation < srcConstraintsByValue.minBlockConfirmations) {
+            const message = `announced block confirmations (${ announcedConfirmation }) is less than the block confirmation constraint (${srcConstraintsByValue.minBlockConfirmations} for order worth of $${usdWorth.toFixed(2)}`;
+            return this.rejectOrder(metadata, message, RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH)
           }
           else {
             logger.debug("accepting order for execution")
@@ -407,15 +453,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         }
         else { // range not found: we do not accept this order, let it come finalized
           const message = `non-finalized order worth of $${usdWorth.toFixed(2)} is not covered by any custom block confirmation range`;
-          logger.debug(message);
-          this.hooksEngine.handleOrderRejected({
-            order: orderInfo,
-            reason: RejectionReason.NOT_YET_FINALIZED,
-            context,
-            attempts: params.attempts,
-            message,
-          });
-          return;
+          return this.rejectOrder(metadata, message, RejectionReason.NOT_YET_FINALIZED);
         }
 
       }
@@ -439,15 +477,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       takeOrderStatus?.status !== undefined
     ) {
       const message = `order is already handled on the take chain (${ ChainId[ orderInfo.order.take.chainId ] }), actual status: ${takeOrderStatus?.status}`;
-      logger.info(message);
-      this.hooksEngine.handleOrderRejected({
-        order: orderInfo,
-        reason: RejectionReason.ALREADY_FULFILLED_OR_CANCELLED,
-        context,
-        attempts: params.attempts,
-        message,
-      });
-      return;
+      return this.rejectOrder(metadata, message, RejectionReason.ALREADY_FULFILLED_OR_CANCELLED)
     }
 
     // validate that order is created
@@ -459,28 +489,12 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     if (giveOrderStatus?.status === undefined) {
       const message = `order does not exist on the give chain (${ChainId[orderInfo.order.give.chainId]})`;
-      logger.info(message);
-      this.hooksEngine.handleOrderRejected({
-        order: orderInfo,
-        reason: RejectionReason.MISSING,
-        context,
-        attempts: params.attempts,
-        message
-      });
-      return;
+      return this.rejectOrder(metadata, message, RejectionReason.MISSING)
     }
 
     if (giveOrderStatus?.status !== OrderState.Created) {
       const message = `order has unexpected give status (${giveOrderStatus?.status}) on the give chain (${ChainId[ orderInfo.order.give.chainId]})`;
-      logger.info(message);
-      this.hooksEngine.handleOrderRejected({
-        order: orderInfo,
-        reason: RejectionReason.UNEXPECTED_GIVE_STATUS,
-        attempts: params.attempts,
-        context,
-        message,
-      });
-      return;
+      return this.rejectOrder(metadata, message, RejectionReason.UNEXPECTED_GIVE_STATUS);
     }
 
     // perform rough estimation: assuming order.give.amount is what we need on balance
@@ -504,17 +518,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         `actual balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))}, `,
         `but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(roughReserveDstDecimals))}`
       ].join('');
-      logger.info(message);
-      this.hooksEngine.handleOrderPostponed({
-        order: orderInfo,
-        context,
-        message,
-        reason: PostponingReason.NOT_ENOUGH_BALANCE,
-        attempts: params.attempts,
-      });
-      if (isFinalizedOrder)
-        this.mempoolService.addOrder(params);
-      return;
+      return this.postponeOrder(metadata, message, PostponingReason.NOT_ENOUGH_BALANCE, isFinalizedOrder)
     }
     logger.debug(`enough balance (${accountReserveBalance.toString()}) to cover order (${roughReserveDstAmount.toString()})`)
 
@@ -586,16 +590,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           logger.error(message);
           logger.error(e);
         }
-        this.hooksEngine.handleOrderPostponed({
-          order: orderInfo,
-          context,
-          reason: PostponingReason.FULFILLMENT_EVM_TX_PREESTIMATION_FAILED,
-          message,
-          attempts: params.attempts,
-        });
-        if (isFinalizedOrder)
-          this.mempoolService.addOrder(params);
-        return;
+        return this.postponeOrder(metadata, message, PostponingReason.FULFILLMENT_EVM_TX_PREESTIMATION_FAILED, isFinalizedOrder);
       }
     }
 
@@ -668,16 +663,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         ].join("");
       }
       logger.info(`order is not profitable: ${message}`);
-      this.hooksEngine.handleOrderPostponed({
-        order: orderInfo,
-        context,
-        message,
-        reason: PostponingReason.NOT_PROFITABLE,
-        attempts: params.attempts,
-      });
-      if (isFinalizedOrder)
-        this.mempoolService.addOrder(params);
-      return;
+      return this.postponeOrder(metadata, message, PostponingReason.NOT_PROFITABLE, isFinalizedOrder);
     }
 
     if (!buffersAreEqual(reserveDstToken, pickedBucket.reserveDstToken)) {
@@ -706,39 +692,20 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`)
         if (evmFulfillGas > evmFulfillGasLimit!) {
           const message = `final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit})`;
-          logger.info(message)
-          this.hooksEngine.handleOrderPostponed({
-            order: orderInfo,
-            context,
-            message,
-            reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_EXCEEDED_PREESTIMATION,
-            attempts: params.attempts,
-          });
 
-          if (isFinalizedOrder) {
-            // reprocess order after 5s delay, but no more than two times in a row
-            const maxFastTrackAttempts = 2; // attempts
-            const fastTrackDelay = 5; // seconds
-            this.mempoolService.addOrder(params, params.attempts < maxFastTrackAttempts ? fastTrackDelay : undefined);
-          }
+          // reprocess order after 5s delay, but no more than two times in a row
+          const maxFastTrackAttempts = 2; // attempts
+          const fastTrackDelay = 5; // seconds
+          const delay = metadata.attempts <= maxFastTrackAttempts ? fastTrackDelay : undefined;
 
-          return;
+          return this.postponeOrder(metadata, message, PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_EXCEEDED_PREESTIMATION, isFinalizedOrder, delay)
         }
       }
       catch (e) {
         const message = `unable to estimate fullfil tx: ${e}`;
         logger.error(message)
         logger.error(e);
-        this.hooksEngine.handleOrderPostponed({
-          order: orderInfo,
-          context,
-          message,
-          reason: PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
-          attempts: params.attempts,
-        });
-        if (isFinalizedOrder)
-          this.mempoolService.addOrder(params);
-        return;
+        return this.postponeOrder(metadata, message, PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED, isFinalizedOrder);
       }
 
       (fulfillTx as Tx).gas = evmFulfillGasLimit;
@@ -767,19 +734,14 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       const message = `fulfill transaction failed: ${e}`;
       logger.error(message);
       logger.error(e);
-      this.hooksEngine.handleOrderPostponed({
-        order: orderInfo,
-        context,
-        reason: isRevertedError(e as Error)
-            ? PostponingReason.FULFILLMENT_TX_REVERTED
-            : PostponingReason.FULFILLMENT_TX_FAILED,
+      return this.postponeOrder(
+        metadata,
         message,
-        attempts: params.attempts,
-      });
-
-      if (isFinalizedOrder)
-        this.mempoolService.addOrder(params);
-      return;
+        isRevertedError(e as Error)
+          ? PostponingReason.FULFILLMENT_TX_REVERTED
+          : PostponingReason.FULFILLMENT_TX_FAILED,
+        isFinalizedOrder
+      );
     }
 
     await this.waitIsOrderFulfilled(orderInfo.orderId, orderInfo.order, context, logger);

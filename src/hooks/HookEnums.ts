@@ -49,6 +49,11 @@ export enum PostponingReason {
    * Unexpected error
    */
   UNHANDLED_ERROR,
+
+  /**
+   * indicates that this order is forcibly delayed according to this dln-takers instance configuration
+   */
+  FORCED_DELAY,
 }
 
 export enum RejectionReason {

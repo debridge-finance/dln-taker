@@ -81,6 +81,22 @@ export type ChainEnvironment = {
   };
 };
 
+export type DstOrderConstraints = {
+    /**
+     * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
+     * coming to this chain after it first saw it.
+     */
+    fulfillmentDelay?: number;
+}
+
+export type SrcOrderConstraints = {
+    /**
+     * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
+     * coming from this chain after it first saw it.
+     */
+    fulfillmentDelay?: number;
+}
+
 /**
  * Represents a chain configuration where orders can be fulfilled.
  */
@@ -113,7 +129,7 @@ export interface ChainDefinition {
   /**
    * Defines constraints imposed on all orders coming from this chain
    */
-  constraints?: {
+  constraints?: SrcOrderConstraints & {
     /**
      * Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
      * For example, you may want to fulfill orders coming from Ethereum:
@@ -129,7 +145,10 @@ export interface ChainDefinition {
      * ]
      * ```
      */
-    requiredConfirmationsThresholds?: Array<{thresholdAmountInUSD: number, minBlockConfirmations: number}>;
+    requiredConfirmationsThresholds?: Array<SrcOrderConstraints & {
+      thresholdAmountInUSD: number,
+      minBlockConfirmations?: number,
+    }>;
 
     /**
      * Defines a budget (a hard cap) of all successfully fulfilled orders' value (expressed in USD) that
@@ -143,7 +162,21 @@ export interface ChainDefinition {
      * one by one as soon as fulfilled orders are being finalized.
      */
     nonFinalizedTVLBudget?: number;
-  }
+  },
+
+  /**
+   * Defines constraints imposed on all orders coming to this chain. These properties have precedence over `constraints` property
+   */
+  dstConstraints?: DstOrderConstraints & {
+    /**
+     * Defines custom constraints for orders falling into the given upper thresholds expressed in US dollars.
+     *
+     * Mind that these constraints have precedence over higher order constraints
+     */
+    perOrderValueUpperThreshold?: Array<DstOrderConstraints & {
+      upperThreshold: number
+    }>
+  },
 
   //
   // taker related

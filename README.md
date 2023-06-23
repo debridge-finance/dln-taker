@@ -12,6 +12,7 @@
 - [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
   - [Reducing transaction finality constraint](#reducing-transaction-finality-constraint)
   - [Setting a budget for non-finalized orders](#setting-a-budget-for-non-finalized-orders)
+  - [Delayed fulfillments](#delayed-fulfillments)
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
   - [Restricting orders from fulfillment](#restricting-orders-from-fulfillment)
   - [Placing new orders](#placing-new-orders)
@@ -221,6 +222,72 @@ and there is an accidental flood of 100,000 orders worth $1 occurs, you probably
 ```
 
 This budged is a hard cap for orders that were not yet finalized after your `dln-taker`'s instance have successfully fulfilled them. As soon as such orders got a finalization status, they got removed effectively releasing the room for other non-finalized orders that can be attempted to be fulfulled.
+
+### Delayed fulfillments
+
+Sometimes you may be willing to run several instances of dln-taker to reduce risks of managing a full bag of assets under one roof, or create a virtual fault tolerant cluster of `dln-taker`'s in which second instance catches up with the new orders when the first instance runs out money.
+
+To avoid a race when all of the instances are attempting to fulfill the same order simultaneously and thus burning each other's gas, there is an opt-in feature that allows configuring delayed fulfillments. This gives the ability to make specific instance wait the given amount of time before starting its attempt to fulfill newly arrived order.
+
+For example, when you want your instance#1 to delay the fulfillment of orders under $1000 by 30s, and all other orders by 60s, you may use `constraints.requiredConfirmationsThresholds[].fulfillmentDelay` and `constraints.fulfillmentDelay` accordingly for each source chain:
+
+```ts
+{
+  chain: ChainId.Avalanche,
+  chainRpc: `${process.env.AVALANCHE_RPC}`,
+
+  constraints: {
+    requiredConfirmationsThresholds: [
+      // expects to receive orders under $1,000 coming from Avalanche as soon as 1 block confirmations,
+      // and starts processing it after a 30s delay
+      {
+        thresholdAmountInUSD: 1000, // USD
+        minBlockConfirmations: 1,   // see transaction finality
+        fulfillmentDelay: 30        // seconds
+      },
+
+      // expects to receive orders under $10,000 coming from Avalanche as soon as 6 block confirmations,
+      // and starts processing it after a 60s delay (see higher level default value)
+      {
+        thresholdAmountInUSD: 10_000, // USD
+        minBlockConfirmations: 6,     // see transaction finality
+        // default value of fulfillmentDelay is implicitly inherited and is set to 60s
+      },
+    ],
+
+    // optional: start processing orders over >$1,000 coming from Avalanche after a 60s delay
+    fulfillmentDelay: 60 // seconds
+  },
+},
+```
+
+At the same time, instance#2 may be configured without such timeouts, so if it goes offline or runs out of money, your instance#1 will catch up with the orders missed by instance#2 after the given time frame.
+
+Additionally, you may be willing to delay orders coming to the specific chain (regardless its source chain). In this case, `dstConstraints` must be used:
+
+```ts
+{
+  chain: ChainId.Ethereum,
+  chainRpc: `${process.env.ETHEREUM_RPC}`,
+
+  dstConstraints: {
+    perOrderValueUpperThreshold: [
+      // start processing all orders under $1,000 coming to Ethereum (from any supported chain) after a 30s delay,
+      // regardless of constraints specified for the supported chains
+      {
+        upperThreshold: 1000, // USD
+        fulfillmentDelay: 30  // seconds
+      },
+    ],
+
+    // optional: start processing orders over >$1,000 coming to ethereum (from any supported chain) after a 40s delay,
+    // regardless of constraints specified for the supported chains
+    fulfillmentDelay: 40 // seconds
+  },
+},
+```
+
+Mind that `dstConstraints` property has precedence over `constraints`.
 
 ## Testing the order execution flow in the wild
 
