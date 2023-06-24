@@ -177,6 +177,11 @@ export interface ChainDefinition {
      */
     nonFinalizedTVLBudget?: number;
 
+    /**
+     * Defines a budget of locked usd amount in current chain. Processor validate that
+     * buckets[giveChain].usdBalance(beneficiary) + buckets[giveChain].usdBalance(taker) + sum(orders(unlockAuthorities))
+     * should be less than `TVLBudget`. If this sum is greater than `TVLBudget` processor will send to review.
+     */
     TVLBudget?: number;
   },
 
