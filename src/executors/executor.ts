@@ -67,8 +67,8 @@ type DstOrderConstraints = Readonly<{
 
 type DstConstraintsPerOrderValue = Array<
   DstOrderConstraints & Readonly<{
-  upperThreshold: number;
-}>
+    upperThreshold: number;
+  }>
 >;
 
 type SrcOrderConstraints = Readonly<{
@@ -77,9 +77,9 @@ type SrcOrderConstraints = Readonly<{
 
 type SrcConstraintsPerOrderValue = Array<
   SrcOrderConstraints & Readonly<{
-  upperThreshold: number;
-  minBlockConfirmations: number;
-}>
+    upperThreshold: number;
+    minBlockConfirmations: number;
+  }>
 >;
 
 export type ExecutorSupportedChain = Readonly<{
