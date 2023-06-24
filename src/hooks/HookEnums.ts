@@ -54,6 +54,11 @@ export enum PostponingReason {
    * indicates that this order is forcibly delayed according to this dln-takers instance configuration
    */
   FORCED_DELAY,
+
+  /**
+   * triggered when budget of tvl orders budget exceeded
+   */
+  TVL_ORDERS_BUDGET_EXCEEDED,
 }
 
 export enum RejectionReason {

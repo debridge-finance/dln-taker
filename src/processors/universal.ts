@@ -355,6 +355,13 @@ class UniversalProcessor extends BaseOrderProcessor {
     const orderId = orderInfo.orderId;
     const logger = context.logger;
 
+    const isNotOutTVLBudget = await context.giveChain.TVLBudgetController.validate(logger);
+    if (!isNotOutTVLBudget) {
+      const message = `Order is out of budget`;
+      logger.error(message);
+      return this.postponeOrder(metadata, message, PostponingReason.TVL_ORDERS_BUDGET_EXCEEDED, true);
+    }
+
     const bucket = context.config.buckets.find(
       (bucket) =>
         bucket.isOneOf(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress) &&

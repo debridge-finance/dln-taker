@@ -176,6 +176,8 @@ export interface ChainDefinition {
      * one by one as soon as fulfilled orders are being finalized.
      */
     nonFinalizedTVLBudget?: number;
+
+    TVLBudget?: number;
   },
 
   /**

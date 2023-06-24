@@ -33,6 +33,8 @@ import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { HooksEngine } from "../hooks/HooksEngine";
 import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOrdersBudgetController";
 import { DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
+import { TVLBudgetController } from "../processors/TVLBudgetController";
+import { StatsAPI } from "../processors/stats_api/StatsAPI";
 import { createClientLogger } from "../logger";
 import { TokensBucket, setSlippageOverloader } from "@debridge-finance/legacy-dln-profitability";
 import { DlnConfig } from "@debridge-finance/dln-client/dist/types/evm/core/models/config.model";
@@ -64,9 +66,9 @@ type DstOrderConstraints = Readonly<{
 }>
 
 type DstConstraintsPerOrderValue = Array<
-    DstOrderConstraints & Readonly<{
-      upperThreshold: number;
-  }>
+  DstOrderConstraints & Readonly<{
+  upperThreshold: number;
+}>
 >;
 
 type SrcOrderConstraints = Readonly<{
@@ -75,9 +77,9 @@ type SrcOrderConstraints = Readonly<{
 
 type SrcConstraintsPerOrderValue = Array<
   SrcOrderConstraints & Readonly<{
-      upperThreshold: number;
-      minBlockConfirmations: number;
-  }>
+  upperThreshold: number;
+  minBlockConfirmations: number;
+}>
 >;
 
 export type ExecutorSupportedChain = Readonly<{
@@ -85,6 +87,7 @@ export type ExecutorSupportedChain = Readonly<{
   chainRpc: string;
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
+  TVLBudgetController: TVLBudgetController;
   nonFinalizedOrdersBudgetController: NonFinalizedOrdersBudgetController;
   srcConstraints: Readonly<SrcOrderConstraints & {
     perOrderValue: SrcConstraintsPerOrderValue
@@ -335,6 +338,12 @@ export class Executor implements IExecutor {
           chain.constraints?.nonFinalizedTVLBudget || 0,
           this.logger
         ),
+        TVLBudgetController: new TVLBudgetController({
+          giveChainId: chain.chain,
+          beneficiary: chain.beneficiary,
+          fulfillProvider,
+          TVLBudget: chain.constraints?.TVLBudget || 0,
+        }, this.buckets),
         beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
         srcConstraints: {
           ...this.getSrcConstraints(chain.constraints || {}),
@@ -375,6 +384,14 @@ export class Executor implements IExecutor {
         address: chain.unlockProvider.address as string,
       };
     });
+
+    TVLBudgetController.setGlobalConfig({
+      unlockAuthorities: unlockAuthorities.map(i => i.address),
+      dlnClient: this.client,
+      statsApi: new StatsAPI(),
+      priceTokenService: this.tokenPriceService,
+    });
+
     const minConfirmationThresholds = Object.values(this.chains)
       .map(chain => ({
         chainId: chain.chain,
@@ -419,7 +436,7 @@ export class Executor implements IExecutor {
           upperThreshold: constraint.thresholdAmountInUSD,
           minBlockConfirmations: constraint.minBlockConfirmations || 0,
           ...this.getSrcConstraints(constraint, configDstConstraints)
-          }
+        }
       })
       // important to sort by upper bound ASC for easier finding of the corresponding range
       .sort((constraintA, constraintB) => constraintA.upperThreshold - constraintB.upperThreshold);
