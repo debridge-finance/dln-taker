@@ -87,6 +87,12 @@ export type DstOrderConstraints = {
      * coming to this chain after it first saw it.
      */
     fulfillmentDelay?: number;
+
+    /**
+     * Defines a target where pre-fulfill swap change should be send to. Default: "taker".
+     * Warning: applies to EVM chains only
+     */
+    preFulfillSwapChangeRecipient?: "taker" | "maker";
 }
 
 export type SrcOrderConstraints = {
