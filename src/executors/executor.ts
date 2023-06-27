@@ -51,6 +51,7 @@ export type ExecutorInitializingChain = Readonly<{
 
 type DstOrderConstraints = Readonly<{
   fulfillmentDelay: number;
+  preFulfillSwapChangeRecipient: "taker" | "maker";
 }>
 
 type DstConstraintsPerOrderValue = Array<
@@ -339,7 +340,8 @@ export class Executor implements IExecutor {
 
   private getDstConstraints(primaryConstraints: RawDstOrderConstraints, defaultConstraints?: RawDstOrderConstraints): DstOrderConstraints {
     return {
-      fulfillmentDelay: primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0
+      fulfillmentDelay: primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0,
+      preFulfillSwapChangeRecipient: primaryConstraints?.preFulfillSwapChangeRecipient || defaultConstraints?.preFulfillSwapChangeRecipient || "taker"
     }
   }
 
