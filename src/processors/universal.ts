@@ -791,7 +791,10 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
         web3: this.takeChain.fulfillProvider.connection as Web3,
         permit: "0x",
         takerAddress: this.takeChain.fulfillProvider.address,
-        unlockAuthority: this.takeChain.unlockProvider.address
+        unlockAuthority: this.takeChain.unlockProvider.address,
+        swapRefundReceiverAddress: context.takeChain.dstConstraints.preFulfillSwapChangeRecipient == "taker"
+          ? this.takeChain.fulfillProvider.address
+          : tokenAddressToString(this.chainId, order.orderAuthorityDstAddress)
       };
       fullFillTxPayload = evmfullFillTxPayload;
     }
