@@ -399,6 +399,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     logger.debug(`order worth in usd: ${usdWorth}`);
 
     let isFinalizedOrder = true;
+    let confirmationFloor = undefined;
 
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status == OrderInfoStatus.Created) {
@@ -448,6 +449,7 @@ class UniversalProcessor extends BaseOrderProcessor {
             return this.rejectOrder(metadata, message, RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH)
           }
           else {
+            confirmationFloor = srcConstraintsByValue.minBlockConfirmations;
             logger.debug("accepting order for execution")
           }
         }
@@ -484,7 +486,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     const giveOrderStatus = await context.config.client.getGiveOrderStatus(
       orderInfo.orderId,
       orderInfo.order.give.chainId,
-      { web3: context.giveChain.fulfillProvider.connection as Web3 }
+      { web3: context.giveChain.fulfillProvider.connection as Web3, confirmationsCount: confirmationFloor }
     );
 
     if (giveOrderStatus?.status === undefined) {
