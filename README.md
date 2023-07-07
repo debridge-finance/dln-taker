@@ -162,12 +162,13 @@ Executing cross-chain transactions is all about managing risks properly: no one 
 
 | Chain     | Guaranteed block confirmations |
 | --------- | ------------------------------ |
-| Arbitrum  | 15                  |
-| Avalanche | 15                  |
-| BNB Chain | 15                  |
-| Ethereum  | 15                  |
-| Fantom    | 15                  |
+| Arbitrum  | 12                  |
+| Avalanche | 12                  |
+| BNB Chain | 12                  |
+| Ethereum  | 12                  |
+| Fantom    | 12                  |
 | Polygon   | 256                 |
+| Solana    | Finalized status    |
 
 However, DLN is an open market with natural competitiveness, where some takers may be willing to put more risk on small amounts of their funds attempting to fulfill orders with lesser block confirmations to get ahead of other takers. For example, some may be willing to fulfill orders under $100 as soon as they appear on blockchains (after 1 block confirmation), because the reward of being the first no matter what beats the risk of losing this amount of money.
 
