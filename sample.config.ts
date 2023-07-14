@@ -30,7 +30,6 @@ const config: ExecutorLaunchConfig = {
       [ChainId.Avalanche]: ["0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"],
       [ChainId.Arbitrum]: ["0xff970a61a04b1ca14834a43f5de4533ebddb5cc8"],
       [ChainId.BSC]: ["0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"],
-      [ChainId.Fantom]: ["0x04068da6c83afcfa0e13ba15a6696662335d5b75"],
       [ChainId.Ethereum]: ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],
       [ChainId.Polygon]: ["0x2791bca1f2de4661ed88a30c99a7a9449aa84174"],
       [ChainId.Solana]: ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
@@ -128,19 +127,6 @@ const config: ExecutorLaunchConfig = {
       // Warn! base64 representation of a private key.
       // Warn! For security reasons, put it to the .env file
       unlockAuthorityPrivateKey: `${process.env.ARBITRUM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-    },
-
-    {
-      chain: ChainId.Fantom,
-      chainRpc: `${process.env.FANTOM_RPC}`,
-
-      beneficiary: `${process.env.FANTOM_BENEFICIARY}`,
-      takerPrivateKey: `${process.env.FANTOM_TAKER_PRIVATE_KEY}`,
-      unlockAuthorityPrivateKey: `${process.env.FANTOM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-
-      orderProcessor: processors.universalProcessor({
-        minProfitabilityBps: 300,
-      }),
     },
 
     {
