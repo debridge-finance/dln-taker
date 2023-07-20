@@ -14,13 +14,14 @@ import { HookHandler } from "./hooks/HookHandler";
 type address = string;
 
 export enum SupportedChain {
-  Avalanche = ChainId.Avalanche,
   Arbitrum = ChainId.Arbitrum,
+  Avalanche = ChainId.Avalanche,
   BSC = ChainId.BSC,
   Ethereum = ChainId.Ethereum,
+  Fantom = ChainId.Fantom,
+  Linea = ChainId.Linea,
   Polygon = ChainId.Polygon,
   Solana = ChainId.Solana,
-  Fantom = ChainId.Fantom
 }
 
 export class EvmRebroadcastAdapterOpts {

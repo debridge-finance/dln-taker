@@ -98,9 +98,10 @@ The [`sample.config.ts` file](./sample.config.ts) already defines all blockchain
 1. Avalanche
 1. BNB Chain
 1. Ethereum
+1. Fantom
+1. Linea
 1. Polygon
 1. Solana
-1. Fantom
 
 so you don't have to describe them explicitly. However, the sample config uses references to the environment variables (via the `${process.env.*}` notation) where sensitive or private data is involved: for example, an API key to access deBridge-managed websocket, or private keys to wallets with reserve funds for order fulfillment are designed to be accessed by the configuration file as environment variables.
 
@@ -138,7 +139,7 @@ The core on-chain DLN protocol is designed to work with arbitrary tokens on eith
 
 As for now, deBridge uses two buckets of tokens for asset routing:
 1. the USDC token, emitted by Circle Inc. on every DLN supported chain, and
-1. the ETH coin, on Ethereum and Arbitrum, and
+1. the ETH coin, on Ethereum, Arbitrum and Linea, and
 1. the wETH token, on Avalanche, BNB Chain and Polygon
 
 Both buckets are explicitly defined in the sample configuration file [here](./sample.config.ts)), so every taker is required to **load theirs address with enough USDC and ETH on every chain you are willing to fulfill orders on**.
@@ -148,7 +149,7 @@ Both buckets are explicitly defined in the sample configuration file [here](./sa
 For every chain you as a taker would like to support:
 - Register the reserves-keeping address (its private key must be set as a `takerPrivateKey` in the configuration file) and load it with:
   - a given amount of USDC tokens (e.g., 100,000 USDC),
-  - a given amount of ETH (e.g. 60 ETH) on Ethereum and Arbitrum,
+  - a given amount of ETH (e.g. 60 ETH) on Ethereum, Arbitrum and Linea,
   - a given amount of wETH tokens (e.g. 60 wETH) on Avalanche, BNB Chain and Polygon,
   - a reasonable amount of native blockchain currency (e.g., 1 ETH on Ethereum) to pay gas for fulfillment transactions.
 - Register the unlock authority address (its private key must be set as an `unlockAuthorityPrivateKey` in the configuration file) and load it with:
@@ -167,6 +168,7 @@ Executing cross-chain transactions is all about managing risks properly: no one 
 | BNB Chain | 12                  |
 | Ethereum  | 12                  |
 | Fantom    | 12                  |
+| Linea     | 12                  |
 | Polygon   | 256                 |
 | Solana    | Finalized status    |
 
