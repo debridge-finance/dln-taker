@@ -32,13 +32,14 @@ import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOr
 import { DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
-  [SupportedChain.Avalanche]: 15,
   [SupportedChain.Arbitrum]: 15,
+  [SupportedChain.Avalanche]: 15,
   [SupportedChain.BSC]: 15,
   [SupportedChain.Ethereum]: 12,
+  [SupportedChain.Fantom]: 15,
+  [SupportedChain.Linea]: 15,
   [SupportedChain.Polygon]: 256,
   [SupportedChain.Solana]: 32,
-  [SupportedChain.Fantom]: 15,
 }
 
 export type ExecutorInitializingChain = Readonly<{
