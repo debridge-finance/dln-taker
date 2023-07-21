@@ -21,8 +21,12 @@ export const orderPostponed = (
             return;
         }
 
-        // show only one attempt
-        if (arg.attempts > 0) {
+        if (
+            // allow two attempts for not-enough-balance, because
+            (arg.reason === PostponingReason.NOT_ENOUGH_BALANCE && arg.reason > 1)
+            // show only one attempt
+            || (arg.attempts > 0)
+        ) {
             return;
         }
 
