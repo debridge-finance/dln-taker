@@ -22,6 +22,8 @@ export enum SupportedChain {
   Linea = ChainId.Linea,
   Polygon = ChainId.Polygon,
   Solana = ChainId.Solana,
+  Base = ChainId.Base,
+  Optimism = ChainId.Optimism,
 }
 
 export class EvmRebroadcastAdapterOpts {
