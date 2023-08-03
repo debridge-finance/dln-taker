@@ -66,7 +66,7 @@ const PRODUCTION: Env = {
       },
     },
     [ChainId.Base]: {
-      deBridgeContract: "0x43dE2d77BF8027e25dBD179B491e8d64f38398aA",
+      deBridgeContract: "0xc1656B63D9EEBa6d114f6bE19565177893e5bCBF",
       pmmSrc: "0xeF4fB24aD0916217251F553c0596F8Edc630EB66",
       pmmDst: "0xE7351Fd770A37282b91D153Ee690B63579D6dd7f",
       evm: {
@@ -74,6 +74,14 @@ const PRODUCTION: Env = {
       },
     },
     [ChainId.Optimism]: {
+      deBridgeContract: "0x43dE2d77BF8027e25dBD179B491e8d64f38398aA",
+      pmmSrc: "0xeF4fB24aD0916217251F553c0596F8Edc630EB66",
+      pmmDst: "0xE7351Fd770A37282b91D153Ee690B63579D6dd7f",
+      evm: {
+        forwarderContract: "0x663DC15D3C1aC63ff12E45Ab68FeA3F0a883C251",
+      },
+    },
+    [ChainId.Linea]: {
       deBridgeContract: "0x43dE2d77BF8027e25dBD179B491e8d64f38398aA",
       pmmSrc: "0xeF4fB24aD0916217251F553c0596F8Edc630EB66",
       pmmDst: "0xE7351Fd770A37282b91D153Ee690B63579D6dd7f",
