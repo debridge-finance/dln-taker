@@ -1,7 +1,9 @@
 import {
+  ChainEngine,
   ChainId,
   CoingeckoPriceFeed,
   Evm,
+  getEngineByChainId,
   JupiterWrapper,
   OneInchConnector,
   PMMClient,
@@ -133,6 +135,32 @@ export class Executor implements IExecutor {
     this.buckets = config.buckets;
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
 
+    const addresses = {} as any;
+    for (const chain of config.chains) {
+      switch (getEngineByChainId(chain.chain)) {
+        case ChainEngine.EVM: {
+          addresses[chain.chain] = {
+            pmmSourceAddress:
+              chain.environment?.pmmSrc ||
+              PRODUCTION.defaultEvmAddresses?.pmmSrc ||
+              PRODUCTION.chains[chain.chain]?.pmmSrc,
+            pmmDestinationAddress:
+              chain.environment?.pmmDst ||
+              PRODUCTION.defaultEvmAddresses?.pmmDst ||
+              PRODUCTION.chains[chain.chain]?.pmmDst,
+            deBridgeGateAddress:
+              chain.environment?.deBridgeContract ||
+              PRODUCTION.defaultEvmAddresses?.deBridgeContract ||
+              PRODUCTION.chains[chain.chain]?.deBridgeContract,
+            crossChainForwarderAddress:
+              chain.environment?.evm?.forwarderContract ||
+              PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract ||
+              PRODUCTION.chains[chain.chain]?.evm?.forwarderContract,
+          };
+        }
+      }
+    }
+
     const clients: { [key in number]: any } = {};
     for (const chain of config.chains) {
       this.logger.info(`initializing ${ChainId[chain.chain]}...`);
@@ -142,6 +170,7 @@ export class Executor implements IExecutor {
       }
 
       let client, unlockProvider, fulfillProvider;
+
       if (chain.chain === ChainId.Solana) {
         const solanaConnection = new Connection(chain.chainRpc);
         const solanaPmmSrc = new PublicKey(
@@ -203,26 +232,7 @@ export class Executor implements IExecutor {
 
         client = new Evm.PmmEvmClient({
           enableContractsCache: true,
-          addresses: {
-            [chain.chain]: {
-              pmmSourceAddress:
-                chain.environment?.pmmSrc ||
-                PRODUCTION.defaultEvmAddresses?.pmmSrc ||
-                PRODUCTION.chains[chain.chain]?.pmmSrc,
-              pmmDestinationAddress:
-                chain.environment?.pmmDst ||
-                PRODUCTION.defaultEvmAddresses?.pmmDst ||
-                PRODUCTION.chains[chain.chain]?.pmmDst,
-              deBridgeGateAddress:
-                chain.environment?.deBridgeContract ||
-                PRODUCTION.defaultEvmAddresses?.deBridgeContract ||
-                PRODUCTION.chains[chain.chain]?.deBridgeContract,
-              crossChainForwarderAddress:
-                chain.environment?.evm?.forwarderContract ||
-                PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract ||
-                PRODUCTION.chains[chain.chain]?.evm?.forwarderContract,
-            },
-          },
+          addresses,
         });
       }
 
