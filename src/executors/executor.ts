@@ -38,6 +38,8 @@ const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Ethereum]: 12,
   [SupportedChain.Fantom]: 15,
   [SupportedChain.Linea]: 15,
+  [SupportedChain.Base]: 15,
+  [SupportedChain.Optimism]: 15,
   [SupportedChain.Polygon]: 256,
   [SupportedChain.Solana]: 32,
 }

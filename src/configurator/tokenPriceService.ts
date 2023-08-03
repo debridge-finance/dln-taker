@@ -25,6 +25,14 @@ export function tokenPriceService(opts?: TokenPriceServiceConfiguratorOpts): Pri
                 token: tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS),
               },
             },
+            [ChainId.Base]: {
+              // remap ETH@Base price to ETH@Ethereum
+              [ZERO_EVM_ADDRESS]: {
+                type: 'redirect',
+                chainId: ChainId.Ethereum,
+                token: tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS),
+              },
+            },
         }, new CachePriceFeed(new CoingeckoPriceFeed(opts?.coingeckoApiKey), opts?.coingeckoCacheTTL || defaultCoingeckoCacheTTL),
       )
 }

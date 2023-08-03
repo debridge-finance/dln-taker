@@ -7,7 +7,6 @@ import { ExecutorLaunchConfig } from "./src/config";
 import { CURRENT_ENVIRONMENT as environment } from "./src/environments";
 import { WsNextOrder } from "./src/orderFeeds/ws.order.feed";
 import * as processors from "./src/processors";
-import * as filters from "./src/filters";
 import configurator from "./src/configurator";
 
 // sanity check to ensure that .env file is supplied
@@ -30,6 +29,7 @@ const config: ExecutorLaunchConfig = {
       [ChainId.Avalanche]: ["0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"],
       [ChainId.BSC]: ["0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"],
       [ChainId.Ethereum]: ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],
+      [ChainId.Optimism]: ['0x7f5c764cbc14f9669b88837ca1490cca17c31607'],
       [ChainId.Polygon]: ["0x2791bca1f2de4661ed88a30c99a7a9449aa84174"],
       [ChainId.Solana]: ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
     }),
@@ -39,9 +39,11 @@ const config: ExecutorLaunchConfig = {
     new TokensBucket({
       [ChainId.Arbitrum]: ['0x0000000000000000000000000000000000000000'],
       [ChainId.Avalanche]: ['0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB'],
+      [ChainId.Base]: ['0x0000000000000000000000000000000000000000'],
       [ChainId.BSC]: ['0x2170Ed0880ac9A755fd29B2688956BD959F933F8'],
       [ChainId.Ethereum]: ['0x0000000000000000000000000000000000000000'],
       [ChainId.Linea]: ['0x0000000000000000000000000000000000000000'],
+      [ChainId.Optimism]: ['0x4200000000000000000000000000000000000006'],
       [ChainId.Polygon]: ['0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619']
     }),
   ],
@@ -221,6 +223,28 @@ const config: ExecutorLaunchConfig = {
       beneficiary: `${process.env.LINEA_BENEFICIARY}`,
       takerPrivateKey: `${process.env.LINEA_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.LINEA_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+    },
+
+    {
+      chain: ChainId.Base,
+      chainRpc: `${process.env.BASE_RPC}`,
+
+      constraints: {},
+
+      beneficiary: `${process.env.BASE_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.BASE_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.BASE_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+    },
+
+    {
+      chain: ChainId.Optimism,
+      chainRpc: `${process.env.OPTIMISM_RPC}`,
+
+      constraints: {},
+
+      beneficiary: `${process.env.OPTIMISM_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.OPTIMISM_TAKER_PRIVATE_KEY}`,
+      unlockAuthorityPrivateKey: `${process.env.OPTIMISM_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
     }
   ],
 };
