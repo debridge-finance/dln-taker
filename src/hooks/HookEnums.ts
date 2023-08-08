@@ -97,4 +97,10 @@ export enum RejectionReason {
    * indicates that non-finalized order is not covered by any custom block confirmation range
    */
   NOT_YET_FINALIZED,
+
+  /**
+   * indicates that the order requires reserve token to be pre-swapped to the take token, but the operation can't be
+   * performed because swaps are not available on the take chain
+   */
+  UNAVAILABLE_PRE_FULFILL_SWAP,
 }
