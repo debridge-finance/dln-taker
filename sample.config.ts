@@ -235,6 +235,9 @@ const config: ExecutorLaunchConfig = {
       beneficiary: `${process.env.BASE_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BASE_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.BASE_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
+      environment: {
+        deBridgeContract: '0xc1656B63D9EEBa6d114f6bE19565177893e5bCBF'
+      }
     },
 
     {
