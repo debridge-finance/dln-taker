@@ -26,6 +26,11 @@ export enum SupportedChain {
   Optimism = ChainId.Optimism,
 }
 
+export enum DexlessChains {
+  Base = ChainId.Base,
+  Linea = ChainId.Linea,
+}
+
 export class EvmRebroadcastAdapterOpts {
   /**
    * defines a multiplier to increase a pending txn's gasPrice for pushing it off the mempool.

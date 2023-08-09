@@ -34,6 +34,7 @@ import {
   SwapConnectorRequest,
   SwapConnectorResult
 } from "@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
+import { DexlessChains } from "../config";
 
 // reasonable multiplier for gas estimated for the fulfill txn to define max
 // gas we are willing to estimate
@@ -499,8 +500,18 @@ class UniversalProcessor extends BaseOrderProcessor {
       return this.rejectOrder(metadata, message, RejectionReason.UNEXPECTED_GIVE_STATUS);
     }
 
-    // perform rough estimation: assuming order.give.amount is what we need on balance
+    // reject orders that require pre-fulfill swaps on the dexless chains (e.g. Linea)
     const pickedBucket = findExpectedBucket(orderInfo.order, context.config.buckets);
+    if (
+        DexlessChains[orderInfo.order.take.chainId]
+        && !buffersAreEqual(pickedBucket.reserveDstToken, orderInfo.order.take.tokenAddress)
+      ) {
+      const takeChainId = orderInfo.order.take.chainId;
+      const message = `swaps are unavailable on ${ChainId[takeChainId]}, can't perform pre-fulfill swap from ${tokenAddressToString(takeChainId, pickedBucket.reserveDstToken)} to ${tokenAddressToString(takeChainId, orderInfo.order.take.tokenAddress)}`;
+      return this.rejectOrder(metadata, message, RejectionReason.UNAVAILABLE_PRE_FULFILL_SWAP);
+    }
+
+    // perform rough estimation: assuming order.give.amount is what we need on balance
     const [reserveSrcTokenDecimals, reserveDstTokenDecimals, takeTokenDecimals] = await Promise.all([
       context.config.client.getDecimals(orderInfo.order.give.chainId, pickedBucket.reserveSrcToken, context.giveChain.fulfillProvider.connection as Web3),
       context.config.client.getDecimals(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, this.takeChain.fulfillProvider.connection as Web3),
