@@ -22,6 +22,7 @@ const PRERELEASE_ENVIRONMENT_CODENAME_MADRID: Env = {
       pmmDst: "MADDfEEeW23M5owdXSXeBKAsb5zmT9oaLxDC4oLPfq7",
       solana: {
         debridgeSetting: "settFZVDbqC9zBmV2ZCBfNMCtTzia2R7mVeR6ccK2nN",
+        environment: 'madrid'
       },
     },
 

@@ -189,23 +189,34 @@ export class WsNextOrder extends GetNextOrder {
 
     // Register message handler
     this.socket.on("message", (event: Buffer) => {
-      const data = JSON.parse(event.toString("utf-8"));
-      this.logger.info(`📨 ws received new message`);
-      this.logger.debug(data);
-      if ("Order" in data) {
+      const rawMessage = event.toString("utf-8");
+      const data = this.parseEvent(rawMessage);
+
+      if (typeof data == "object") {
+        this.logger.info(`📨 ws received new message`);
+        this.logger.debug(data);
         const parsedEvent = data as WsOrderEvent<any>;
 
-        try {
-          const status = this.flattenStatus(parsedEvent.Order.order_info);
-          const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
-          const orderId = parsedEvent.Order.order_info.order_id
-          const nextOrderInfo = this.transformToNextOrderInfo(status, orderId, order, parsedEvent);
-          this.processNextOrder(nextOrderInfo);
+        if ("Order" in data) {
+          try {
+            const status = this.flattenStatus(parsedEvent.Order.order_info);
+            const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
+            const orderId = parsedEvent.Order.order_info.order_id
+            const nextOrderInfo = this.transformToNextOrderInfo(status, orderId, order, parsedEvent);
+            this.processNextOrder(nextOrderInfo);
+          }
+          catch (e) {
+            this.logger.error(`message processing failed: ${e}`)
+            this.logger.error(e);
+          }
         }
-        catch (e) {
-          this.logger.error(`message processing failed: ${e}`)
-          this.logger.error(e);
+        else {
+          this.logger.debug('message not handled')
         }
+      }
+      else {
+        this.logger.error(`unexpected message from WS`)
+        this.logger.error(rawMessage)
       }
     });
 
@@ -220,6 +231,16 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.heartbeat();
+  }
+
+  private parseEvent(message: string): any | undefined {
+    try {
+      return JSON.parse(message)
+    }
+    catch (e) {
+      this.logger.error("unable to parse event")
+      this.logger.error(e)
+    }
   }
 
   private sendCommand(command: { [key in any]: any }) {

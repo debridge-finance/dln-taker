@@ -21,6 +21,10 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     return helpers.bufferToHex(this.wallet.publicKey.toBuffer());
   }
 
+  public get bytesAddress(): Uint8Array {
+    return this.wallet.publicKey.toBuffer()
+  }
+
   async sendTransaction(data: unknown, context: SendTransactionContext) {
     const logger = context.logger.child({
       service: "SolanaProviderAdapter",

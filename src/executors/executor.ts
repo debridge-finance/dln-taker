@@ -1,18 +1,19 @@
 import {
+  Address,
   ChainEngine,
   ChainId,
+  ClientImplementation,
   CoingeckoPriceFeed,
+  CommonDlnClient,
   Evm,
   getEngineByChainId,
   JupiterWrapper,
   OneInchConnector,
-  PMMClient,
   PriceTokenService,
-  setSlippageOverloader,
   Solana,
   SwapConnector,
   SwapConnectorImpl,
-  TokensBucket,
+  tokenStringToBuffer,
 } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
@@ -23,7 +24,7 @@ import { ChainDefinition, ExecutorLaunchConfig, SupportedChain } from "../config
 import { PRODUCTION } from "../environments";
 import * as filters from "../filters";
 import { OrderFilter } from "../filters";
-import { GetNextOrder, IncomingOrder, OrderInfoStatus } from "../interfaces";
+import { DlnClient, GetNextOrder, IncomingOrder, OrderInfoStatus } from "../interfaces";
 import { WsNextOrder } from "../orderFeeds/ws.order.feed";
 import * as processors from "../processors";
 import { EvmProviderAdapter } from "../providers/evm.provider.adapter";
@@ -32,6 +33,10 @@ import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { HooksEngine } from "../hooks/HooksEngine";
 import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOrdersBudgetController";
 import { DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
+import { createClientLogger } from "../logger";
+import { TokensBucket, setSlippageOverloader } from "@debridge-finance/legacy-dln-profitability";
+import { DlnConfig } from "@debridge-finance/dln-client/dist/types/evm/core/models/config.model";
+
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Arbitrum]: 15,
@@ -51,7 +56,6 @@ export type ExecutorInitializingChain = Readonly<{
   chainRpc: string;
   unlockProvider: ProviderAdapter;
   fulfillProvider: ProviderAdapter;
-  client: Solana.PmmClient | Evm.PmmEvmClient;
 }>;
 
 type DstOrderConstraints = Readonly<{
@@ -91,8 +95,7 @@ export type ExecutorSupportedChain = Readonly<{
   orderProcessor: processors.IOrderProcessor;
   unlockProvider: ProviderAdapter;
   fulfillProvider: ProviderAdapter;
-  beneficiary: string;
-  client: Solana.PmmClient | Evm.PmmEvmClient;
+  beneficiary: Address;
 }>;
 
 export interface IExecutor {
@@ -101,7 +104,7 @@ export interface IExecutor {
   readonly orderFeed: GetNextOrder;
   readonly chains: { [key in ChainId]?: ExecutorSupportedChain };
   readonly buckets: TokensBucket[];
-  readonly client: PMMClient;
+  readonly client: DlnClient;
 }
 
 export class Executor implements IExecutor {
@@ -110,11 +113,22 @@ export class Executor implements IExecutor {
   orderFeed: GetNextOrder;
   chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
   buckets: TokensBucket[] = [];
-  client: PMMClient;
+  client: DlnClient;
 
   private isInitialized = false;
   private readonly url1Inch = "https://nodes.debridge.finance";
   constructor(private readonly logger: Logger) { }
+
+  private getTokenBuckets(config: ExecutorLaunchConfig['buckets']): Array<TokensBucket> {
+    return config.map(metaBucket => {
+      const tokens = Object.fromEntries(
+        Object.entries(metaBucket).map(
+          ([key, value]) => [key, typeof value === 'string' ? [value] : value]
+        )
+      );
+      return new TokensBucket(tokens)
+    })
+  }
 
   async init(config: ExecutorLaunchConfig) {
     if (this.isInitialized) return;
@@ -132,7 +146,7 @@ export class Executor implements IExecutor {
       jupiterConnector
     );
 
-    this.buckets = config.buckets;
+    this.buckets = this.getTokenBuckets(config.buckets);
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
 
     const addresses = {} as any;
@@ -161,7 +175,8 @@ export class Executor implements IExecutor {
       }
     }
 
-    const clients: { [key in number]: any } = {};
+    const clients: ClientImplementation[] = [];
+    const evmChainConfig: DlnConfig["chainConfig"] = {};
     for (const chain of config.chains) {
       this.logger.info(`initializing ${ChainId[chain.chain]}...`);
 
@@ -170,6 +185,7 @@ export class Executor implements IExecutor {
       }
 
       let client, unlockProvider, fulfillProvider;
+      let contractsForApprove: string[] = [];
 
       if (chain.chain === ChainId.Solana) {
         const solanaConnection = new Connection(chain.chainRpc);
@@ -205,18 +221,22 @@ export class Executor implements IExecutor {
           decodeKey(chain.unlockAuthorityPrivateKey)
         );
 
-        client = new Solana.PmmClient(
+        client = new Solana.DlnClient(
           solanaConnection,
           solanaPmmSrc,
           solanaPmmDst,
           solanaDebridge,
-          solanaDebridgeSetting
+          solanaDebridgeSetting,
+          undefined,
+          undefined,
+          undefined,
+          chain.environment?.solana?.environment
         );
         await client.destination.debridge.init();
 
         // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
         const altInitTx = await client.initForFulfillPreswap(
-          new PublicKey(chain.beneficiary),
+          new PublicKey(client.parseAddress(chain.beneficiary)),
           config.chains.map(chainConfig => chainConfig.chain),
           jupiterConnector
         );
@@ -226,14 +246,37 @@ export class Executor implements IExecutor {
         } else {
           this.logger.info(`Solana Address Lookup Table (ALT) already exists`)
         }
+        clients.push(client);
       } else {
         unlockProvider = new EvmProviderAdapter(chain.chain, chain.chainRpc, chain.unlockAuthorityPrivateKey);
         fulfillProvider = new EvmProviderAdapter(chain.chain, chain.chainRpc, chain.takerPrivateKey, chain.environment?.evm?.evmRebroadcastAdapterOpts);
 
-        client = new Evm.PmmEvmClient({
-          enableContractsCache: true,
-          addresses,
-        });
+        evmChainConfig[chain.chain] = {
+          connection: fulfillProvider.connection, // connection is required for on-chain data reading. No connection .address is used
+          dlnSourceAddress:
+            chain.environment?.pmmSrc ||
+            PRODUCTION.chains[chain.chain]?.pmmSrc ||
+            PRODUCTION.defaultEvmAddresses!.pmmSrc!,
+          dlnDestinationAddress:
+            chain.environment?.pmmDst ||
+            PRODUCTION.chains[chain.chain]?.pmmDst ||
+            PRODUCTION.defaultEvmAddresses!.pmmDst!,
+          deBridgeGateAddress:
+            chain.environment?.deBridgeContract ||
+            PRODUCTION.chains[chain.chain]?.deBridgeContract ||
+            PRODUCTION.defaultEvmAddresses!.deBridgeContract!,
+          crossChainForwarderAddress:
+            chain.environment?.evm?.forwarderContract ||
+            PRODUCTION.chains[chain.chain]?.evm?.forwarderContract ||
+            PRODUCTION.defaultEvmAddresses?.evm!.forwarderContract!,
+        };
+
+        if (!chain.disabled) {
+          contractsForApprove = [
+            evmChainConfig[chain.chain]!.dlnDestinationAddress,
+            evmChainConfig[chain.chain]!.crossChainForwarderAddress,
+          ];
+        }
       }
 
       const processorInitializer =
@@ -246,13 +289,13 @@ export class Executor implements IExecutor {
         unlockProvider,
         fulfillProvider: fulfillProvider,
         nonFinalizedTVLBudget: chain.constraints?.nonFinalizedTVLBudget,
-        client,
       };
       const orderProcessor = await processorInitializer(chain.chain, {
         takeChain: initializingChain,
-        buckets: config.buckets,
+        buckets: this.buckets,
         logger: this.logger,
         hooksEngine,
+        contractsForApprove,
       });
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -292,8 +335,7 @@ export class Executor implements IExecutor {
           chain.constraints?.nonFinalizedTVLBudget || 0,
           this.logger
         ),
-        client,
-        beneficiary: chain.beneficiary,
+        beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
         srcConstraints: {
           ...this.getSrcConstraints(chain.constraints || {}),
           perOrderValue: this.getSrcConstraintsPerOrderValue(chain.chain as unknown as SupportedChain, chain.constraints || {})
@@ -303,11 +345,19 @@ export class Executor implements IExecutor {
           perOrderValue: this.getDstConstraintsPerOrderValue(chain.dstConstraints || {}),
         }
       };
-
-      clients[chain.chain] = client;
     }
 
-    this.client = new PMMClient(clients);
+    if (Object.keys(evmChainConfig).length !== 0) {
+      clients.push(
+        new Evm.DlnClient({
+          chainConfig: evmChainConfig,
+          enableContractsCache: true,
+        })
+      );
+    }
+    this.client = new CommonDlnClient<Evm.DlnClient | Solana.DlnClient>(
+      ...(clients as (Evm.DlnClient | Solana.DlnClient)[])
+    );
 
     let orderFeed = config.orderFeed as GetNextOrder;
     if (typeof orderFeed === "string" || !orderFeed) {
