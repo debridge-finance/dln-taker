@@ -38,6 +38,12 @@ export function tokenPriceService(opts?: TokenPriceServiceConfiguratorOpts): Pri
                 chainId: ChainId.Ethereum,
                 token: tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS),
               },
+              // remap USDbC@Base price to USDC@Ethereum
+              '0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca': {
+                type: 'redirect',
+                chainId: ChainId.Ethereum,
+                token: tokenStringToBuffer(ChainId.Ethereum, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'),
+              },
             },
         }, new CachePriceFeed(new CoingeckoPriceFeed(opts?.coingeckoApiKey), opts?.coingeckoCacheTTL || defaultCoingeckoCacheTTL),
       )
