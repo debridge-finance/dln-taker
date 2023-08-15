@@ -1,4 +1,4 @@
-import { ChainId, tokenAddressToString, ZERO_EVM_ADDRESS } from "@debridge-finance/dln-client";
+import { ChainId, tokenAddressToString, tokenStringToBuffer, ZERO_EVM_ADDRESS } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import { clearInterval, clearTimeout } from "timers";
@@ -53,6 +53,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
   public get address(): string {
     return this.#address;
+  }
+
+  public get bytesAddress(): Uint8Array {
+    return tokenStringToBuffer(this.chainId, this.#address);
   }
 
   async sendTransaction(data: unknown, context: SendTransactionContext) {

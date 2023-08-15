@@ -2,7 +2,6 @@ import {
   ChainId,
   PriceTokenService,
   SwapConnector,
-  TokensBucket,
 } from "@debridge-finance/dln-client";
 
 import { OrderFilterInitializer } from "./filters/order.filter";
@@ -86,6 +85,7 @@ export type ChainEnvironment = {
 
   solana?: {
     debridgeSetting?: string;
+    environment?: 'lima' | 'madrid' | 'prod'
   };
 };
 
@@ -268,5 +268,7 @@ export interface ExecutorLaunchConfig {
   /**
    * Defines buckets of tokens that have equal value and near-zero re-balancing costs across supported chains
    */
-  buckets: TokensBucket[];
+  buckets: Array<{
+    [key in ChainId]?: string | Array<string>
+  }>;
 }

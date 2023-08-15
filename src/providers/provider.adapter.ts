@@ -8,6 +8,7 @@ export interface ProviderAdapter {
   connection: unknown;
   wallet: unknown;
   address: string;
+  bytesAddress: Uint8Array;
   sendTransaction: (
     data: unknown,
     context: SendTransactionContext

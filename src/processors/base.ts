@@ -2,11 +2,9 @@ import {
   ChainId,
   OrderData,
   OrderState,
-  TokensBucket,
 } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import { Logger } from "pino";
-import Web3 from "web3";
 
 import {
   ExecutorInitializingChain,
@@ -15,6 +13,7 @@ import {
 } from "../executors/executor";
 import { IncomingOrderContext } from "../interfaces";
 import { HooksEngine } from "../hooks/HooksEngine";
+import { TokensBucket } from "@debridge-finance/legacy-dln-profitability";
 
 export type OrderId = string;
 
@@ -30,6 +29,7 @@ export class OrderProcessorInitContext {
   buckets: TokensBucket[];
   logger: Logger;
   hooksEngine: HooksEngine;
+  contractsForApprove: string[];
 }
 
 export type OrderProcessorInitializer = (
@@ -63,10 +63,12 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
     logger: Logger
   ) {
     if (order.take.chainId === ChainId.Solana) {
-      let state = await context.config.client.getTakeOrderStatus(
-        orderId,
-        order.take.chainId,
-        { web3: this.takeChain.fulfillProvider.connection as Web3 }
+      let state = await context.config.client.getTakeOrderState(
+        {
+          orderId,
+          takeChain: order.take.chainId,
+        },
+        {}
       );
       const limit = 10;
       let iteration = 0;
@@ -75,9 +77,12 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
           throw new Error(
             "Failed to wait for order fulfillment, retries limit reached"
           );
-        state = await context.config.client.getTakeOrderStatus(
-          orderId,
-          order.take.chainId
+        state = await context.config.client.getTakeOrderState(
+          {
+            orderId,
+            takeChain: order.take.chainId,
+          },
+          {}
         );
         logger.debug(`state=${JSON.stringify(state)}`);
         await helpers.sleep(2000);

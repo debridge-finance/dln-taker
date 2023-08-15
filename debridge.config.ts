@@ -2,7 +2,6 @@ import {
   CachePriceFeed,
   ChainId,
   CoingeckoPriceFeed,
-  TokensBucket,
 } from "@debridge-finance/dln-client";
 
 import { ExecutorLaunchConfig } from "./src/config";
@@ -23,7 +22,7 @@ const config: ExecutorLaunchConfig = {
     //
     // Setting the USDC bucket (all tokens are emitted by Circle Inc on every DLN supported chain)
     //
-    new TokensBucket({
+    {
       [ChainId.Avalanche]: ["0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"],
       [ChainId.Arbitrum]: ["0xff970a61a04b1ca14834a43f5de4533ebddb5cc8"],
       [ChainId.Base]: ["0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca"],
@@ -32,15 +31,15 @@ const config: ExecutorLaunchConfig = {
       [ChainId.Ethereum]: ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],
       [ChainId.Polygon]: ["0x2791bca1f2de4661ed88a30c99a7a9449aa84174"],
       [ChainId.Solana]: ["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
-    }),
+    },
     // ETH
-    new TokensBucket({
+    {
       [ChainId.Arbitrum]: ['0x0000000000000000000000000000000000000000'],
       [ChainId.Avalanche]: ['0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB'],
       [ChainId.BSC]: ['0x2170Ed0880ac9A755fd29B2688956BD959F933F8'],
       [ChainId.Ethereum]: ['0x0000000000000000000000000000000000000000'],
       [ChainId.Polygon]: ['0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619']
-    }),
+    },
   ],
 
   tokenPriceService: new CachePriceFeed(
