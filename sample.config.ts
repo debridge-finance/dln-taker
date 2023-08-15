@@ -28,6 +28,7 @@ const config: ExecutorLaunchConfig = {
       [ChainId.Arbitrum]: ["0xff970a61a04b1ca14834a43f5de4533ebddb5cc8"],
       [ChainId.Avalanche]: ["0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"],
       [ChainId.BSC]: ["0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"],
+      [ChainId.Base]: ["0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca"],
       [ChainId.Ethereum]: ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],
       [ChainId.Linea]: ['0x176211869cA2b568f2A7D4EE941E073a821EE1ff'],
       [ChainId.Optimism]: ['0x7f5c764cbc14f9669b88837ca1490cca17c31607'],
