@@ -160,16 +160,16 @@ export class Executor implements IExecutor {
               PRODUCTION.chains[chain.chain]?.pmmSrc,
             pmmDestinationAddress:
               chain.environment?.pmmDst ||
-              PRODUCTION.defaultEvmAddresses?.pmmDst ||
-              PRODUCTION.chains[chain.chain]?.pmmDst,
+              PRODUCTION.chains[chain.chain]?.pmmDst ||
+              PRODUCTION.defaultEvmAddresses?.pmmDst,
             deBridgeGateAddress:
               chain.environment?.deBridgeContract ||
-              PRODUCTION.defaultEvmAddresses?.deBridgeContract ||
-              PRODUCTION.chains[chain.chain]?.deBridgeContract,
+              PRODUCTION.chains[chain.chain]?.deBridgeContract ||
+              PRODUCTION.defaultEvmAddresses?.deBridgeContract,
             crossChainForwarderAddress:
               chain.environment?.evm?.forwarderContract ||
-              PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract ||
-              PRODUCTION.chains[chain.chain]?.evm?.forwarderContract,
+              PRODUCTION.chains[chain.chain]?.evm?.forwarderContract ||
+              PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract
           };
         }
       }
