@@ -34,6 +34,7 @@ export class OrderProcessorInitContext {
 
 export type OrderProcessorInitializer = (
   chainId: ChainId,
+  executor: IExecutor,
   context: OrderProcessorInitContext
 ) => Promise<IOrderProcessor>;
 
@@ -52,6 +53,7 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
 
   abstract init(
     chainId: ChainId,
+    executor: IExecutor,
     context: OrderProcessorInitContext
   ): Promise<void>;
   abstract process(params: IncomingOrderContext): Promise<void>;

@@ -9,6 +9,7 @@ import {
   getEngineByChainId,
   JupiterWrapper,
   OneInchConnector,
+  OrderData,
   PriceTokenService,
   Solana,
   SwapConnector,
@@ -34,10 +35,11 @@ import { HooksEngine } from "../hooks/HooksEngine";
 import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOrdersBudgetController";
 import { DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
 import { TVLBudgetController } from "../processors/TVLBudgetController";
-import { StatsAPI } from "../processors/stats_api/StatsAPI";
-import { createClientLogger } from "../logger";
 import { TokensBucket, setSlippageOverloader } from "@debridge-finance/legacy-dln-profitability";
 import { DlnConfig } from "@debridge-finance/dln-client/dist/types/evm/core/models/config.model";
+import { DataStore } from "../processors/DataStore";
+import BigNumber from "bignumber.js";
+import { createClientLogger } from "../logger";
 
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
@@ -108,6 +110,13 @@ export interface IExecutor {
   readonly chains: { [key in ChainId]?: ExecutorSupportedChain };
   readonly buckets: TokensBucket[];
   readonly client: DlnClient;
+  readonly dlnApi: DataStore;
+
+  getSupportedChainIds(): Array<ChainId>
+  getSupportedChain(chain: ChainId): ExecutorSupportedChain;
+
+  usdValueOfAsset(chain: ChainId, token: Address, value: bigint): Promise<number>;
+  usdValueOfOrder(order: OrderData): Promise<number>;
 }
 
 export class Executor implements IExecutor {
@@ -117,10 +126,34 @@ export class Executor implements IExecutor {
   chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
   buckets: TokensBucket[] = [];
   client: DlnClient;
+  dlnApi: DataStore = new DataStore(this)
 
   private isInitialized = false;
   private readonly url1Inch = "https://nodes.debridge.finance";
   constructor(private readonly logger: Logger) { }
+
+  async usdValueOfAsset(chain: ChainId, token: Address, amount: bigint): Promise<number> {
+    const tokenPrice = await this.tokenPriceService.getPrice(chain, token, {
+      logger: createClientLogger(this.logger)
+    });
+
+    const tokenDecimals = await this.client.getDecimals(chain, token)
+    return new BigNumber(amount.toString()).multipliedBy(tokenPrice).div(new BigNumber(10).pow(tokenDecimals)).toNumber();
+  }
+
+  async usdValueOfOrder(order: OrderData): Promise<number> {
+    return this.usdValueOfAsset(order.give.chainId, order.give.tokenAddress, order.give.amount)
+  }
+
+  getSupportedChain(chain: ChainId): ExecutorSupportedChain {
+    const supportedChain = this.chains[chain];
+    if (!supportedChain) throw new Error(`Unsupported chain: ${ChainId[chain]}`);
+    return supportedChain
+  }
+
+  getSupportedChainIds(): Array<ChainId> {
+    return Object.values(this.chains).map(chain => chain.chain)
+  }
 
   private getTokenBuckets(config: ExecutorLaunchConfig['buckets']): Array<TokensBucket> {
     return config.map(metaBucket => {
@@ -293,7 +326,7 @@ export class Executor implements IExecutor {
         fulfillProvider: fulfillProvider,
         nonFinalizedTVLBudget: chain.constraints?.nonFinalizedTVLBudget,
       };
-      const orderProcessor = await processorInitializer(chain.chain, {
+      const orderProcessor = await processorInitializer(chain.chain, this, {
         takeChain: initializingChain,
         buckets: this.buckets,
         logger: this.logger,
@@ -338,12 +371,7 @@ export class Executor implements IExecutor {
           chain.constraints?.nonFinalizedTVLBudget || 0,
           this.logger
         ),
-        TVLBudgetController: new TVLBudgetController({
-          giveChainId: chain.chain,
-          beneficiary: chain.beneficiary,
-          fulfillProvider,
-          TVLBudget: chain.constraints?.TVLBudget || 0,
-        }, this.buckets),
+        TVLBudgetController: new TVLBudgetController(chain.chain, this, chain.constraints?.TVLBudget || 0, this.logger),
         beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
         srcConstraints: {
           ...this.getSrcConstraints(chain.constraints || {}),
@@ -383,13 +411,6 @@ export class Executor implements IExecutor {
         chainId: chain.chain,
         address: chain.unlockProvider.address as string,
       };
-    });
-
-    TVLBudgetController.setGlobalConfig({
-      unlockAuthorities: unlockAuthorities.map(i => i.address),
-      dlnClient: this.client,
-      statsApi: new StatsAPI(),
-      priceTokenService: this.tokenPriceService,
     });
 
     const minConfirmationThresholds = Object.values(this.chains)

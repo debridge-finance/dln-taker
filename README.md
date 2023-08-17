@@ -11,6 +11,7 @@
   - [Deploying reserve funds](#deploying-reserve-funds)
 - [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
   - [Reducing transaction finality constraint](#reducing-transaction-finality-constraint)
+  - [Setting a TVL budget](#setting-a-tvl-budget)
   - [Setting a budget for non-finalized orders](#setting-a-budget-for-non-finalized-orders)
   - [Delayed fulfillments](#delayed-fulfillments)
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
@@ -197,6 +198,45 @@ constraints: {
   ]
 },
 ```
+
+### Setting a TVL budget
+
+It is now possible to define a budget (priced in the US dollar) of assets deployed and locked on the given chain. This
+allows to limit the risks of having to much liquidity on a particular chain, which is the case when a lof of orders
+are coming from such chain during a turmoil.
+
+Any new order coming from the given chain to any other supported chain that potentially increases the TVL beyond
+the given budget (if being successfully fulfilled) gets postponed unless the TVL is decreased (either manually during
+a re-balancing routines, or automatically when orders coming to this chain get fulfilled).
+
+The TVL is calculated as a sum of:
+- the total value of intermediary assets deployed on the taker account (represented as `takerPrivateKey`)
+- PLUS the total value of intermediary assets deployed on the unlock_beneficiary account (represented
+  as `unlockAuthorityPrivateKey`, if differs from `takerPrivateKey`)
+- PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
+  the unlock_beneficiary account as soon as the commands to unlock fulfilled (but not yet unlocked) orders
+  are sent from other chains
+- PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
+  the unlock_beneficiary account as soon as all active unlock commands (that were sent from other chains
+  but were not yet claimed/executed on the given chain) are executed.
+
+Imagine you want to limit the TVL on Solana for up to $100,000:
+
+```ts
+      constraints: {
+        // set a budget for up to $100,000
+        TVLBudget: 100_000
+     }
+```
+
+If you deploy $70,000 to your taker's account on Solana, and then 10 orders (each of $10,000) immediately come from Solana
+to each supported chain (e.g., Ethereum, BNB, etc), then the taker would attempt to fulfill only first three of them,
+because first three of these orders increase the TVL by $30,000, which gives a TVL of $100,000.
+
+However, if there are several other orders coming to Solana, then every time the taker fulfills such order on your
+behalf, your TVL on Solana gets reduced by the value of each fulfilled order. For example, after previously mentioned
+three orders got fulfilled, and the TVL on Solana is increased to its maximum of $100,000, an order of $20,000
+coming from Ethereum to Solana decreases the TVL on Solana to $80,000 if gets fulfilled.
 
 ### Setting a budget for non-finalized orders
 

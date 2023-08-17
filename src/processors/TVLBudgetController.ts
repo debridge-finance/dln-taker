@@ -1,110 +1,106 @@
 import {
   Address,
+  buffersAreEqual,
   ChainId,
-  Logger as ClientLogger,
-  OrderState,
-  PMMClient, PriceTokenService,
-  TokensBucket, tokenStringToBuffer
 } from "@debridge-finance/dln-client";
+import { ExecutorSupportedChain, IExecutor } from "../executors/executor";
+import NodeCache from "node-cache"
 import { Logger } from "pino";
-import { createClientLogger } from "../logger";
-import BigNumber from "bignumber.js";
-import { StatsAPI } from "./stats_api/StatsAPI";
-import {ProviderAdapter} from "../providers/provider.adapter";
-import Web3 from "web3";
 
-type Config = {
-  giveChainId: ChainId;
-  beneficiary: string;
-  fulfillProvider: ProviderAdapter;
-  TVLBudget: number,
-};
+enum TvlCacheKey {
+  TVL
+}
 
-type GlobalConfig = {
-  unlockAuthorities: string[];
-  priceTokenService: PriceTokenService;
-  dlnClient: PMMClient;
-  statsApi: StatsAPI;
-};
+// 30m cache is OK because the cache is being flushed on every fulfilled order
+const DEFAULT_TVL_CACHE_TTL = 30 * 60;
 
 export class TVLBudgetController {
+  public readonly budget: number;
 
-  private static unlockAuthorities: string[] = [];
-  private static buckets: TokensBucket[];
-  private static priceTokenService: PriceTokenService;
-  private static dlnClient: PMMClient;
-  private static statsApi: StatsAPI;
+  private readonly chain: ChainId;
+  private readonly executor: IExecutor;
+  private readonly cache = new NodeCache({stdTTL: DEFAULT_TVL_CACHE_TTL});
+  private readonly logger: Logger;
 
-  private readonly giveChainId: ChainId;
-  private readonly beneficiary: Address;
-  private readonly fulfillProvider: ProviderAdapter;
-  private readonly taker: Address;
-  private readonly TVLBudget: number;
-  private readonly reservedTokens: Address[];
-
-  static setGlobalConfig(config: GlobalConfig) {
-    TVLBudgetController.unlockAuthorities = config.unlockAuthorities;
-    TVLBudgetController.priceTokenService = config.priceTokenService;
-    TVLBudgetController.dlnClient = config.dlnClient;
-    TVLBudgetController.statsApi = config.statsApi;
-  }
-
-  constructor(config: Config, buckets: TokensBucket[]) {
-    this.giveChainId = config.giveChainId;
-    this.TVLBudget = config.TVLBudget;
-    this.fulfillProvider = config.fulfillProvider;
-    this.beneficiary = tokenStringToBuffer(this.giveChainId, config.beneficiary);
-    this.taker = tokenStringToBuffer(this.giveChainId, config.fulfillProvider.address);
-    const reservedTokens: Address[] = [];
-    buckets.forEach(bucket => {
-      const tokensInBucket = bucket?.findTokens(this.giveChainId);
-      if (tokensInBucket) {
-        reservedTokens.push(...tokensInBucket);
-      }
-    });
-    this.reservedTokens = reservedTokens;
-  }
-
-  async validate(logger: Logger): Promise<boolean> {
-    if (this.TVLBudget === 0) {
-      return true;
+  constructor(chain: ChainId, executor: IExecutor, budget: number, logger: Logger) {
+    this.chain = chain;
+    this.executor = executor;
+    this.budget = budget;
+    this.logger = logger.child(({ service: TVLBudgetController.name, chainId: chain, budget }));
+    if (budget) {
+      this.logger.debug(`Will preserve a TVL of $${budget} on ${ChainId[chain]}`)
     }
-    const clientLogger = createClientLogger(logger.child({ service: TVLBudgetController.name }));
-
-    const takerUsdBalance = (await Promise.all(this.reservedTokens.map(async token => {
-      return this.getAccountUsdBalance(this.giveChainId, token, this.beneficiary, clientLogger);
-    }))).reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-    logger.debug(`takerUsdBalance in give chain ${ChainId[this.giveChainId]} is ${takerUsdBalance}`);
-
-    const beneficiaryUsdBalance = (await Promise.all(this.reservedTokens.map(async token => {
-      return this.getAccountUsdBalance(this.giveChainId, token, this.taker, clientLogger);
-    }))).reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-    logger.debug(`beneficiaryUsdBalance in give chain ${ChainId[this.giveChainId]} is ${beneficiaryUsdBalance}`);
-
-    const orders = await TVLBudgetController.statsApi.getOrders([this.giveChainId], [OrderState.Fulfilled, OrderState.SentUnlock], TVLBudgetController.unlockAuthorities.join(' '));
-    const orderGiveAmountUsd = (await Promise.all(orders.map(order => {
-      const giveToken = tokenStringToBuffer(this.giveChainId, order.giveOfferWithMetadata.tokenAddress.stringValue);
-      const giveAmount = order.giveOfferWithMetadata.amount.stringValue;
-      return this.convertTokenAmountToUsd(this.giveChainId, giveToken, giveAmount, clientLogger)
-    }))).reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-    logger.debug(`orderGiveAmountUsd in give chain ${ChainId[this.giveChainId]} is ${orderGiveAmountUsd}`);
-
-    const giveAmountBalanceUsd =  orderGiveAmountUsd + beneficiaryUsdBalance + takerUsdBalance;
-    const result = this.TVLBudget > giveAmountBalanceUsd;
-    logger.debug(`TVLBudget ${this.TVLBudget} > giveAmountBalanceUsd ${giveAmountBalanceUsd} : ${result}`);
-    return result;
   }
 
-  private async getAccountUsdBalance(chainId: ChainId, tokenAddress: Address, accountAddress: Address, clientLogger: ClientLogger): Promise<number> {
-    const tokenBalance = await TVLBudgetController.dlnClient.getAccountBalance(chainId, tokenAddress, accountAddress, this.fulfillProvider.connection as Web3);
-    return this.convertTokenAmountToUsd(chainId, tokenAddress, tokenBalance.toString(), clientLogger);
+  get giveChain(): ExecutorSupportedChain {
+    return this.executor.chains[this.chain]!
   }
 
-  private async convertTokenAmountToUsd(chainId: ChainId, tokenAddress: Address, amount: string, clientLogger: ClientLogger): Promise<number> {
-    const tokenPrice = await TVLBudgetController.priceTokenService.getPrice(chainId, tokenAddress, {
-      logger: clientLogger,
-    });
-    const tokenDecimals = await TVLBudgetController.dlnClient.getDecimals(chainId, tokenAddress, this.fulfillProvider.connection as Web3);
-    return new BigNumber(amount.toString()).multipliedBy(tokenPrice).div(new BigNumber(10).pow(tokenDecimals)).toNumber();
+  get hasSeparateUnlockBeneficiary(): boolean {
+    return !buffersAreEqual(this.giveChain.fulfillProvider.bytesAddress, this.giveChain.unlockProvider.bytesAddress)
+  }
+
+  get trackedTokens(): Address[] {
+    return this.executor.buckets
+      .map(bucket => bucket.findTokens(this.chain) || [])
+      .reduce((prev, curr) => [...prev, ...curr], []);
+  }
+
+  flushCache(): void {
+    this.cache.del(TvlCacheKey.TVL);
+  }
+
+  async getCurrentTVL(): Promise<number> {
+    const cachedTVL = this.cache.get<Promise<number>>(TvlCacheKey.TVL);
+    if (undefined === cachedTVL) {
+      // to avoid simultaneous requests from different take_chains for the same giveTVL,
+      // we introduce a promisified synchronization root here
+      // Mind that this promise gets erased once resolved
+      this.cache.set(TvlCacheKey.TVL, this.calculateCurrentTVL());
+    }
+
+    return this.cache.get<Promise<number>>(TvlCacheKey.TVL)!
+  }
+
+  async calculateCurrentTVL() :Promise<number> {
+    const takerAccountBalance = await this.getTakerAccountBalance();
+    const unlockBeneficiaryAccountBalance = await this.getUnlockBeneficiaryAccountBalance();
+    const pendingUnlockOrdersValue = await this.getPendingUnlockOrdersValue();
+
+    const tvl = takerAccountBalance + unlockBeneficiaryAccountBalance + pendingUnlockOrdersValue;
+    return tvl;
+  }
+
+  private async getTakerAccountBalance(): Promise<number> {
+    return this.getAccountValue(this.giveChain.fulfillProvider.bytesAddress);
+  }
+
+  private async getUnlockBeneficiaryAccountBalance(): Promise<number> {
+    if (!this.hasSeparateUnlockBeneficiary) return 0;
+    return this.getAccountValue(this.giveChain.unlockProvider.bytesAddress);
+  }
+
+  private async getAccountValue(account: Address): Promise<number> {
+    const usdValues = await Promise.all(
+      this.trackedTokens.map(token => this.getAssetValueAtAccount(token, account))
+    );
+
+    return usdValues.reduce((prevValue, value) => prevValue + value, 0)
+  }
+
+  private async getAssetValueAtAccount(token: Address, account: Address): Promise<number> {
+    const balance = await this.executor.client.getClient(this.chain).getBalance(this.chain, token, account);
+    const usdValue = await this.executor.usdValueOfAsset(this.chain, token, balance);
+    return usdValue;
+  }
+
+  private async getPendingUnlockOrdersValue(): Promise<number> {
+    const orders = await this.executor.dlnApi.getPendingForUnlockOrders(this.chain);
+
+    const usdValues = await Promise.all(
+      orders.map(order => this.executor.usdValueOfOrder(order))
+    );
+
+    return usdValues.reduce((prevValue, value) => prevValue + value, 0)
   }
 }

@@ -56,9 +56,10 @@ export enum PostponingReason {
   FORCED_DELAY,
 
   /**
-   * triggered when budget of tvl orders budget exceeded
+   * triggered when the value of a new order potentially increases the TVL of the source chain beyond the given budget
+   * (if being successfully fulfilled).
    */
-  TVL_ORDERS_BUDGET_EXCEEDED,
+  TVL_BUDGET_EXCEEDED,
 }
 
 export enum RejectionReason {

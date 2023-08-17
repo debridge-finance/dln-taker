@@ -39,7 +39,7 @@
     "tslint-plugin-prettier": "2.3.0"
   },
   "dependencies": {
-    "@debridge-finance/dln-client": "6.5.2",
+    "@debridge-finance/dln-client": "6.5.4",
     "@debridge-finance/legacy-dln-profitability": "1.1.1",
     "@debridge-finance/solana-utils": "4.1.0",
     "@protobuf-ts/plugin": "2.8.1",
@@ -50,6 +50,7 @@
     "bignumber.js": "9.1.0",
     "bs58": "5.0.0",
     "dotenv": "16.0.3",
+    "node-cache": "^5.1.2",
     "pino": "8.7.0",
     "pino-pretty": "9.1.1",
     "pino-sentry": "0.13.0",

@@ -34,6 +34,7 @@ import {
 import { helpers } from "@debridge-finance/solana-utils";
 import { findExpectedBucket, calculateExpectedTakeAmount } from "@debridge-finance/legacy-dln-profitability";
 import { DexlessChains } from "../config";
+import { IExecutor } from "../executors/executor";
 
 // reasonable multiplier for gas estimated for the fulfill txn to define max
 // gas we are willing to estimate
@@ -98,6 +99,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   private queue = new Set<OrderId>(); // queue of orderid for retry processing order
   private isLocked: boolean = false;
   private batchUnlocker: BatchUnlocker;
+  private executor: IExecutor;
 
   readonly #createdOrdersMetadata = new Map<OrderId, CreatedOrderMetadata>()
 
@@ -124,9 +126,11 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   async init(
     chainId: ChainId,
+    executor: IExecutor,
     context: OrderProcessorInitContext
   ): Promise<void> {
     this.chainId = chainId;
+    this.executor = executor;
     this.takeChain = context.takeChain;
     this.hooksEngine = context.hooksEngine;
 
@@ -211,6 +215,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
         this.clearInternalQueues(orderId);
         this.clearOrderStore(orderId);
+        context.giveChain.TVLBudgetController.flushCache();
+        context.takeChain.TVLBudgetController.flushCache();
         context.logger.debug(`deleted from queues`);
 
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
@@ -355,13 +361,6 @@ class UniversalProcessor extends BaseOrderProcessor {
     const orderId = orderInfo.orderId;
     const logger = context.logger;
 
-    const isNotOutTVLBudget = await context.giveChain.TVLBudgetController.validate(logger);
-    if (!isNotOutTVLBudget) {
-      const message = `Order is out of budget`;
-      logger.error(message);
-      return this.postponeOrder(metadata, message, PostponingReason.TVL_ORDERS_BUDGET_EXCEEDED, true);
-    }
-
     const bucket = context.config.buckets.find(
       (bucket) =>
         bucket.isOneOf(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress) &&
@@ -372,26 +371,19 @@ class UniversalProcessor extends BaseOrderProcessor {
       return this.rejectOrder(metadata, message, RejectionReason.UNEXPECTED_GIVE_TOKEN);
     }
 
-    // calculate USD worth of order
-    const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
-      context.config.tokenPriceService.getPrice(
-        orderInfo.order.give.chainId,
-        buffersAreEqual(orderInfo.order.give.tokenAddress, tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS)) ? null : orderInfo.order.give.tokenAddress,
-        {
-          logger: createClientLogger(context.logger)
-        }
-      ),
-      context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress)
-    ]);
-    logger.debug(`usd rate for give token: ${giveTokenUsdRate}`);
-    logger.debug(`decimals for give token: ${giveTokenDecimals}`);
-
     // converting give amount
-    const usdWorth = BigNumber(giveTokenUsdRate)
-      .multipliedBy(orderInfo.order.give.amount.toString())
-      .dividedBy(new BigNumber(10).pow(giveTokenDecimals))
-      .toNumber();
+    const usdWorth = await this.executor.usdValueOfOrder(orderInfo.order);
     logger.debug(`order worth in usd: ${usdWorth}`);
+
+    // ensuring this order does not increase TVL over a budget
+    const budget = context.giveChain.TVLBudgetController.budget;
+    if (budget > 0) {
+      const currentGiveTVL = await context.giveChain.TVLBudgetController.getCurrentTVL();
+      if ((currentGiveTVL + usdWorth) > budget) {
+        const message = `order worth $${usdWorth} increases TVL of the ${ChainId[context.giveChain.chain]} over a budget of $${budget} (current TVL: $${currentGiveTVL}), thus postponing`;
+        return this.postponeOrder(metadata, message, PostponingReason.TVL_BUDGET_EXCEEDED, true);
+      }
+    }
 
     let isFinalizedOrder = true;
     let confirmationFloor = undefined;
@@ -796,6 +788,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
 
     // order is fulfilled, remove it from queues (the order may have come again thru WS)
     this.clearInternalQueues(orderInfo.orderId);
+    context.giveChain.TVLBudgetController.flushCache()
     logger.info(`order fulfilled: ${orderId}`);
   }
 
@@ -862,9 +855,9 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
 export const universalProcessor = (
   params?: Partial<UniversalProcessorParams>
 ): OrderProcessorInitializer => {
-  return async (chainId: ChainId, context: OrderProcessorInitContext) => {
+  return async (chainId: ChainId, executor: IExecutor, context: OrderProcessorInitContext) => {
     const processor = new UniversalProcessor(params);
-    await processor.init(chainId, context);
+    await processor.init(chainId, executor, context);
     return processor;
   };
 };
