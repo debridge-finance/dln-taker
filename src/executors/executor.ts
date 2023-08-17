@@ -117,6 +117,8 @@ export interface IExecutor {
 
   usdValueOfAsset(chain: ChainId, token: Address, value: bigint): Promise<number>;
   usdValueOfOrder(order: OrderData): Promise<number>;
+  formatTokenValue(chain: ChainId, token: Address, amount: bigint): Promise<number>
+  resyncDecimals(chainA: ChainId, tokenA: Address, amountA: bigint, chainB: ChainId, tokenB: Address): Promise<bigint>
 }
 
 export class Executor implements IExecutor {
@@ -139,6 +141,27 @@ export class Executor implements IExecutor {
 
     const tokenDecimals = await this.client.getDecimals(chain, token)
     return new BigNumber(amount.toString()).multipliedBy(tokenPrice).div(new BigNumber(10).pow(tokenDecimals)).toNumber();
+  }
+
+  async formatTokenValue(chain: ChainId, token: Address, amount: bigint): Promise<number> {
+    const tokenDecimals = await this.client.getDecimals(chain, token);
+    return new BigNumber(amount.toString()).div(new BigNumber(10).pow(tokenDecimals)).toNumber();
+  }
+
+  async resyncDecimals(chainIn: ChainId, tokenIn: Address, amountIn: bigint, chainOut: ChainId, tokenOut: Address): Promise<bigint> {
+    const [decimalsIn, decimalsOut] = await Promise.all([
+      this.client.getDecimals(chainIn, tokenIn),
+      this.client.getDecimals(chainOut, tokenOut),
+    ]);
+    if (decimalsIn === decimalsOut) return amountIn;
+
+    // ported from fixDecimals() which is not being exported from the client
+    const delta = decimalsIn - decimalsOut;
+    if (delta > 0) {
+      return amountIn / 10n ** BigInt(delta);
+    } else {
+      return amountIn * 10n ** BigInt(-delta);
+    }
   }
 
   async usdValueOfOrder(order: OrderData): Promise<number> {

@@ -501,25 +501,22 @@ class UniversalProcessor extends BaseOrderProcessor {
       return this.rejectOrder(metadata, message, RejectionReason.UNAVAILABLE_PRE_FULFILL_SWAP);
     }
 
-    // perform rough estimation: assuming order.give.amount is what we need on balance
-    const [reserveSrcTokenDecimals, reserveDstTokenDecimals, takeTokenDecimals] = await Promise.all([
-      context.config.client.getDecimals(orderInfo.order.give.chainId, pickedBucket.reserveSrcToken),
-      context.config.client.getDecimals(orderInfo.order.take.chainId, pickedBucket.reserveDstToken),
-      context.config.client.getDecimals(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress),
-    ]);
-
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
-    const roughReserveDstDecimals = reserveSrcTokenDecimals - reserveDstTokenDecimals;
-    let roughReserveDstAmount = BigNumber(orderInfo.order.give.amount.toString()).div(BigNumber(10).pow(roughReserveDstDecimals)).integerValue();
+    let roughReserveDstAmount = await this.executor.resyncDecimals(
+      orderInfo.order.give.chainId,
+      orderInfo.order.give.tokenAddress,
+      orderInfo.order.give.amount,
+      orderInfo.order.take.chainId,
+      pickedBucket.reserveDstToken
+    )
     logger.debug(`expressed order give amount (${orderInfo.order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(orderInfo.order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[orderInfo.order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
 
-    const accountReserveBalance =
-      await this.takeChain.fulfillProvider.getBalance(pickedBucket.reserveDstToken);
-    if (new BigNumber(accountReserveBalance).lt(roughReserveDstAmount)) {
+    const accountReserveBalance = await this.executor.client.getClient(this.takeChain.chain).getBalance(this.takeChain.chain, pickedBucket.reserveDstToken, this.takeChain.fulfillProvider.bytesAddress)
+    if (accountReserveBalance < roughReserveDstAmount) {
       const message = [
         `not enough funds of the reserve token (${tokenAddressToString(this.takeChain.chain, pickedBucket.reserveDstToken)}); `,
-        `actual balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))}, `,
-        `but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(roughReserveDstDecimals))}`
+        `actual balance: ${await this.executor.formatTokenValue(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, accountReserveBalance)}, `,
+        `but expected ${await this.executor.formatTokenValue(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, roughReserveDstAmount)}`
       ].join('');
       return this.postponeOrder(metadata, message, PostponingReason.NOT_ENOUGH_BALANCE, isFinalizedOrder)
     }
@@ -644,7 +641,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       isProfitable,
       reserveToken: reserveDstToken,
       requiredReserveAmount: requiredReserveDstAmount,
-      fulfillToken: orderInfo.order?.take.tokenAddress!,
+      fulfillToken: orderInfo.order.take.tokenAddress,
       projectedFulfillAmount: profitableTakeAmount,
     };
     this.hooksEngine.handleOrderEstimated({
@@ -652,6 +649,9 @@ class UniversalProcessor extends BaseOrderProcessor {
       estimation: hookEstimation,
       context,
     });
+
+    const requiredReserveDstAmountBN = BigInt(new BigNumber(requiredReserveDstAmount).integerValue().toString());
+    const profitableTakeAmountBN = BigInt(new BigNumber(profitableTakeAmount).integerValue().toString())
 
     if (isProfitable) {
       logger.info("order is profitable");
@@ -669,11 +669,11 @@ class UniversalProcessor extends BaseOrderProcessor {
         const takeTokenDesc = tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress);
         message = [
           `order is estimated to be profitable when supplying `,
-          `${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals))} `,
+          `${await this.executor.formatTokenValue(orderInfo.order.take.chainId, reserveDstToken, requiredReserveDstAmountBN)} `,
           `of reserve token (${reserveTokenDesc}) during fulfillment, `,
-          `which gives only ${new BigNumber(profitableTakeAmount).div(BigNumber(10).pow(takeTokenDecimals))} `,
+          `which gives only ${await this.executor.formatTokenValue(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress, profitableTakeAmountBN)} `,
           `of take token (${takeTokenDesc}), `,
-          `while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals))} of take amount `,
+          `while order requires ${await  this.executor.formatTokenValue(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress, orderInfo.order.take.amount)} of take amount `,
           `(${takeAmountDropShare}% drop)`
         ].join("");
       }

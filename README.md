@@ -236,7 +236,7 @@ because first three of these orders increase the TVL by $30,000, which gives a T
 However, if there are several other orders coming to Solana, then every time the taker fulfills such order on your
 behalf, your TVL on Solana gets reduced by the value of each fulfilled order. For example, after previously mentioned
 three orders got fulfilled, and the TVL on Solana is increased to its maximum of $100,000, an order of $20,000
-coming from Ethereum to Solana decreases the TVL on Solana to $80,000 if gets fulfilled.
+coming from Ethereum to Solana decreases the TVL on Solana to $80,000 if gets fulfilled on your behalf.
 
 ### Setting a budget for non-finalized orders
 

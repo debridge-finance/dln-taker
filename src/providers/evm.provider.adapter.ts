@@ -1,4 +1,4 @@
-import { ChainId, tokenAddressToString, tokenStringToBuffer, ZERO_EVM_ADDRESS } from "@debridge-finance/dln-client";
+import { ChainId, tokenStringToBuffer } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import { clearInterval, clearTimeout } from "timers";
@@ -7,8 +7,7 @@ import Web3 from "web3";
 import { EvmRebroadcastAdapterOpts } from "../config";
 
 import { ProviderAdapter, SendTransactionContext } from "./provider.adapter";
-import { getEvmAccountBalance } from "./utils/getEvmAccountBalance";
-import { approve, isApproved} from "./utils/approve";
+import { approve, isApproved } from "./utils/approve";
 
 // reasonable multiplier for gas estimated before txn is being broadcasted
 export const GAS_MULTIPLIER = 1.1;
@@ -304,18 +303,6 @@ export class EvmProviderAdapter implements ProviderAdapter {
     if (this.rebroadcast.pollingInterval === undefined) {
       this.rebroadcast.pollingInterval = 5_000;
     }
-  }
-
-  getBalance(token: Uint8Array): Promise<string> {
-    const tokenAddress = tokenAddressToString(ChainId.Ethereum, token);
-    if (tokenAddress === ZERO_EVM_ADDRESS) {
-      return this.connection.eth.getBalance(this.address)
-    }
-    return getEvmAccountBalance(
-      this.connection,
-      tokenAddress,
-      this.address
-    );
   }
 
   async approveToken(tokenAddress: string,
