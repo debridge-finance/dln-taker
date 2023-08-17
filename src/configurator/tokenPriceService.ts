@@ -45,6 +45,14 @@ export function tokenPriceService(opts?: TokenPriceServiceConfiguratorOpts): Pri
                 token: tokenStringToBuffer(ChainId.Ethereum, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'),
               },
             },
+            [ChainId.Optimism]: {
+              // remap ETH@Optimism price to ETH@Ethereum
+              [ZERO_EVM_ADDRESS]: {
+                type: 'redirect',
+                chainId: ChainId.Ethereum,
+                token: tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS),
+              },
+            },
         }, new CachePriceFeed(new CoingeckoPriceFeed(opts?.coingeckoApiKey), opts?.coingeckoCacheTTL || defaultCoingeckoCacheTTL),
       )
 }

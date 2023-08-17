@@ -151,8 +151,8 @@ Both buckets are explicitly defined in the sample configuration file [here](./sa
 For every chain you as a taker would like to support:
 - Register the reserves-keeping address (its private key must be set as a `takerPrivateKey` in the configuration file) and load it with:
   - a given amount of USDC tokens (e.g., 100,000 USDC),
-  - a given amount of ETH (e.g. 60 ETH) on Ethereum, Arbitrum, Base and Linea,
-  - a given amount of wETH tokens (e.g. 60 wETH) on Avalanche, BNB Chain, Optimism and Polygon,
+  - a given amount of ETH (e.g. 60 ETH) on Arbitrum, Base, Ethereum, Linea and Optimism,
+  - a given amount of wETH tokens (e.g. 60 wETH) on Avalanche, BNB Chain and Polygon,
   - a reasonable amount of native blockchain currency (e.g., 1 ETH on Ethereum) to pay gas for fulfillment transactions.
 - Register the unlock authority address (its private key must be set as an `unlockAuthorityPrivateKey` in the configuration file) and load it with:
   - a reasonable amount of native blockchain currency (e.g. 1 ETH on Ethereum) to pay gas for order unlocking transactions.
