@@ -34,6 +34,7 @@ import {
 import { helpers } from "@debridge-finance/solana-utils";
 import { findExpectedBucket, calculateExpectedTakeAmount } from "@debridge-finance/legacy-dln-profitability";
 import { DexlessChains } from "../config";
+import { IExecutor } from "../executors/executor";
 
 // reasonable multiplier for gas estimated for the fulfill txn to define max
 // gas we are willing to estimate
@@ -98,6 +99,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   private queue = new Set<OrderId>(); // queue of orderid for retry processing order
   private isLocked: boolean = false;
   private batchUnlocker: BatchUnlocker;
+  private executor: IExecutor;
 
   readonly #createdOrdersMetadata = new Map<OrderId, CreatedOrderMetadata>()
 
@@ -124,9 +126,11 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   async init(
     chainId: ChainId,
+    executor: IExecutor,
     context: OrderProcessorInitContext
   ): Promise<void> {
     this.chainId = chainId;
+    this.executor = executor;
     this.takeChain = context.takeChain;
     this.hooksEngine = context.hooksEngine;
 
@@ -211,6 +215,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
         this.clearInternalQueues(orderId);
         this.clearOrderStore(orderId);
+        context.giveChain.TVLBudgetController.flushCache();
+        context.takeChain.TVLBudgetController.flushCache();
         context.logger.debug(`deleted from queues`);
 
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
@@ -365,26 +371,19 @@ class UniversalProcessor extends BaseOrderProcessor {
       return this.rejectOrder(metadata, message, RejectionReason.UNEXPECTED_GIVE_TOKEN);
     }
 
-    // calculate USD worth of order
-    const [giveTokenUsdRate, giveTokenDecimals] = await Promise.all([
-      context.config.tokenPriceService.getPrice(
-        orderInfo.order.give.chainId,
-        buffersAreEqual(orderInfo.order.give.tokenAddress, tokenStringToBuffer(ChainId.Ethereum, ZERO_EVM_ADDRESS)) ? null : orderInfo.order.give.tokenAddress,
-        {
-          logger: createClientLogger(context.logger)
-        }
-      ),
-      context.config.client.getDecimals(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress)
-    ]);
-    logger.debug(`usd rate for give token: ${giveTokenUsdRate}`);
-    logger.debug(`decimals for give token: ${giveTokenDecimals}`);
-
     // converting give amount
-    const usdWorth = BigNumber(giveTokenUsdRate)
-      .multipliedBy(orderInfo.order.give.amount.toString())
-      .dividedBy(new BigNumber(10).pow(giveTokenDecimals))
-      .toNumber();
+    const usdWorth = await this.executor.usdValueOfOrder(orderInfo.order);
     logger.debug(`order worth in usd: ${usdWorth}`);
+
+    // ensuring this order does not increase TVL over a budget
+    const budget = context.giveChain.TVLBudgetController.budget;
+    if (budget > 0) {
+      const currentGiveTVL = await context.giveChain.TVLBudgetController.getCurrentTVL();
+      if ((currentGiveTVL + usdWorth) > budget) {
+        const message = `order worth $${usdWorth} increases TVL of the ${ChainId[context.giveChain.chain]} over a budget of $${budget} (current TVL: $${currentGiveTVL}), thus postponing`;
+        return this.postponeOrder(metadata, message, PostponingReason.TVL_BUDGET_EXCEEDED, true);
+      }
+    }
 
     let isFinalizedOrder = true;
     let confirmationFloor = undefined;
@@ -502,25 +501,22 @@ class UniversalProcessor extends BaseOrderProcessor {
       return this.rejectOrder(metadata, message, RejectionReason.UNAVAILABLE_PRE_FULFILL_SWAP);
     }
 
-    // perform rough estimation: assuming order.give.amount is what we need on balance
-    const [reserveSrcTokenDecimals, reserveDstTokenDecimals, takeTokenDecimals] = await Promise.all([
-      context.config.client.getDecimals(orderInfo.order.give.chainId, pickedBucket.reserveSrcToken),
-      context.config.client.getDecimals(orderInfo.order.take.chainId, pickedBucket.reserveDstToken),
-      context.config.client.getDecimals(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress),
-    ]);
-
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
-    const roughReserveDstDecimals = reserveSrcTokenDecimals - reserveDstTokenDecimals;
-    let roughReserveDstAmount = BigNumber(orderInfo.order.give.amount.toString()).div(BigNumber(10).pow(roughReserveDstDecimals)).integerValue();
+    let roughReserveDstAmount = await this.executor.resyncDecimals(
+      orderInfo.order.give.chainId,
+      orderInfo.order.give.tokenAddress,
+      orderInfo.order.give.amount,
+      orderInfo.order.take.chainId,
+      pickedBucket.reserveDstToken
+    )
     logger.debug(`expressed order give amount (${orderInfo.order.give.amount.toString()}) in reserve dst token ${tokenAddressToString(orderInfo.order.take.chainId, pickedBucket.reserveDstToken)} @ ${ChainId[orderInfo.order.take.chainId]}: ${roughReserveDstAmount.toString()} `)
 
-    const accountReserveBalance =
-      await this.takeChain.fulfillProvider.getBalance(pickedBucket.reserveDstToken);
-    if (new BigNumber(accountReserveBalance).lt(roughReserveDstAmount)) {
+    const accountReserveBalance = await this.executor.client.getClient(this.takeChain.chain).getBalance(this.takeChain.chain, pickedBucket.reserveDstToken, this.takeChain.fulfillProvider.bytesAddress)
+    if (accountReserveBalance < roughReserveDstAmount) {
       const message = [
         `not enough funds of the reserve token (${tokenAddressToString(this.takeChain.chain, pickedBucket.reserveDstToken)}); `,
-        `actual balance: ${new BigNumber(accountReserveBalance).div(BigNumber(10).pow(reserveDstTokenDecimals))}, `,
-        `but expected ${new BigNumber(roughReserveDstAmount).div(BigNumber(10).pow(roughReserveDstDecimals))}`
+        `actual balance: ${await this.executor.formatTokenValue(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, accountReserveBalance)}, `,
+        `but expected ${await this.executor.formatTokenValue(orderInfo.order.take.chainId, pickedBucket.reserveDstToken, roughReserveDstAmount)}`
       ].join('');
       return this.postponeOrder(metadata, message, PostponingReason.NOT_ENOUGH_BALANCE, isFinalizedOrder)
     }
@@ -645,7 +641,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       isProfitable,
       reserveToken: reserveDstToken,
       requiredReserveAmount: requiredReserveDstAmount,
-      fulfillToken: orderInfo.order?.take.tokenAddress!,
+      fulfillToken: orderInfo.order.take.tokenAddress,
       projectedFulfillAmount: profitableTakeAmount,
     };
     this.hooksEngine.handleOrderEstimated({
@@ -653,6 +649,9 @@ class UniversalProcessor extends BaseOrderProcessor {
       estimation: hookEstimation,
       context,
     });
+
+    const requiredReserveDstAmountBN = BigInt(new BigNumber(requiredReserveDstAmount).integerValue().toString());
+    const profitableTakeAmountBN = BigInt(new BigNumber(profitableTakeAmount).integerValue().toString())
 
     if (isProfitable) {
       logger.info("order is profitable");
@@ -670,11 +669,11 @@ class UniversalProcessor extends BaseOrderProcessor {
         const takeTokenDesc = tokenAddressToString(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress);
         message = [
           `order is estimated to be profitable when supplying `,
-          `${new BigNumber(requiredReserveDstAmount).div(BigNumber(10).pow(reserveDstTokenDecimals))} `,
+          `${await this.executor.formatTokenValue(orderInfo.order.take.chainId, reserveDstToken, requiredReserveDstAmountBN)} `,
           `of reserve token (${reserveTokenDesc}) during fulfillment, `,
-          `which gives only ${new BigNumber(profitableTakeAmount).div(BigNumber(10).pow(takeTokenDecimals))} `,
+          `which gives only ${await this.executor.formatTokenValue(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress, profitableTakeAmountBN)} `,
           `of take token (${takeTokenDesc}), `,
-          `while order requires ${new BigNumber(orderInfo.order.take.amount.toString()).div(BigNumber(10).pow(takeTokenDecimals))} of take amount `,
+          `while order requires ${await  this.executor.formatTokenValue(orderInfo.order.take.chainId, orderInfo.order.take.tokenAddress, orderInfo.order.take.amount)} of take amount `,
           `(${takeAmountDropShare}% drop)`
         ].join("");
       }
@@ -789,6 +788,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
 
     // order is fulfilled, remove it from queues (the order may have come again thru WS)
     this.clearInternalQueues(orderInfo.orderId);
+    context.giveChain.TVLBudgetController.flushCache()
     logger.info(`order fulfilled: ${orderId}`);
   }
 
@@ -855,9 +855,9 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
 export const universalProcessor = (
   params?: Partial<UniversalProcessorParams>
 ): OrderProcessorInitializer => {
-  return async (chainId: ChainId, context: OrderProcessorInitContext) => {
+  return async (chainId: ChainId, executor: IExecutor, context: OrderProcessorInitContext) => {
     const processor = new UniversalProcessor(params);
-    await processor.init(chainId, context);
+    await processor.init(chainId, executor, context);
     return processor;
   };
 };

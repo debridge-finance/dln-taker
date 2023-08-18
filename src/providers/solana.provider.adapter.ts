@@ -46,21 +46,4 @@ export class SolanaProviderAdapter implements ProviderAdapter {
 
     return txid;
   }
-
-  async getBalance(token: Uint8Array): Promise<string> {
-    const tokenString = tokenAddressToString(ChainId.Solana, token);
-    if (tokenString === "11111111111111111111111111111111") {
-      return (
-        await this.connection.getBalance(this.wallet.publicKey)
-      ).toString();
-    }
-    const response = await this.connection.getParsedTokenAccountsByOwner(
-      this.wallet.publicKey,
-      { mint: new PublicKey(token) }
-    );
-
-    return (
-      response.value[0]?.account?.data?.parsed?.info?.tokenAmount?.amount || 0
-    );
-  }
 }

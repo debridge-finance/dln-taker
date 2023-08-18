@@ -9,6 +9,7 @@ import {
   getEngineByChainId,
   JupiterWrapper,
   OneInchConnector,
+  OrderData,
   PriceTokenService,
   Solana,
   SwapConnector,
@@ -33,9 +34,12 @@ import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { HooksEngine } from "../hooks/HooksEngine";
 import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOrdersBudgetController";
 import { DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
-import { createClientLogger } from "../logger";
+import { TVLBudgetController } from "../processors/TVLBudgetController";
 import { TokensBucket, setSlippageOverloader } from "@debridge-finance/legacy-dln-profitability";
 import { DlnConfig } from "@debridge-finance/dln-client/dist/types/evm/core/models/config.model";
+import { DataStore } from "../processors/DataStore";
+import BigNumber from "bignumber.js";
+import { createClientLogger } from "../logger";
 
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
@@ -64,8 +68,8 @@ type DstOrderConstraints = Readonly<{
 }>
 
 type DstConstraintsPerOrderValue = Array<
-    DstOrderConstraints & Readonly<{
-      upperThreshold: number;
+  DstOrderConstraints & Readonly<{
+    upperThreshold: number;
   }>
 >;
 
@@ -75,8 +79,8 @@ type SrcOrderConstraints = Readonly<{
 
 type SrcConstraintsPerOrderValue = Array<
   SrcOrderConstraints & Readonly<{
-      upperThreshold: number;
-      minBlockConfirmations: number;
+    upperThreshold: number;
+    minBlockConfirmations: number;
   }>
 >;
 
@@ -85,6 +89,7 @@ export type ExecutorSupportedChain = Readonly<{
   chainRpc: string;
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
+  TVLBudgetController: TVLBudgetController;
   nonFinalizedOrdersBudgetController: NonFinalizedOrdersBudgetController;
   srcConstraints: Readonly<SrcOrderConstraints & {
     perOrderValue: SrcConstraintsPerOrderValue
@@ -105,6 +110,15 @@ export interface IExecutor {
   readonly chains: { [key in ChainId]?: ExecutorSupportedChain };
   readonly buckets: TokensBucket[];
   readonly client: DlnClient;
+  readonly dlnApi: DataStore;
+
+  getSupportedChainIds(): Array<ChainId>
+  getSupportedChain(chain: ChainId): ExecutorSupportedChain;
+
+  usdValueOfAsset(chain: ChainId, token: Address, value: bigint): Promise<number>;
+  usdValueOfOrder(order: OrderData): Promise<number>;
+  formatTokenValue(chain: ChainId, token: Address, amount: bigint): Promise<number>
+  resyncDecimals(chainA: ChainId, tokenA: Address, amountA: bigint, chainB: ChainId, tokenB: Address): Promise<bigint>
 }
 
 export class Executor implements IExecutor {
@@ -114,10 +128,55 @@ export class Executor implements IExecutor {
   chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
   buckets: TokensBucket[] = [];
   client: DlnClient;
+  dlnApi: DataStore = new DataStore(this)
 
   private isInitialized = false;
   private readonly url1Inch = "https://nodes.debridge.finance";
   constructor(private readonly logger: Logger) { }
+
+  async usdValueOfAsset(chain: ChainId, token: Address, amount: bigint): Promise<number> {
+    const tokenPrice = await this.tokenPriceService.getPrice(chain, token, {
+      logger: createClientLogger(this.logger)
+    });
+
+    const tokenDecimals = await this.client.getDecimals(chain, token)
+    return new BigNumber(amount.toString()).multipliedBy(tokenPrice).div(new BigNumber(10).pow(tokenDecimals)).toNumber();
+  }
+
+  async formatTokenValue(chain: ChainId, token: Address, amount: bigint): Promise<number> {
+    const tokenDecimals = await this.client.getDecimals(chain, token);
+    return new BigNumber(amount.toString()).div(new BigNumber(10).pow(tokenDecimals)).toNumber();
+  }
+
+  async resyncDecimals(chainIn: ChainId, tokenIn: Address, amountIn: bigint, chainOut: ChainId, tokenOut: Address): Promise<bigint> {
+    const [decimalsIn, decimalsOut] = await Promise.all([
+      this.client.getDecimals(chainIn, tokenIn),
+      this.client.getDecimals(chainOut, tokenOut),
+    ]);
+    if (decimalsIn === decimalsOut) return amountIn;
+
+    // ported from fixDecimals() which is not being exported from the client
+    const delta = decimalsIn - decimalsOut;
+    if (delta > 0) {
+      return amountIn / 10n ** BigInt(delta);
+    } else {
+      return amountIn * 10n ** BigInt(-delta);
+    }
+  }
+
+  async usdValueOfOrder(order: OrderData): Promise<number> {
+    return this.usdValueOfAsset(order.give.chainId, order.give.tokenAddress, order.give.amount)
+  }
+
+  getSupportedChain(chain: ChainId): ExecutorSupportedChain {
+    const supportedChain = this.chains[chain];
+    if (!supportedChain) throw new Error(`Unsupported chain: ${ChainId[chain]}`);
+    return supportedChain
+  }
+
+  getSupportedChainIds(): Array<ChainId> {
+    return Object.values(this.chains).map(chain => chain.chain)
+  }
 
   private getTokenBuckets(config: ExecutorLaunchConfig['buckets']): Array<TokensBucket> {
     return config.map(metaBucket => {
@@ -290,7 +349,7 @@ export class Executor implements IExecutor {
         fulfillProvider: fulfillProvider,
         nonFinalizedTVLBudget: chain.constraints?.nonFinalizedTVLBudget,
       };
-      const orderProcessor = await processorInitializer(chain.chain, {
+      const orderProcessor = await processorInitializer(chain.chain, this, {
         takeChain: initializingChain,
         buckets: this.buckets,
         logger: this.logger,
@@ -335,6 +394,7 @@ export class Executor implements IExecutor {
           chain.constraints?.nonFinalizedTVLBudget || 0,
           this.logger
         ),
+        TVLBudgetController: new TVLBudgetController(chain.chain, this, chain.constraints?.TVLBudget || 0, this.logger),
         beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
         srcConstraints: {
           ...this.getSrcConstraints(chain.constraints || {}),
@@ -375,6 +435,7 @@ export class Executor implements IExecutor {
         address: chain.unlockProvider.address as string,
       };
     });
+
     const minConfirmationThresholds = Object.values(this.chains)
       .map(chain => ({
         chainId: chain.chain,
@@ -419,7 +480,7 @@ export class Executor implements IExecutor {
           upperThreshold: constraint.thresholdAmountInUSD,
           minBlockConfirmations: constraint.minBlockConfirmations || 0,
           ...this.getSrcConstraints(constraint, configDstConstraints)
-          }
+        }
       })
       // important to sort by upper bound ASC for easier finding of the corresponding range
       .sort((constraintA, constraintB) => constraintA.upperThreshold - constraintB.upperThreshold);

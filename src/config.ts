@@ -176,6 +176,24 @@ export interface ChainDefinition {
      * one by one as soon as fulfilled orders are being finalized.
      */
     nonFinalizedTVLBudget?: number;
+
+    /**
+     * Defines a budget (priced in the US dollar) of assets deployed and locked on the given chain. Any new order coming
+     * from the given chain to any other supported chain that potentially increases the TVL beyond the given budget
+     * (if being successfully fulfilled) gets rejected.
+     *
+     * The TVL is calculated as a sum of:
+     * - the total value of intermediary assets deployed on the taker account (represented as takerPrivateKey)
+     * - PLUS the total value of intermediary assets deployed on the unlock_beneficiary account (represented
+     *   as unlockAuthorityPrivateKey, if differs from takerPrivateKey)
+     * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
+     *   the unlock_beneficiary account as soon as the commands to unlock fulfilled (but not yet unlocked) orders
+     *   are sent from other chains
+     * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
+     *   the unlock_beneficiary account as soon as all active unlock commands (that were sent from other chains
+     *   but were not yet claimed/executed on the given chain) are executed.
+     */
+    TVLBudget?: number;
   },
 
   /**
