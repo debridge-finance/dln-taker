@@ -202,7 +202,7 @@ constraints: {
 ### Setting a TVL budget
 
 It is now possible to define a budget (priced in the US dollar) of assets deployed and locked on the given chain. This
-allows to limit the risks of having to much liquidity on a particular chain, which is the case when a lof of orders
+allows to limit the risks of having too much liquidity on a particular chain, which is the case when a lof of orders
 are coming from such chain during a turmoil.
 
 Any new order coming from the given chain to any other supported chain that potentially increases the TVL beyond
@@ -212,7 +212,7 @@ a re-balancing routines, or automatically when orders coming to this chain get f
 The TVL is calculated as a sum of:
 - the total value of intermediary assets deployed on the taker account (represented as `takerPrivateKey`)
 - PLUS the total value of intermediary assets deployed on the unlock_beneficiary account (represented
-  as `unlockAuthorityPrivateKey`, if differs from `takerPrivateKey`)
+  as `beneficiary` address, if differs from the address resolved from the `takerPrivateKey`)
 - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
   the unlock_beneficiary account as soon as the commands to unlock fulfilled (but not yet unlocked) orders
   are sent from other chains
