@@ -37,7 +37,7 @@ export class TVLBudgetController {
   }
 
   get hasSeparateUnlockBeneficiary(): boolean {
-    return !buffersAreEqual(this.giveChain.fulfillProvider.bytesAddress, this.giveChain.unlockProvider.bytesAddress)
+    return !buffersAreEqual(this.giveChain.fulfillProvider.bytesAddress, this.giveChain.beneficiary)
   }
 
   get trackedTokens(): Address[] {
@@ -77,7 +77,7 @@ export class TVLBudgetController {
 
   private async getUnlockBeneficiaryAccountBalance(): Promise<number> {
     if (!this.hasSeparateUnlockBeneficiary) return 0;
-    return this.getAccountValue(this.giveChain.unlockProvider.bytesAddress);
+    return this.getAccountValue(this.giveChain.beneficiary);
   }
 
   private async getAccountValue(account: Address): Promise<number> {
