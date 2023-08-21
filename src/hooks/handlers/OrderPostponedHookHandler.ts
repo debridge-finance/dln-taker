@@ -2,7 +2,6 @@ import {HookHandler} from "../HookHandler";
 import {Notifier} from "../notification/Notifier";
 import {Hooks, PostponingReason} from "../HookEnums";
 import {HookParams} from "../types/HookParams";
-import Web3 from "web3";
 import { ChainId } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import { OrderInfoStatus } from "../../interfaces";
@@ -31,11 +30,11 @@ export const orderPostponed = (
         }
 
         const order = arg.order.order;
-        const [giveDecimals, takeDecimals, giveTokenSymbol, takeTokenSymbol] = await Promise.all([
-            arg.context.config.client.getDecimals(order.give.chainId, order.give.tokenAddress, arg.context.giveChain.fulfillProvider.connection as Web3),
-            arg.context.config.client.getDecimals(order.take.chainId, order.take.tokenAddress, arg.context.config.chains[order.take.chainId]?.fulfillProvider.connection as Web3),
-            arg.context.config.client.getTokenSymbol(order.give.chainId, order.give.tokenAddress, arg.context.giveChain.fulfillProvider.connection as Web3),
-            arg.context.config.client.getTokenSymbol(order.take.chainId, order.take.tokenAddress, arg.context.config.chains[order.take.chainId]?.fulfillProvider.connection as Web3),
+        const [giveDecimals, takeDecimals, { symbol: giveTokenSymbol }, { symbol: takeTokenSymbol }] = await Promise.all([
+            arg.context.config.client.getDecimals(order.give.chainId, order.give.tokenAddress),
+            arg.context.config.client.getDecimals(order.take.chainId, order.take.tokenAddress),
+            arg.context.config.client.getTokenInfo(order.give.chainId, order.give.tokenAddress),
+            arg.context.config.client.getTokenInfo(order.take.chainId, order.take.tokenAddress),
         ]);
         const giveInfo = `${new BigNumber(order.give.amount.toString()).div(new BigNumber(10).pow(giveDecimals)).toFixed(3)} ${giveTokenSymbol} @ ${ChainId[order.give.chainId]}`;
         const takeInfo = `${new BigNumber(order.take.amount.toString()).div(new BigNumber(10).pow(takeDecimals)).toFixed(3)} ${takeTokenSymbol} @ ${ChainId[order.take.chainId]}`;
