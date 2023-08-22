@@ -3,7 +3,7 @@
     "$schema": "https://json.schemastore.org/tsconfig",
     "display": "Node 20",
     "_version": "20.5.0",
-    "include": ["src"],
+    "include": ["src", "tests", "./sample.config.ts"],
 
     "compilerOptions": {
       /* Visit https://aka.ms/tsconfig.json to read more about this file */

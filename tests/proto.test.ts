@@ -1,9 +1,9 @@
-import { Order as PmmOrder, OrderData } from "@debridge-finance/dln-client";
+import { Order as PmmOrder } from "@debridge-finance/dln-client";
 import assert from "assert";
 import { readFileSync } from "fs";
 
 import { eventToOrderData, U256 } from "../src/helpers";
-import { Order, PmmEvent } from "../src/pmm_common";
+import { PmmEvent } from "../src/pmm_common";
 
 function protoTest() {
   const eventsRaw = readFileSync("./tests/protoEvents.raw");
