@@ -477,7 +477,9 @@ class UniversalProcessor extends BaseOrderProcessor {
         orderId: orderInfo.orderId,
         giveChain: orderInfo.order.give.chainId,
       },
-      {}
+      {
+        confirmationsCount: confirmationFloor
+      }
     );
 
     if (giveOrderStatus?.status === undefined) {
