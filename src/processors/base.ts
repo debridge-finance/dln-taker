@@ -17,14 +17,14 @@ import { TokensBucket } from "@debridge-finance/legacy-dln-profitability";
 
 export type OrderId = string;
 
-export class OrderProcessorContext {
+export type OrderProcessorContext = {
   logger: Logger;
   config: IExecutor;
   giveChain: ExecutorSupportedChain;
   takeChain: ExecutorSupportedChain;
 }
 
-export class OrderProcessorInitContext {
+export type OrderProcessorInitContext = {
   takeChain: ExecutorInitializingChain;
   buckets: TokensBucket[];
   logger: Logger;
@@ -47,8 +47,11 @@ export interface IOrderProcessor {
  *
  */
 export abstract class BaseOrderProcessor implements IOrderProcessor {
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   protected chainId: ChainId;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   protected takeChain: ExecutorInitializingChain;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   protected hooksEngine: HooksEngine;
 
   abstract init(

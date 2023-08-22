@@ -14,7 +14,7 @@ export class ExecutorEngine {
   private executor: Executor;
 
   constructor(private readonly executorConfig: ExecutorLaunchConfig) {
-    this.createLogger();
+    this.logger = this.createLogger()
     this.executor = new Executor(this.logger);
   }
 
@@ -41,7 +41,7 @@ export class ExecutorEngine {
       });
       streams.push({ level: "error", stream: sentryStream });
     }
-    this.logger = pino(
+    return pino(
       {
         level: process.env.LOG_LEVEL || "info",
         translateFormat: 'd mmm yyyy H:MM'

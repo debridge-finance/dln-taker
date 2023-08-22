@@ -1,4 +1,10 @@
+# build files
+dist
+
+# development
+.idea
 node_modules
+
+# safety
 .env
 executor*.config.ts
-.idea

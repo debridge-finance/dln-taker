@@ -12,7 +12,7 @@ import { approve, isApproved } from "./utils/approve";
 // reasonable multiplier for gas estimated before txn is being broadcasted
 export const GAS_MULTIPLIER = 1.1;
 
-export class Tx {
+export type Tx = {
   data: string;
   to: string;
   value: string;
@@ -26,8 +26,6 @@ export class Tx {
 }
 
 export class EvmProviderAdapter implements ProviderAdapter {
-  wallet: never;
-
   private staleTx?: Tx;
 
   private rebroadcast: EvmRebroadcastAdapterOpts = {};

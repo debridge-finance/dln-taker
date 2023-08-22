@@ -1,4 +1,4 @@
-import { ChainId, OrderData } from "@debridge-finance/dln-client";
+import { OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import BigNumber from "bignumber.js";
 
@@ -6,7 +6,6 @@ import { createClientLogger } from "../logger";
 
 import {
   FilterContext,
-  OrderFilterInitContext,
   OrderFilterInitializer,
 } from "./order.filter";
 
@@ -18,7 +17,7 @@ export const giveAmountUsdEquivalentBetween = (
   minUSDEquivalent: number,
   maxUSDEquivalent: number
 ): OrderFilterInitializer => {
-  return async (chainId: ChainId, context: OrderFilterInitContext) => {
+  return async (/* chainId: ChainId */{}, /* context: OrderFilterInitContext */{}) => {
     return async (
       order: OrderData,
       context: FilterContext

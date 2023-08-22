@@ -11,8 +11,6 @@ import {
   OrderDataWithId,
   OrderState,
   tokenAddressToString,
-  tokenStringToBuffer,
-  ZERO_EVM_ADDRESS,
 } from "@debridge-finance/dln-client";
 import BigNumber from "bignumber.js";
 import { Logger } from "pino";
@@ -30,7 +28,7 @@ import { isRevertedError } from "./utils/isRevertedError";
 import {
   SwapConnectorRequest,
   SwapConnectorResult
-} from "@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
+} from "node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
 import { helpers } from "@debridge-finance/solana-utils";
 import { findExpectedBucket, calculateExpectedTakeAmount } from "@debridge-finance/legacy-dln-profitability";
 import { DexlessChains } from "../config";
@@ -94,12 +92,15 @@ type CreatedOrderMetadata = {
 };
 
 class UniversalProcessor extends BaseOrderProcessor {
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private mempoolService: MempoolService;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
+  private batchUnlocker: BatchUnlocker;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
+  private executor: IExecutor;
   private priorityQueue = new Set<OrderId>(); // queue of orderid for processing created order
   private queue = new Set<OrderId>(); // queue of orderid for retry processing order
   private isLocked: boolean = false;
-  private batchUnlocker: BatchUnlocker;
-  private executor: IExecutor;
 
   readonly #createdOrdersMetadata = new Map<OrderId, CreatedOrderMetadata>()
 
@@ -386,7 +387,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
 
     let isFinalizedOrder = true;
-    let confirmationFloor = undefined;
+    let confirmationFloor: number | undefined = undefined;
 
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status == OrderInfoStatus.Created) {
@@ -477,9 +478,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         orderId: orderInfo.orderId,
         giveChain: orderInfo.order.give.chainId,
       },
-      {
-        confirmationsCount: confirmationFloor
-      }
+      { confirmationsCount: confirmationFloor }
     );
 
     if (giveOrderStatus?.status === undefined) {

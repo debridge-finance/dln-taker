@@ -1,16 +1,13 @@
 import {
-  buffersAreEqual,
-  ChainId,
+
   Order,
   OrderData,
-  tokenStringToBuffer,
 } from "@debridge-finance/dln-client";
-import { helpers } from "@debridge-finance/solana-utils";
 
 import {
   FilterContext,
   OrderFilter,
-  OrderFilterInitContext,
+
   OrderFilterInitializer,
 } from "./order.filter";
 
@@ -18,8 +15,7 @@ export function whitelistedOrderId(
   orderIds: string[]
 ): OrderFilterInitializer {
   return async (
-    chainId: ChainId,
-    context: OrderFilterInitContext
+    /*chainId: ChainId*/{}, /*context: OrderFilterInitContext*/{}
   ): Promise<OrderFilter> => {
     return async (
       order: OrderData,

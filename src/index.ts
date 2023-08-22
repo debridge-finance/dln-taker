@@ -25,7 +25,7 @@ async function main() {
   }
 
   console.log(`Using config file: ${configPath}`);
-  const config = await import(configPath);
+  const config = require(configPath)
 
   const executor = new ExecutorEngine(config);
   await executor.init();

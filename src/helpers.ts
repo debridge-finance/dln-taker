@@ -1,4 +1,4 @@
-import { ChainId, OrderData } from "@debridge-finance/dln-client";
+import { OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 
 import { Order } from "./pmm_common";
@@ -40,7 +40,7 @@ export class U256 {
     const result = Buffer.alloc(32);
     const shifts = Array.from({ length: 8 })
       .fill(0n)
-      .map((v, i) => BigInt(56 - 8 * i));
+      .map((/*v*/_, i) => BigInt(56 - 8 * i));
     for (let i = 0; i < 32; i++) {
       switch (Math.floor(i / 8)) {
         case 0:

@@ -36,7 +36,7 @@ import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOr
 import { DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
 import { TVLBudgetController } from "../processors/TVLBudgetController";
 import { TokensBucket, setSlippageOverloader } from "@debridge-finance/legacy-dln-profitability";
-import { DlnConfig } from "@debridge-finance/dln-client/dist/types/evm/core/models/config.model";
+import { DlnConfig } from "node_modules/@debridge-finance/dln-client/dist/types/evm/core/models/config.model";
 import { DataStore } from "../processors/DataStore";
 import BigNumber from "bignumber.js";
 import { createClientLogger } from "../logger";
@@ -122,12 +122,16 @@ export interface IExecutor {
 }
 
 export class Executor implements IExecutor {
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   tokenPriceService: PriceTokenService;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   swapConnector: SwapConnector;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   orderFeed: GetNextOrder;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
+  client: DlnClient;
   chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
   buckets: TokensBucket[] = [];
-  client: DlnClient;
   dlnApi: DataStore = new DataStore(this)
 
   private isInitialized = false;
@@ -420,7 +424,7 @@ export class Executor implements IExecutor {
     );
 
     let orderFeed = config.orderFeed as GetNextOrder;
-    if (typeof orderFeed === "string" || !orderFeed) {
+    if (typeof orderFeed === "string") {
       orderFeed = new WsNextOrder(orderFeed);
     }
     orderFeed.setEnabledChains(

@@ -8,7 +8,6 @@ import { helpers } from "@debridge-finance/solana-utils";
 
 import {
   FilterContext,
-  OrderFilterInitContext,
   OrderFilterInitializer,
 } from "./order.filter";
 
@@ -19,7 +18,7 @@ import {
 export function blacklistedGiveToken(
   addresses: string[]
 ): OrderFilterInitializer {
-  return async (chainId: ChainId, context: OrderFilterInitContext) => {
+  return async (chainId: ChainId, /* context: OrderFilterInitContext */ {}) => {
     const addressesBuffer = addresses.map((address) =>
       tokenStringToBuffer(chainId, address)
     );

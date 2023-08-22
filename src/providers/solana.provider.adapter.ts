@@ -1,9 +1,8 @@
-import { ChainId, tokenAddressToString } from "@debridge-finance/dln-client";
+import { ChainId } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 import {
   Connection,
   Keypair,
-  PublicKey,
   Transaction,
   VersionedTransaction,
 } from "@solana/web3.js";

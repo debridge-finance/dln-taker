@@ -9,7 +9,7 @@ import { helpers } from "@debridge-finance/solana-utils";
 import {
   FilterContext,
   OrderFilter,
-  OrderFilterInitContext,
+
   OrderFilterInitializer,
 } from "./order.filter";
 
@@ -20,7 +20,7 @@ import {
 export function whitelistedMaker(addresses: string[]): OrderFilterInitializer {
   return async (
     chainId: ChainId,
-    context: OrderFilterInitContext
+    /* context: OrderFilterInitContext */{}
   ): Promise<OrderFilter> => {
     const addressesBuffer = addresses.map((address) =>
       tokenStringToBuffer(chainId, address)

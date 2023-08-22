@@ -83,17 +83,21 @@ type WsOrderEvent<T extends WsOrderInfoStatus> = {
 };
 
 export class WsNextOrder extends GetNextOrder {
-  private wsArgs;
-  private socket: WebSocket;
+  private wsArgs: ConstructorParameters<typeof WebSocket>;
+  private timeLastDisconnect: Date | undefined;
+  private pingTimer: NodeJS.Timeout | undefined;
   private readonly pingTimeoutMs = 3000;
-  private pingTimer: NodeJS.Timeout;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
+  private socket: WebSocket;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private unlockAuthorities: UnlockAuthority[];
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private minConfirmationThresholds: Array<{
     chainId: ChainId;
     points: number[]
   }>;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private hooksEngine: HooksEngine;
-  private timeLastDisconnect: Date;
 
   private heartbeat() {
     clearTimeout(this.pingTimer);

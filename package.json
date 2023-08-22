@@ -1,11 +1,11 @@
 {
-  "name": "@debridge-finance/dln-executor",
+  "name": "@debridge-finance/dln-taker",
   "description": "DLN executor is the rule-based daemon service developed to automatically execute orders placed on the deSwap Liquidity Network (DLN) across supported blockchains",
   "version": "2.10.2",
   "author": "deBridge",
   "license": "GPL-3.0-only",
   "homepage": "https://debridge.finance",
-  "repository": "github:debridge-finance/dln-executor",
+  "repository": "github:debridge-finance/dln-taker",
   "keywords": [
     "deBridge",
     "DLN",
@@ -20,7 +20,11 @@
     "test": "mocha -r ts-node/register -b -t 100000 ./tests/**/*.test.ts",
     "loop": "node -r ts-node/register ./src/index.ts",
     "conv": "mocha -r ts-node/register -b -t 100000 ./tests/conversions.test.ts",
-    "executor": "node -r ts-node/register ./src/index.ts"
+    "executor": "ts-node -P tsconfig.dev.json ./src/index.ts",
+    "start:compiled": "ts-node -P tsconfig.dev.json ./dist/index.js",
+    "build": "npm run clean && npm run compile",
+    "compile": "tsc -P tsconfig.build.json",
+    "clean": "rimraf ./dist"
   },
   "devDependencies": {
     "@types/amqplib": "0.10.1",

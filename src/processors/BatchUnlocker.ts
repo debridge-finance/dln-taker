@@ -20,11 +20,12 @@ import { HooksEngine } from "../hooks/HooksEngine";
 import { helpers } from "@debridge-finance/solana-utils";
 
 export class BatchUnlocker {
+  // @ts-ignore Initialized deferredly within the first call of the unlockOrder() method. Should be rewritten during the next major refactoring
+  private executor: IExecutor;
   private ordersDataMap = new Map<string, OrderData>(); // orderId => orderData
   private unlockBatchesOrderIdMap = new Map<ChainId, Set<string>>(); // chainId => orderId[]
   private isBatchUnlockLocked: boolean = false;
   private readonly logger: Logger;
-  private executor: IExecutor;
 
   constructor(
     logger: Logger,

@@ -50,8 +50,11 @@ export type UnlockAuthority = {
 };
 
 export abstract class GetNextOrder {
+  // @ts-ignore Initialized deferredly within the setEnabledChains() method. Should be rewritten during the next major refactoring
   protected enabledChains: ChainId[];
+  // @ts-ignore Initialized deferredly within the setLogger() method. Should be rewritten during the next major refactoring
   protected logger: Logger;
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   protected processNextOrder: OrderProcessorFunc;
 
   constructor() {}
