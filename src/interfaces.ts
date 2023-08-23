@@ -1,8 +1,8 @@
-import { ChainId, CommonDlnClient, Evm, OrderData, Solana } from "@debridge-finance/dln-client";
-import { Logger } from "pino";
+import { ChainId, CommonDlnClient, Evm, OrderData, Solana } from '@debridge-finance/dln-client';
+import { Logger } from 'pino';
 
-import { OrderId, OrderProcessorContext } from "./processors/base";
-import { HooksEngine } from "./hooks/HooksEngine";
+import { OrderId, OrderProcessorContext } from './processors/base';
+import { HooksEngine } from './hooks/HooksEngine';
 
 export enum OrderInfoStatus {
   Created,
@@ -13,27 +13,30 @@ export enum OrderInfoStatus {
   UnlockSent,
   UnlockClaim,
   TakeOfferDecreased,
-  GiveOfferIncreased
+  GiveOfferIncreased,
 }
 
-type FinalizationInfo = {
-  Finalized: {
-    transaction_hash:  string;
-  }
-} | {
-  Confirmed: {
-    confirmation_blocks_count: number;
-    transaction_hash:  string;
-  }
-} | "Revoked";
+type FinalizationInfo =
+  | {
+      Finalized: {
+        transaction_hash: string;
+      };
+    }
+  | {
+      Confirmed: {
+        confirmation_blocks_count: number;
+        transaction_hash: string;
+      };
+    }
+  | 'Revoked';
 
 export type IncomingOrder<T extends OrderInfoStatus> = {
   orderId: string;
   status: OrderInfoStatus;
   order: OrderData;
-} & (T extends OrderInfoStatus.ArchivalFulfilled ? { unlockAuthority: string } : {}
-) & (T extends OrderInfoStatus.Fulfilled ? { unlockAuthority: string } : {}
-) & (T extends OrderInfoStatus.Created ? { finalization_info: FinalizationInfo } : {})
+} & (T extends OrderInfoStatus.ArchivalFulfilled ? { unlockAuthority: string } : {}) &
+  (T extends OrderInfoStatus.Fulfilled ? { unlockAuthority: string } : {}) &
+  (T extends OrderInfoStatus.Created ? { finalization_info: FinalizationInfo } : {});
 
 export type ProcessOrder = (orderId: OrderId) => Promise<void>;
 
@@ -50,18 +53,21 @@ export type UnlockAuthority = {
 };
 
 export abstract class GetNextOrder {
+  // @ts-ignore Initialized deferredly within the setEnabledChains() method. Should be rewritten during the next major refactoring
   protected enabledChains: ChainId[];
-  protected logger: Logger;
-  protected processNextOrder: OrderProcessorFunc;
 
-  constructor() {}
+  // @ts-ignore Initialized deferredly within the setLogger() method. Should be rewritten during the next major refactoring
+  protected logger: Logger;
+
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
+  protected processNextOrder: OrderProcessorFunc;
 
   abstract init(
     processNextOrder: OrderProcessorFunc,
     UnlockAuthority: UnlockAuthority[],
     minConfirmationThresholds: Array<{
       chainId: ChainId;
-      points: number[]
+      points: number[];
     }>,
     hooksEngine: HooksEngine,
   ): void;
@@ -76,4 +82,4 @@ export abstract class GetNextOrder {
 }
 
 type ActiveClients = Solana.DlnClient | Evm.DlnClient;
-export type DlnClient = CommonDlnClient<ActiveClients>
+export type DlnClient = CommonDlnClient<ActiveClients>;

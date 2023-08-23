@@ -1,14 +1,10 @@
-import {
-  Address,
-  buffersAreEqual,
-  ChainId,
-} from "@debridge-finance/dln-client";
-import { ExecutorSupportedChain, IExecutor } from "../executors/executor";
-import NodeCache from "node-cache"
-import { Logger } from "pino";
+import { Address, buffersAreEqual, ChainId } from '@debridge-finance/dln-client';
+import NodeCache from 'node-cache';
+import { Logger } from 'pino';
+import { ExecutorSupportedChain, IExecutor } from '../executors/executor';
 
 enum TvlCacheKey {
-  TVL
+  TVL,
 }
 
 // 30m cache is OK because the cache is being flushed on every fulfilled order
@@ -18,31 +14,37 @@ export class TVLBudgetController {
   public readonly budget: number;
 
   private readonly chain: ChainId;
+
   private readonly executor: IExecutor;
-  private readonly cache = new NodeCache({stdTTL: DEFAULT_TVL_CACHE_TTL});
+
+  private readonly cache = new NodeCache({ stdTTL: DEFAULT_TVL_CACHE_TTL });
+
   private readonly logger: Logger;
 
   constructor(chain: ChainId, executor: IExecutor, budget: number, logger: Logger) {
     this.chain = chain;
     this.executor = executor;
     this.budget = budget;
-    this.logger = logger.child(({ service: TVLBudgetController.name, chainId: chain, budget }));
+    this.logger = logger.child({ service: TVLBudgetController.name, chainId: chain, budget });
     if (budget) {
-      this.logger.debug(`Will preserve a TVL of $${budget} on ${ChainId[chain]}`)
+      this.logger.debug(`Will preserve a TVL of $${budget} on ${ChainId[chain]}`);
     }
   }
 
   get giveChain(): ExecutorSupportedChain {
-    return this.executor.chains[this.chain]!
+    return this.executor.chains[this.chain]!;
   }
 
   get hasSeparateUnlockBeneficiary(): boolean {
-    return !buffersAreEqual(this.giveChain.fulfillProvider.bytesAddress, this.giveChain.beneficiary)
+    return !buffersAreEqual(
+      this.giveChain.fulfillProvider.bytesAddress,
+      this.giveChain.beneficiary,
+    );
   }
 
   get trackedTokens(): Address[] {
     return this.executor.buckets
-      .map(bucket => bucket.findTokens(this.chain) || [])
+      .map((bucket) => bucket.findTokens(this.chain) || [])
       .reduce((prev, curr) => [...prev, ...curr], []);
   }
 
@@ -59,10 +61,10 @@ export class TVLBudgetController {
       this.cache.set(TvlCacheKey.TVL, this.calculateCurrentTVL());
     }
 
-    return this.cache.get<Promise<number>>(TvlCacheKey.TVL)!
+    return this.cache.get<Promise<number>>(TvlCacheKey.TVL)!;
   }
 
-  async calculateCurrentTVL() :Promise<number> {
+  async calculateCurrentTVL(): Promise<number> {
     const takerAccountBalance = await this.getTakerAccountBalance();
     const unlockBeneficiaryAccountBalance = await this.getUnlockBeneficiaryAccountBalance();
     const pendingUnlockOrdersValue = await this.getPendingUnlockOrdersValue();
@@ -82,14 +84,16 @@ export class TVLBudgetController {
 
   private async getAccountValue(account: Address): Promise<number> {
     const usdValues = await Promise.all(
-      this.trackedTokens.map(token => this.getAssetValueAtAccount(token, account))
+      this.trackedTokens.map((token) => this.getAssetValueAtAccount(token, account)),
     );
 
-    return usdValues.reduce((prevValue, value) => prevValue + value, 0)
+    return usdValues.reduce((prevValue, value) => prevValue + value, 0);
   }
 
   private async getAssetValueAtAccount(token: Address, account: Address): Promise<number> {
-    const balance = await this.executor.client.getClient(this.chain).getBalance(this.chain, token, account);
+    const balance = await this.executor.client
+      .getClient(this.chain)
+      .getBalance(this.chain, token, account);
     const usdValue = await this.executor.usdValueOfAsset(this.chain, token, balance);
     return usdValue;
   }
@@ -98,9 +102,9 @@ export class TVLBudgetController {
     const orders = await this.executor.dlnApi.getPendingForUnlockOrders(this.chain);
 
     const usdValues = await Promise.all(
-      orders.map(order => this.executor.usdValueOfOrder(order))
+      orders.map((order) => this.executor.usdValueOfOrder(order)),
     );
 
-    return usdValues.reduce((prevValue, value) => prevValue + value, 0)
+    return usdValues.reduce((prevValue, value) => prevValue + value, 0);
   }
 }

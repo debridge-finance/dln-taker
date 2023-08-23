@@ -1,4 +1,11 @@
+# build files
+dist
+
+# development
+.idea
 node_modules
+.eslintcache
+
+# safety
 .env
 executor*.config.ts
-.idea

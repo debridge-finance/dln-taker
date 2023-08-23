@@ -1,16 +1,12 @@
-import {
-  ChainId,
-  PriceTokenService,
-  SwapConnector,
-} from "@debridge-finance/dln-client";
+import { ChainId, PriceTokenService, SwapConnector } from '@debridge-finance/dln-client';
 
-import { OrderFilterInitializer } from "./filters/order.filter";
-import { GetNextOrder } from "./interfaces";
-import { OrderProcessorInitializer } from "./processors";
-import { Hooks } from "./hooks/HookEnums";
-import { HookHandler } from "./hooks/HookHandler";
+import { OrderFilterInitializer } from './filters/order.filter';
+import { GetNextOrder } from './interfaces';
+import { OrderProcessorInitializer } from './processors';
+import { Hooks } from './hooks/HookEnums';
+import { HookHandler } from './hooks/HookHandler';
 
-type address = string;
+type StringifiedAddress = string;
 
 export enum SupportedChain {
   Arbitrum = ChainId.Arbitrum,
@@ -66,50 +62,50 @@ export type ChainEnvironment = {
   /**
    * Address of the DLN contract responsible for order creation, unlocking and cancellation
    */
-  pmmSrc?: address;
+  pmmSrc?: StringifiedAddress;
 
   /**
    * Address of the DLN contract responsible for order fulfillment
    */
-  pmmDst?: address;
+  pmmDst?: StringifiedAddress;
 
   /**
    * Address of the deBridgeGate contract responsible for cross-chain messaging (used by pmmDst)
    */
-  deBridgeContract?: address;
+  deBridgeContract?: StringifiedAddress;
 
   evm?: {
-    forwarderContract?: address;
+    forwarderContract?: StringifiedAddress;
     evmRebroadcastAdapterOpts?: EvmRebroadcastAdapterOpts;
   };
 
   solana?: {
     debridgeSetting?: string;
-    environment?: 'lima' | 'madrid' | 'prod'
+    environment?: 'lima' | 'madrid' | 'prod';
   };
 };
 
 export type DstOrderConstraints = {
-    /**
-     * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
-     * coming to this chain after it first saw it.
-     */
-    fulfillmentDelay?: number;
+  /**
+   * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
+   * coming to this chain after it first saw it.
+   */
+  fulfillmentDelay?: number;
 
-    /**
-     * Defines a target where pre-fulfill swap change should be send to. Default: "taker".
-     * Warning: applies to EVM chains only
-     */
-    preFulfillSwapChangeRecipient?: "taker" | "maker";
-}
+  /**
+   * Defines a target where pre-fulfill swap change should be send to. Default: "taker".
+   * Warning: applies to EVM chains only
+   */
+  preFulfillSwapChangeRecipient?: 'taker' | 'maker';
+};
 
 export type SrcOrderConstraints = {
-    /**
-     * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
-     * coming from this chain after it first saw it.
-     */
-    fulfillmentDelay?: number;
-}
+  /**
+   * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
+   * coming from this chain after it first saw it.
+   */
+  fulfillmentDelay?: number;
+};
 
 /**
  * Represents a chain configuration where orders can be fulfilled.
@@ -134,10 +130,9 @@ export interface ChainDefinition {
    */
   disabled?: boolean;
 
-
   /**
-  * chain context related
-  */
+   * chain context related
+   */
   environment?: ChainEnvironment;
 
   /**
@@ -159,10 +154,12 @@ export interface ChainDefinition {
      * ]
      * ```
      */
-    requiredConfirmationsThresholds?: Array<SrcOrderConstraints & {
-      thresholdAmountInUSD: number,
-      minBlockConfirmations?: number,
-    }>;
+    requiredConfirmationsThresholds?: Array<
+      SrcOrderConstraints & {
+        thresholdAmountInUSD: number;
+        minBlockConfirmations?: number;
+      }
+    >;
 
     /**
      * Defines a budget (a hard cap) of all successfully fulfilled orders' value (expressed in USD) that
@@ -194,7 +191,7 @@ export interface ChainDefinition {
      *   but were not yet claimed/executed on the given chain) are executed.
      */
     TVLBudget?: number;
-  },
+  };
 
   /**
    * Defines constraints imposed on all orders coming to this chain. These properties have precedence over `constraints` property
@@ -205,10 +202,12 @@ export interface ChainDefinition {
      *
      * Mind that these constraints have precedence over higher order constraints
      */
-    perOrderValueUpperThreshold?: Array<DstOrderConstraints & {
-      upperThreshold: number
-    }>
-  },
+    perOrderValueUpperThreshold?: Array<
+      DstOrderConstraints & {
+        upperThreshold: number;
+      }
+    >;
+  };
 
   //
   // taker related
@@ -217,7 +216,7 @@ export interface ChainDefinition {
   /**
    * Taker controlled address where the orders (fulfilled on other chains) would unlock the funds to.
    */
-  beneficiary: address;
+  beneficiary: StringifiedAddress;
 
   /**
    * The private key for the wallet with funds to fulfill orders. Must have enough reserves and native currency
@@ -229,7 +228,7 @@ export interface ChainDefinition {
    * The private key for the wallet who is responsible for sending order unlocks (must differ from takerPrivateKey).
    * Must have enough ether to unlock orders
    */
-  unlockAuthorityPrivateKey: address;
+  unlockAuthorityPrivateKey: string;
 
   /**
    * Represents a list of filters which filter out orders for fulfillment
@@ -287,6 +286,6 @@ export interface ExecutorLaunchConfig {
    * Defines buckets of tokens that have equal value and near-zero re-balancing costs across supported chains
    */
   buckets: Array<{
-    [key in ChainId]?: string | Array<string>
+    [key in ChainId]?: string | Array<string>;
   }>;
 }

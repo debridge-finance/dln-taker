@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": false
+  },
+
+  "typedocOptions": {
+      "entryPoints": ["./src/index.ts"],
+      "entryPointStrategy": "expand",
+      "plugin": "typedoc-plugin-markdown",
+      "excludeExternals": true,
+      "externalPattern": ["**/node_modules/**"],
+      "excludePrivate": true,
+      "out": "docs"
+  }
+}

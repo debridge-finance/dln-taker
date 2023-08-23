@@ -1,17 +1,19 @@
-import { ChainId, OrderData } from "@debridge-finance/dln-client";
-import { helpers } from "@debridge-finance/solana-utils";
+/* eslint-disable no-bitwise -- This helpers implement U256 arithmetics. Seems like not needed anymore because WS returns standard integers. TODO #862karjre */
 
-import { Order } from "./pmm_common";
+import { OrderData } from '@debridge-finance/dln-client';
+import { helpers } from '@debridge-finance/solana-utils';
+
+import { Order } from './pmm_common';
 
 export function timeDiff(timestamp: number) {
   return Date.now() / 1000 - timestamp;
 }
 
-function BytesToU64(data: Buffer, encoding: "le" | "be"): bigint {
+function BytesToU64(data: Buffer, encoding: 'le' | 'be'): bigint {
   let result: bigint = 0n;
   const leOrder = [0, 1, 2, 3, 4, 5, 6, 7];
   let counter = 0;
-  for (const i of encoding === "be" ? leOrder.reverse() : leOrder) {
+  for (const i of encoding === 'be' ? leOrder.reverse() : leOrder) {
     result += BigInt(data[i]) << BigInt(8 * counter);
     counter += 1;
   }
@@ -40,7 +42,7 @@ export class U256 {
     const result = Buffer.alloc(32);
     const shifts = Array.from({ length: 8 })
       .fill(0n)
-      .map((v, i) => BigInt(56 - 8 * i));
+      .map((/* v */ _, i) => BigInt(56 - 8 * i));
     for (let i = 0; i < 32; i++) {
       switch (Math.floor(i / 8)) {
         case 0:
@@ -55,6 +57,8 @@ export class U256 {
         case 3:
           result[i] = Number((u.limb1 >> shifts[i % 8]) & 0xffn);
           break;
+        default:
+          throw new Error('Unreachable');
       }
     }
     return result;
@@ -71,10 +75,10 @@ export class U256 {
 
   static fromBytesBE(data: Buffer): U256 {
     return new U256({
-      limb4: BytesToU64(data.subarray(0, 8), "be"),
-      limb3: BytesToU64(data.subarray(8, 16), "be"),
-      limb2: BytesToU64(data.subarray(16, 24), "be"),
-      limb1: BytesToU64(data.subarray(24, 32), "be"),
+      limb4: BytesToU64(data.subarray(0, 8), 'be'),
+      limb3: BytesToU64(data.subarray(8, 16), 'be'),
+      limb2: BytesToU64(data.subarray(16, 24), 'be'),
+      limb1: BytesToU64(data.subarray(24, 32), 'be'),
     });
   }
 
@@ -109,25 +113,17 @@ export function eventToOrderData(event: Order): OrderData {
     maker: Buffer.from(event.makerSrc?.address!),
     givePatchAuthority: Buffer.from(event.givePatchAuthoritySrc!.address),
     nonce: event.makerOrderNonce,
-    orderAuthorityDstAddress: Buffer.from(
-      event.orderAuthorityAddressDst!.address
-    ),
+    orderAuthorityDstAddress: Buffer.from(event.orderAuthorityAddressDst!.address),
     receiver: Buffer.from(event.receiverDst!.address),
     allowedCancelBeneficiary: event.allowedCancelBeneficiarySrc
       ? Buffer.from(event.allowedCancelBeneficiarySrc.address)
       : undefined,
-    allowedTaker: event.allowedTakerDst
-      ? Buffer.from(event.allowedTakerDst.address)
-      : undefined,
+    allowedTaker: event.allowedTakerDst ? Buffer.from(event.allowedTakerDst.address) : undefined,
     externalCall: event.externalCall
       ? {
           executionFee: U256.toBigInt(event.externalCall.executionFee!),
-          externalCallHash: U256.toBytesBE(
-            event.externalCall.hashOfExternalCall!
-          ),
-          fallbackDstAddress: Buffer.from(
-            event.externalCall.fallbackAddressDst!.address
-          ),
+          externalCallHash: U256.toBytesBE(event.externalCall.hashOfExternalCall!),
+          fallbackDstAddress: Buffer.from(event.externalCall.fallbackAddressDst!.address),
         }
       : undefined,
   };
