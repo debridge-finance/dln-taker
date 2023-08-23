@@ -10,7 +10,7 @@ import { OrderProcessorInitializer } from "./processors";
 import { Hooks } from "./hooks/HookEnums";
 import { HookHandler } from "./hooks/HookHandler";
 
-type address = string;
+type StringifiedAddress = string;
 
 export enum SupportedChain {
   Arbitrum = ChainId.Arbitrum,
@@ -66,20 +66,20 @@ export type ChainEnvironment = {
   /**
    * Address of the DLN contract responsible for order creation, unlocking and cancellation
    */
-  pmmSrc?: address;
+  pmmSrc?: StringifiedAddress;
 
   /**
    * Address of the DLN contract responsible for order fulfillment
    */
-  pmmDst?: address;
+  pmmDst?: StringifiedAddress;
 
   /**
    * Address of the deBridgeGate contract responsible for cross-chain messaging (used by pmmDst)
    */
-  deBridgeContract?: address;
+  deBridgeContract?: StringifiedAddress;
 
   evm?: {
-    forwarderContract?: address;
+    forwarderContract?: StringifiedAddress;
     evmRebroadcastAdapterOpts?: EvmRebroadcastAdapterOpts;
   };
 
@@ -217,7 +217,7 @@ export interface ChainDefinition {
   /**
    * Taker controlled address where the orders (fulfilled on other chains) would unlock the funds to.
    */
-  beneficiary: address;
+  beneficiary: StringifiedAddress;
 
   /**
    * The private key for the wallet with funds to fulfill orders. Must have enough reserves and native currency
@@ -229,7 +229,7 @@ export interface ChainDefinition {
    * The private key for the wallet who is responsible for sending order unlocks (must differ from takerPrivateKey).
    * Must have enough ether to unlock orders
    */
-  unlockAuthorityPrivateKey: address;
+  unlockAuthorityPrivateKey: string;
 
   /**
    * Represents a list of filters which filter out orders for fulfillment

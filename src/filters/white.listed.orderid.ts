@@ -15,9 +15,8 @@ export function whitelistedOrderId(
   orderIds: string[]
 ): OrderFilterInitializer {
   return async (
-    /*chainId: ChainId*/{}, /*context: OrderFilterInitContext*/{}
-  ): Promise<OrderFilter> => {
-    return async (
+    /* chainId: ChainId */{}, /* context: OrderFilterInitContext */{}
+  ): Promise<OrderFilter> => async (
       order: OrderData,
       context: FilterContext
     ): Promise<boolean> => {
@@ -29,5 +28,4 @@ export function whitelistedOrderId(
       logger.info(`approve status: ${result}, orderId is whitelisted`);
       return Promise.resolve(result);
     };
-  };
 }

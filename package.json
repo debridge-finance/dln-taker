@@ -15,7 +15,7 @@
   ],
   "main": "dist/cjs/index.js",
   "scripts": {
-    "format": "npm-run-all pretty lint",
+    "format": "npm-run-all lint pretty",
     "lint": "npm-run-all lint:ts",
     "lint:ts": "eslint --fix \"{src,tests}/**/*.ts\" sample.config.ts",
     "pre-commit": "lint-staged",
@@ -39,6 +39,7 @@
     "assert": "2.0.0",
     "eslint-config-airbnb-typescript": "^17.1.0",
     "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-prettier": "^5.0.0",
     "husky": "^8.0.3",
     "lint-staged": "^14.0.1",

@@ -6,9 +6,12 @@ import { Logger } from "pino";
 export class NonFinalizedOrdersBudgetController {
 
     #spent: number = 0;
+
     readonly #isControllerEnabled: boolean = false;
+
     readonly #logger: Logger;
-    readonly #orders = new Map<string, number>(); //key - orderId, value - usdValue
+
+    readonly #orders = new Map<string, number>(); // key - orderId, value - usdValue
 
     get spent(): number {
         return this.#spent;
@@ -36,9 +39,9 @@ export class NonFinalizedOrdersBudgetController {
         return true;
     }
 
-    addOrder(orderId: string, usdValue: number) {
+    addOrder(orderId: string, usdValue: number): void {
         if (!this.#isControllerEnabled) {
-            return true;
+            return;
         }
 
         this.#spent = this.#spent + usdValue - (this.#orders.get(orderId) || 0);
@@ -50,7 +53,7 @@ export class NonFinalizedOrdersBudgetController {
 
     removeOrder(orderId: string) {
         const usdValue = this.#orders.get(orderId) || 0;
-        this.#spent = this.#spent - usdValue;
+        this.#spent -= usdValue;
 
         this.#orders.delete(orderId);
         this.#logger.child({orderId})

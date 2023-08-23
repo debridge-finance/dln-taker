@@ -38,15 +38,17 @@ type OrderLiteModelResponse = {
 }
 
 export class StatsAPI {
-  private static readonly domain = 'https://dln-api.debridge.finance';
+  private static readonly defaultHost = 'https://dln-api.debridge.finance';
+
+  constructor(private readonly host = StatsAPI.defaultHost) {}
 
   async getOrderLiteModel(orderId: string): Promise<OrderLiteModelResponse> {
-    const resp = await axios.get(StatsAPI.domain + '/api/Orders/' + orderId + '/liteModel')
+    const resp = await axios.get(`${this.host  }/api/Orders/${  orderId  }/liteModel`)
     return resp.data
   }
 
   async getForUnlockAuthorities(giveChainIds: number[], orderStates: string[], unlockAuthorities: string[], skip: number, take: number): Promise<GetForUnlockAuthoritiesResponse> {
-    const resp = await axios.post(StatsAPI.domain + '/api/Orders/getForUnlockAuthorities', {
+    const resp = await axios.post(`${this.host  }/api/Orders/getForUnlockAuthorities`, {
       giveChainIds,
       orderStates,
       unlockAuthorities: unlockAuthorities.join(' '),

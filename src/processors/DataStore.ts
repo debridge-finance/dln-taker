@@ -1,7 +1,7 @@
-import { StatsAPI } from "./StatsAPI";
 import { ChainId, OrderDataWithId } from "@debridge-finance/dln-client";
-import { IExecutor } from "../executors/executor";
 import { helpers } from "@debridge-finance/solana-utils";
+import { StatsAPI } from "./StatsAPI";
+import { IExecutor } from "../executors/executor";
 
 export class DataStore {
     private statsApi: StatsAPI = new StatsAPI;
@@ -12,7 +12,8 @@ export class DataStore {
         const orderIds = await this.getPendingForUnlockOrderIds(from);
         const orders: OrderDataWithId[] = []
         for (const orderId of orderIds) {
-            const order = this.convertOrder(await this.statsApi.getOrderLiteModel(orderId));
+            // eslint-disable-next-line no-await-in-loop -- Very ugly but intentionally acceptable unless TVLBudget feature gets exposure OR dln-taker starts using StatsApi heavily during the initialization TODO #862karugz
+            const order = DataStore.convertOrder(await this.statsApi.getOrderLiteModel(orderId));
             orders.push(order);
         }
 
@@ -24,8 +25,10 @@ export class DataStore {
           .map(chainId => this.executor.getSupportedChain(chainId).unlockProvider.address);
 
         let skip = 0;
+        let hasMoreOrders = true;
         const orderIds: string[] = [];
-        do {
+        while (hasMoreOrders) {
+            // eslint-disable-next-line no-await-in-loop -- Pagination is intentionally acceptable here
             const getForUnlockOrders = await this.statsApi.getForUnlockAuthorities(
                 [from],
                 ["Fulfilled", "SentUnlock"],
@@ -42,39 +45,39 @@ export class DataStore {
                 getForUnlockOrders.orders.length === 0
                 || orderIds.length >= getForUnlockOrders.totalCount
             ) {
-                break;
+                hasMoreOrders = false;
             }
-        } while (true);
+        }
 
         return orderIds
     }
 
-    private convertOrder(order: Awaited<ReturnType<StatsAPI['getOrderLiteModel']>>): OrderDataWithId {
+    private static convertOrder(order: Awaited<ReturnType<StatsAPI['getOrderLiteModel']>>): OrderDataWithId {
         return {
             orderId: helpers.hexToBuffer(order.orderId.stringValue),
 
             nonce: BigInt(order.makerOrderNonce),
-            maker: this.parseBytesArray(order.makerSrc.bytesArrayValue),
+            maker: DataStore.parseBytesArray(order.makerSrc.bytesArrayValue),
             give: {
-                tokenAddress: this.parseBytesArray(order.giveOffer.tokenAddress.bytesArrayValue),
+                tokenAddress: DataStore.parseBytesArray(order.giveOffer.tokenAddress.bytesArrayValue),
                 amount: BigInt(order.giveOffer.amount.stringValue),
                 chainId: Number(order.giveOffer.chainId.stringValue)
             },
             take: {
-                tokenAddress: this.parseBytesArray(order.takeOffer.tokenAddress.bytesArrayValue),
+                tokenAddress: DataStore.parseBytesArray(order.takeOffer.tokenAddress.bytesArrayValue),
                 amount: BigInt(order.takeOffer.amount.stringValue),
                 chainId: Number(order.takeOffer.chainId.stringValue)
             },
-            receiver: this.parseBytesArray(order.receiverDst.bytesArrayValue),
-            givePatchAuthority: this.parseBytesArray(order.givePatchAuthoritySrc.bytesArrayValue),
-            orderAuthorityDstAddress: this.parseBytesArray(order.orderAuthorityAddressDst.bytesArrayValue),
-            allowedTaker: order.allowedTakerDst.bytesArrayValue ? this.parseBytesArray(order.allowedTakerDst.bytesArrayValue) : undefined,
-            allowedCancelBeneficiary: order.allowedCancelBeneficiarySrc.bytesArrayValue ? this.parseBytesArray(order.allowedCancelBeneficiarySrc.bytesArrayValue) : undefined,
+            receiver: DataStore.parseBytesArray(order.receiverDst.bytesArrayValue),
+            givePatchAuthority: DataStore.parseBytesArray(order.givePatchAuthoritySrc.bytesArrayValue),
+            orderAuthorityDstAddress: DataStore.parseBytesArray(order.orderAuthorityAddressDst.bytesArrayValue),
+            allowedTaker: order.allowedTakerDst.bytesArrayValue ? DataStore.parseBytesArray(order.allowedTakerDst.bytesArrayValue) : undefined,
+            allowedCancelBeneficiary: order.allowedCancelBeneficiarySrc.bytesArrayValue ? DataStore.parseBytesArray(order.allowedCancelBeneficiarySrc.bytesArrayValue) : undefined,
             externalCall: undefined
         }
     }
 
-    private parseBytesArray(bytesArrayString: string): Uint8Array {
+    private static parseBytesArray(bytesArrayString: string): Uint8Array {
         return new Uint8Array(JSON.parse(bytesArrayString))
     }
 }

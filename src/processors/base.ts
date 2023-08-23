@@ -6,6 +6,7 @@ import {
 import { helpers } from "@debridge-finance/solana-utils";
 import { Logger } from "pino";
 
+import { TokensBucket } from "@debridge-finance/legacy-dln-profitability";
 import {
   ExecutorInitializingChain,
   ExecutorSupportedChain,
@@ -13,7 +14,6 @@ import {
 } from "../executors/executor";
 import { IncomingOrderContext } from "../interfaces";
 import { HooksEngine } from "../hooks/HooksEngine";
-import { TokensBucket } from "@debridge-finance/legacy-dln-profitability";
 
 export type OrderId = string;
 
@@ -39,7 +39,7 @@ export type OrderProcessorInitializer = (
 ) => Promise<IOrderProcessor>;
 
 export interface IOrderProcessor {
-  process(params: IncomingOrderContext): Promise<void>;
+  process(params: IncomingOrderContext): void;
 }
 
 /**
@@ -49,8 +49,10 @@ export interface IOrderProcessor {
 export abstract class BaseOrderProcessor implements IOrderProcessor {
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   protected chainId: ChainId;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   protected takeChain: ExecutorInitializingChain;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   protected hooksEngine: HooksEngine;
 
@@ -59,9 +61,9 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
     executor: IExecutor,
     context: OrderProcessorInitContext
   ): Promise<void>;
-  abstract process(params: IncomingOrderContext): Promise<void>;
+  abstract process(params: IncomingOrderContext): void;
 
-  protected async waitIsOrderFulfilled(
+  protected static async waitIsOrderFulfilled(
     orderId: string,
     order: OrderData,
     context: OrderProcessorContext,
@@ -82,6 +84,7 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
           throw new Error(
             "Failed to wait for order fulfillment, retries limit reached"
           );
+        // eslint-disable-next-line no-await-in-loop -- Very ugly, must be rewritten #862karqmr
         state = await context.config.client.getTakeOrderState(
           {
             orderId,
@@ -90,6 +93,7 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
           {}
         );
         logger.debug(`state=${JSON.stringify(state)}`);
+        // eslint-disable-next-line no-await-in-loop -- Very ugly, must be rewritten #862karqmr
         await helpers.sleep(2000);
         iteration += 1;
       }

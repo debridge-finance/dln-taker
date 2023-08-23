@@ -11,10 +11,11 @@ config();
 
 export class ExecutorEngine {
   private logger: Logger;
+
   private executor: Executor;
 
   constructor(private readonly executorConfig: ExecutorLaunchConfig) {
-    this.logger = this.createLogger()
+    this.logger = ExecutorEngine.createLogger()
     this.executor = new Executor(this.logger);
   }
 
@@ -22,7 +23,7 @@ export class ExecutorEngine {
     return this.executor.init(this.executorConfig);
   }
 
-  private createLogger() {
+  private static createLogger() {
     const prettyStream = pretty({
       colorize: process.stdout.isTTY,
       sync: true,

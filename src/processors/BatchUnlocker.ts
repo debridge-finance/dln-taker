@@ -8,6 +8,7 @@ import {
 } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
 
+import { helpers } from "@debridge-finance/solana-utils";
 import {
   ExecutorInitializingChain,
   ExecutorSupportedChain,
@@ -17,14 +18,17 @@ import { createClientLogger } from "../logger";
 
 import { OrderProcessorContext } from "./base";
 import { HooksEngine } from "../hooks/HooksEngine";
-import { helpers } from "@debridge-finance/solana-utils";
 
 export class BatchUnlocker {
   // @ts-ignore Initialized deferredly within the first call of the unlockOrder() method. Should be rewritten during the next major refactoring
   private executor: IExecutor;
+
   private ordersDataMap = new Map<string, OrderData>(); // orderId => orderData
+
   private unlockBatchesOrderIdMap = new Map<ChainId, Set<string>>(); // chainId => orderId[]
+
   private isBatchUnlockLocked: boolean = false;
+
   private readonly logger: Logger;
 
   constructor(
@@ -78,7 +82,7 @@ export class BatchUnlocker {
     }
 
     // filling batch queue
-    return this.addOrder(orderId, order, context);
+    this.addOrder(orderId, order, context);
   }
 
   private async addOrder(
@@ -99,7 +103,7 @@ export class BatchUnlocker {
       } ${this.unlockBatchesOrderIdMap.get(order.give.chainId)!.size} order(s)`
     );
 
-    return this.tryUnlock(order.give.chainId);
+    this.tryUnlock(order.give.chainId);
   }
 
   async tryUnlock(giveChainId: ChainId): Promise<void> {
@@ -134,13 +138,16 @@ export class BatchUnlocker {
   }
 
   private async unlockAny(): Promise<void> {
-    let giveChainId: ChainId | undefined;
-    while ((giveChainId = this.peekNextBatch())) {
+    let giveChainId = this.peekNextBatch()
+    while (giveChainId) {
       this.logger.debug(
         `trying to send batch unlock to ${ChainId[giveChainId]}`
       );
+      // eslint-disable-next-line no-await-in-loop -- Intentional because we want to handle all available batches
       const batchSucceeded = await this.performBatchUnlock(giveChainId);
-      if (!batchSucceeded) {
+      if (batchSucceeded) {
+        giveChainId = this.peekNextBatch()
+      } else {
         this.logger.error("batch unlock failed, stopping");
         break;
       }
@@ -153,6 +160,8 @@ export class BatchUnlocker {
         return chainId;
       }
     }
+
+    return undefined;
   }
 
   /**
@@ -199,6 +208,7 @@ export class BatchUnlocker {
       return orderState?.status === OrderState.Fulfilled
     }));
     // filter off orders that are already unlocked
+    // eslint-disable-next-line no-param-reassign -- Must be rewritten ASAP, TODO: #862kaqf9u
     orderIds = orderIds.filter((_, idx) => {
       if (notUnlockedOrders[idx]) return true;
       unlockedOrders.push(orderIds[idx])

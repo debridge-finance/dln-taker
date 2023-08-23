@@ -16,9 +16,7 @@ import {
 export const giveAmountUsdEquivalentBetween = (
   minUSDEquivalent: number,
   maxUSDEquivalent: number
-): OrderFilterInitializer => {
-  return async (/* chainId: ChainId */{}, /* context: OrderFilterInitContext */{}) => {
-    return async (
+): OrderFilterInitializer => async (/* chainId: ChainId */{}, /* context: OrderFilterInitContext */{}) => async (
       order: OrderData,
       context: FilterContext
     ): Promise<boolean> => {
@@ -59,5 +57,3 @@ export const giveAmountUsdEquivalentBetween = (
       );
       return Promise.resolve(result);
     };
-  };
-};

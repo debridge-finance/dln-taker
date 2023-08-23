@@ -16,6 +16,12 @@ import BigNumber from "bignumber.js";
 import { Logger } from "pino";
 import Web3 from "web3";
 
+import {
+  SwapConnectorRequest,
+  SwapConnectorResult
+} from "node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
+import { helpers } from "@debridge-finance/solana-utils";
+import { findExpectedBucket, calculateExpectedTakeAmount } from "@debridge-finance/legacy-dln-profitability";
 import { DlnClient, IncomingOrder, IncomingOrderContext, OrderInfoStatus } from "../interfaces";
 import { createClientLogger } from "../logger";
 import { EvmProviderAdapter, Tx } from "../providers/evm.provider.adapter";
@@ -25,12 +31,6 @@ import { BatchUnlocker } from "./BatchUnlocker";
 import { MempoolService } from "./mempool.service";
 import { PostponingReason, RejectionReason } from "../hooks/HookEnums";
 import { isRevertedError } from "./utils/isRevertedError";
-import {
-  SwapConnectorRequest,
-  SwapConnectorResult
-} from "node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
-import { helpers } from "@debridge-finance/solana-utils";
-import { findExpectedBucket, calculateExpectedTakeAmount } from "@debridge-finance/legacy-dln-profitability";
 import { DexlessChains } from "../config";
 import { IExecutor } from "../executors/executor";
 
@@ -94,12 +94,17 @@ type CreatedOrderMetadata = {
 class UniversalProcessor extends BaseOrderProcessor {
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private mempoolService: MempoolService;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private batchUnlocker: BatchUnlocker;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private executor: IExecutor;
+
   private priorityQueue = new Set<OrderId>(); // queue of orderid for processing created order
+
   private queue = new Set<OrderId>(); // queue of orderid for retry processing order
+
   private isLocked: boolean = false;
 
   readonly #createdOrdersMetadata = new Map<OrderId, CreatedOrderMetadata>()
@@ -165,20 +170,16 @@ class UniversalProcessor extends BaseOrderProcessor {
       const evmProvider = this.takeChain.fulfillProvider as EvmProviderAdapter
       for (const token of tokens) {
         for (const contract of context.contractsForApprove) {
+          // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
           await evmProvider.approveToken(token, contract, logger);
         }
       }
     }
   }
 
-  async process(params: IncomingOrderContext): Promise<void> {
+  process(params: IncomingOrderContext): void {
     const { context, orderInfo } = params;
     const { orderId } = orderInfo;
-
-    params.context.logger = context.logger.child({
-      processor: "universal",
-      orderId,
-    });
 
     switch (orderInfo.status) {
       case OrderInfoStatus.Created:
@@ -199,7 +200,8 @@ class UniversalProcessor extends BaseOrderProcessor {
         // override order params because there can be refreshed data (patches, newer confirmations, etc)
         this.#createdOrdersMetadata.get(orderId)!.context = params;
 
-        return this.tryProcess(orderId);
+        this.tryProcess(orderId);
+        return;
       }
       case OrderInfoStatus.ArchivalFulfilled: {
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
@@ -227,7 +229,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         context.logger.debug(
           `status=${OrderInfoStatus[orderInfo.status]} not implemented, skipping`
         );
-        return;
+
       }
     }
   }
@@ -246,8 +248,8 @@ class UniversalProcessor extends BaseOrderProcessor {
     const metadata = this.getCreatedOrderMetadata(orderId);
     const params = metadata.context
 
-    const logger = params.context.logger;
-    const orderInfo = params.orderInfo;
+    const {logger} = params.context;
+    const {orderInfo} = params;
 
     // already processing an order
     if (this.isLocked) {
@@ -300,16 +302,15 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.priorityQueue.values().next().value ||
       this.queue.values().next().value;
 
-    if (nextOrderId) {
+    if (!nextOrderId) { return undefined; }
       this.priorityQueue.delete(nextOrderId);
       this.queue.delete(nextOrderId);
 
       return nextOrderId;
-    }
   }
 
   // gets the amount of sec to additionally wait until this order can be processed
-  private getOrderRemainingDelay(firstSeen: Date, delay: number): number {
+  private static getOrderRemainingDelay(firstSeen: Date, delay: number): number {
     if (delay > 0) {
       const delayMs = delay * 1000;
 
@@ -344,7 +345,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       this.mempoolService.addOrder(metadata.orderId, remainingDelay, attempts)
   }
 
-  private rejectOrder(metadata: CreatedOrderMetadata, message: string, reason: RejectionReason) {
+  private rejectOrder(metadata: CreatedOrderMetadata, message: string, reason: RejectionReason): Promise<void> {
     const { attempts, context: { context, orderInfo } } = metadata;
 
     context.logger.info(message);
@@ -355,17 +356,19 @@ class UniversalProcessor extends BaseOrderProcessor {
       reason,
       attempts,
     });
+
+    return Promise.resolve();
   }
 
-  private async processOrder(metadata: CreatedOrderMetadata): Promise<void | never> {
+  private async processOrder(metadata: CreatedOrderMetadata): Promise<void> {
     const { context, orderInfo } = metadata.context;
-    const orderId = orderInfo.orderId;
-    const logger = context.logger;
+    const {orderId} = orderInfo;
+    const {logger} = context;
 
     const bucket = context.config.buckets.find(
-      (bucket) =>
-        bucket.isOneOf(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress) &&
-        bucket.findFirstToken(orderInfo.order.take.chainId) !== undefined
+      (iteratedBucket) =>
+        iteratedBucket.isOneOf(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress) &&
+        iteratedBucket.findFirstToken(orderInfo.order.take.chainId) !== undefined
     );
     if (bucket === undefined) {
       const message = `no bucket found to cover order's give token: ${tokenAddressToString(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress)}`;
@@ -377,7 +380,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     logger.debug(`order worth in usd: ${usdWorth}`);
 
     // ensuring this order does not increase TVL over a budget
-    const budget = context.giveChain.TVLBudgetController.budget;
+    const {budget} = context.giveChain.TVLBudgetController;
     if (budget > 0) {
       const currentGiveTVL = await context.giveChain.TVLBudgetController.getCurrentTVL();
       if ((currentGiveTVL + usdWorth) > budget) {
@@ -387,10 +390,10 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
 
     let isFinalizedOrder = true;
-    let confirmationFloor: number | undefined = undefined;
+    let confirmationFloor: number | undefined;
 
     // compare worthiness of the order against block confirmation thresholds
-    if (orderInfo.status == OrderInfoStatus.Created) {
+    if (orderInfo.status === OrderInfoStatus.Created) {
       // find corresponding srcConstraints
       const srcConstraintsByValue = context.giveChain.srcConstraints.perOrderValue.find(srcConstraints => usdWorth <= srcConstraints.upperThreshold);
       const srcConstraints = srcConstraintsByValue || context.giveChain.srcConstraints;
@@ -402,20 +405,20 @@ class UniversalProcessor extends BaseOrderProcessor {
 
       // determine if we should postpone the order
       const fulfillmentDelay = dstConstraintsByValue.fulfillmentDelay || srcConstraints.fulfillmentDelay;
-      const remainingDelay = this.getOrderRemainingDelay(metadata.arrivedAt, fulfillmentDelay);
+      const remainingDelay = UniversalProcessor.getOrderRemainingDelay(metadata.arrivedAt, fulfillmentDelay);
       if (remainingDelay > 0) {
         const message = `order should be delayed by ${remainingDelay}s (why: fulfillment delay is set to ${fulfillmentDelay}s)`;
         return this.postponeOrder(metadata, message, PostponingReason.FORCED_DELAY, true, remainingDelay);
       }
 
       const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info;
-      if (finalizationInfo == 'Revoked') {
+      if (finalizationInfo === 'Revoked') {
         this.clearInternalQueues(orderInfo.orderId);
 
         const message = 'order has been revoked by the order feed due to chain reorganization';
         return this.rejectOrder(metadata, message, RejectionReason.REVOKED);
       }
-      else if ('Confirmed' in finalizationInfo) {
+      if ('Confirmed' in finalizationInfo) {
         // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
         // to avoid data discrepancy and rely on WS instead
         isFinalizedOrder = false;
@@ -436,10 +439,10 @@ class UniversalProcessor extends BaseOrderProcessor {
             const message = `announced block confirmations (${announcedConfirmation}) is less than the block confirmation constraint (${srcConstraintsByValue.minBlockConfirmations} for order worth of $${usdWorth.toFixed(2)}`;
             return this.rejectOrder(metadata, message, RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH)
           }
-          else {
+
             confirmationFloor = srcConstraintsByValue.minBlockConfirmations;
             logger.debug("accepting order for execution")
-          }
+
         }
         else { // range not found: we do not accept this order, let it come finalized
           const message = `non-finalized order worth of $${usdWorth.toFixed(2)} is not covered by any custom block confirmation range`;
@@ -503,7 +506,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
-    let roughReserveDstAmount = await this.executor.resyncDecimals(
+    const roughReserveDstAmount = await this.executor.resyncDecimals(
       orderInfo.order.give.chainId,
       orderInfo.order.give.tokenAddress,
       orderInfo.order.give.amount,
@@ -526,7 +529,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     let evmFulfillGasLimit: number | undefined;
     let evmFulfillCappedGasPrice: BigNumber | undefined;
     let preswapTx: SwapConnectorResult<EvmChains> | undefined;
-    if (getEngineByChainId(this.takeChain.chain) == ChainEngine.EVM) {
+    if (getEngineByChainId(this.takeChain.chain) === ChainEngine.EVM) {
       // we need to perform fulfill estimation (to obtain planned gasLimit),
       // but we don't know yet how much reserveAmount should we pass. So, we simply pick
       // as much as giveAmount (without even subtracting operating expenses or fees) because we
@@ -631,7 +634,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       }
     );
 
-    let {
+    const {
       reserveDstToken,
       requiredReserveDstAmount,
       isProfitable,
@@ -785,12 +788,14 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
       );
     }
 
-    await this.waitIsOrderFulfilled(orderInfo.orderId, orderInfo.order, context, logger);
+    await BaseOrderProcessor.waitIsOrderFulfilled(orderInfo.orderId, orderInfo.order, context, logger);
 
     // order is fulfilled, remove it from queues (the order may have come again thru WS)
     this.clearInternalQueues(orderInfo.orderId);
     context.giveChain.TVLBudgetController.flushCache()
     logger.info(`order fulfilled: ${orderId}`);
+
+    return Promise.resolve()
   }
 
   private getPreFulfillSlippage(evaluatedTakeAmount: bigint, takeAmount: bigint): number {
@@ -855,10 +860,8 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(orderInfo.orde
 
 export const universalProcessor = (
   params?: Partial<UniversalProcessorParams>
-): OrderProcessorInitializer => {
-  return async (chainId: ChainId, executor: IExecutor, context: OrderProcessorInitContext) => {
+): OrderProcessorInitializer => async (chainId: ChainId, executor: IExecutor, context: OrderProcessorInitContext) => {
     const processor = new UniversalProcessor(params);
     await processor.init(chainId, executor, context);
     return processor;
   };
-};

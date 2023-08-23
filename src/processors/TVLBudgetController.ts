@@ -3,9 +3,9 @@ import {
   buffersAreEqual,
   ChainId,
 } from "@debridge-finance/dln-client";
-import { ExecutorSupportedChain, IExecutor } from "../executors/executor";
 import NodeCache from "node-cache"
 import { Logger } from "pino";
+import { ExecutorSupportedChain, IExecutor } from "../executors/executor";
 
 enum TvlCacheKey {
   TVL
@@ -18,8 +18,11 @@ export class TVLBudgetController {
   public readonly budget: number;
 
   private readonly chain: ChainId;
+
   private readonly executor: IExecutor;
+
   private readonly cache = new NodeCache({stdTTL: DEFAULT_TVL_CACHE_TTL});
+
   private readonly logger: Logger;
 
   constructor(chain: ChainId, executor: IExecutor, budget: number, logger: Logger) {

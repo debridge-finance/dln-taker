@@ -84,18 +84,25 @@ type WsOrderEvent<T extends WsOrderInfoStatus> = {
 
 export class WsNextOrder extends GetNextOrder {
   private wsArgs: ConstructorParameters<typeof WebSocket>;
+
   private timeLastDisconnect: Date | undefined;
+
   private pingTimer: NodeJS.Timeout | undefined;
+
   private readonly pingTimeoutMs = 3000;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private socket: WebSocket;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private unlockAuthorities: UnlockAuthority[];
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private minConfirmationThresholds: Array<{
     chainId: ChainId;
     points: number[]
   }>;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   private hooksEngine: HooksEngine;
 
@@ -196,17 +203,17 @@ export class WsNextOrder extends GetNextOrder {
       const rawMessage = event.toString("utf-8");
       const data = this.parseEvent(rawMessage);
 
-      if (typeof data == "object") {
+      if (typeof data === "object") {
         this.logger.info(`📨 ws received new message`);
         this.logger.debug(data);
         const parsedEvent = data as WsOrderEvent<any>;
 
         if ("Order" in data) {
           try {
-            const status = this.flattenStatus(parsedEvent.Order.order_info);
-            const order = this.wsOrderToOrderData(parsedEvent.Order.order_info);
+            const status = WsNextOrder.flattenStatus(parsedEvent.Order.order_info);
+            const order = WsNextOrder.wsOrderToOrderData(parsedEvent.Order.order_info);
             const orderId = parsedEvent.Order.order_info.order_id
-            const nextOrderInfo = this.transformToNextOrderInfo(status, orderId, order, parsedEvent);
+            const nextOrderInfo = WsNextOrder.transformToNextOrderInfo(status, orderId, order, parsedEvent);
             this.processNextOrder(nextOrderInfo);
           }
           catch (e) {
@@ -244,6 +251,7 @@ export class WsNextOrder extends GetNextOrder {
     catch (e) {
       this.logger.error("unable to parse event")
       this.logger.error(e)
+      return undefined;
     }
   }
 
@@ -253,14 +261,14 @@ export class WsNextOrder extends GetNextOrder {
     this.socket.send(JSON.stringify(command));
   }
 
-  private transformToNextOrderInfo(
+  private static transformToNextOrderInfo(
     status: WsOrderInfoStatus,
     orderId: string,
     order: OrderData,
     event: WsOrderEvent<any>
   ): IncomingOrder<any> {
     switch (status) {
-      case WsOrderInfoStatus.Created:
+      case WsOrderInfoStatus.Created: {
         const createdOrder: IncomingOrder<OrderInfoStatus.Created> = {
           orderId,
           order,
@@ -268,14 +276,16 @@ export class WsNextOrder extends GetNextOrder {
           finalization_info: (event as WsOrderEvent<WsOrderInfoStatus.Created>).Order.order_info.order_info_status.Created.finalization_info
         };
         return createdOrder
-      case WsOrderInfoStatus.ArchivalCreated:
+      }
+      case WsOrderInfoStatus.ArchivalCreated: {
         const archivalCreatedOrder: IncomingOrder<OrderInfoStatus.ArchivalCreated> =  {
           orderId,
           order,
           status: OrderInfoStatus.ArchivalCreated,
         }
         return archivalCreatedOrder
-      case WsOrderInfoStatus.ArchivalFulfilled:
+      }
+      case WsOrderInfoStatus.ArchivalFulfilled: {
         const archivalFulfilledOrder: IncomingOrder<OrderInfoStatus.ArchivalFulfilled> =  {
           orderId,
           order,
@@ -283,7 +293,8 @@ export class WsNextOrder extends GetNextOrder {
           unlockAuthority: (event as WsOrderEvent<WsOrderInfoStatus.ArchivalFulfilled>).Order.order_info.order_info_status.ArchivalFulfilled.unlock_authority
         }
         return archivalFulfilledOrder
-      case WsOrderInfoStatus.Fulfilled:
+      }
+      case WsOrderInfoStatus.Fulfilled: {
         const fulfilledOrder: IncomingOrder<OrderInfoStatus.Fulfilled> =  {
           orderId,
           order,
@@ -291,47 +302,54 @@ export class WsNextOrder extends GetNextOrder {
           unlockAuthority: (event as WsOrderEvent<WsOrderInfoStatus.Fulfilled>).Order.order_info.order_info_status.Fulfilled.unlock_authority
         }
         return fulfilledOrder
-      case WsOrderInfoStatus.Cancelled:
+      }
+      case WsOrderInfoStatus.Cancelled: {
         const cancelledOrder: IncomingOrder<OrderInfoStatus.Cancelled> =  {
           orderId,
           order,
           status: OrderInfoStatus.Cancelled,
         }
         return cancelledOrder
-        case WsOrderInfoStatus.UnlockSent:
+      }
+      case WsOrderInfoStatus.UnlockSent: {
           const unlockSent: IncomingOrder<OrderInfoStatus.UnlockSent> =  {
             orderId,
             order,
             status: OrderInfoStatus.UnlockSent,
           }
           return unlockSent
-        case WsOrderInfoStatus.UnlockClaim:
+        }
+      case WsOrderInfoStatus.UnlockClaim: {
           const UnlockClaim: IncomingOrder<OrderInfoStatus.UnlockClaim> =  {
             orderId,
             order,
             status: OrderInfoStatus.UnlockClaim,
           }
           return UnlockClaim
-        case WsOrderInfoStatus.TakeOfferDecreased:
+      }
+      case WsOrderInfoStatus.TakeOfferDecreased: {
           const TakeOfferDecreased: IncomingOrder<OrderInfoStatus.TakeOfferDecreased> =  {
             orderId,
             order,
             status: OrderInfoStatus.TakeOfferDecreased,
           }
           return TakeOfferDecreased
-        case WsOrderInfoStatus.GiveOfferIncreased:
+        }
+        case WsOrderInfoStatus.GiveOfferIncreased: {
           const GiveOfferIncreased: IncomingOrder<OrderInfoStatus.GiveOfferIncreased> =  {
             orderId,
             order,
             status: OrderInfoStatus.GiveOfferIncreased,
           }
           return GiveOfferIncreased
-      default:
+        }
+      default: {
         throw new Error(`Unsupported order state: ${WsOrderInfoStatus[status]}`);
+      }
     }
   }
 
-  private wsOfferToOffer(info: WsOrderOffer): Offer {
+  private static wsOfferToOffer(info: WsOrderOffer): Offer {
     return {
       amount: U256.fromBytesBE(helpers.hexToBuffer(info.amount)).toBigInt(),
       chainId: Number(U256.fromHexBEString(info.chain_id).toBigInt()),
@@ -339,11 +357,11 @@ export class WsNextOrder extends GetNextOrder {
     };
   }
 
-  private wsOrderToOrderData(info: WsOrderInfo<any>): OrderData {
+  private static wsOrderToOrderData(info: WsOrderInfo<any>): OrderData {
     const order: OrderData = {
       nonce: BigInt(info.order.maker_order_nonce),
-      give: this.wsOfferToOffer(info.order.give),
-      take: this.wsOfferToOffer(info.order.take),
+      give: WsNextOrder.wsOfferToOffer(info.order.give),
+      take: WsNextOrder.wsOfferToOffer(info.order.take),
       givePatchAuthority: helpers.hexToBuffer(
         info.order.give_patch_authority_src
       ),
@@ -368,15 +386,16 @@ export class WsNextOrder extends GetNextOrder {
     return order;
   }
 
-  private flattenStatus(
+  private static flattenStatus(
     info: WsOrderInfo<any>
   ): WsOrderInfoStatus {
-    for (let orderInfoStatus in WsOrderInfoStatus) {
+    // eslint-disable-next-line no-restricted-syntax -- Intentional because ForIn is the only way to iterate over enum, if done safely
+    for (const orderInfoStatus in WsOrderInfoStatus) {
       // skip indicies (0, 1, 2, ...)
-      if (!isNaN(Number(orderInfoStatus))) continue;
-
-      if (orderInfoStatus in info.order_info_status) {
-        return WsOrderInfoStatus[orderInfoStatus] as any as WsOrderInfoStatus;
+      if (Number.isNaN(Number(orderInfoStatus))) {
+        if (orderInfoStatus in info.order_info_status) {
+          return WsOrderInfoStatus[orderInfoStatus] as any as WsOrderInfoStatus;
+        }
       }
     }
 

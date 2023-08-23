@@ -1,3 +1,5 @@
+/* eslint-disable import/no-default-export -- Allowed to simplify configuration file */
+
 import {
   ChainId,
 } from "@debridge-finance/dln-client";
@@ -253,4 +255,4 @@ const config: ExecutorLaunchConfig = {
   ],
 };
 
-module.exports = config;
+export default config;

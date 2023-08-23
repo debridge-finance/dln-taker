@@ -1,3 +1,5 @@
+/* eslint-disable no-bitwise -- This helpers implement U256 arithmetics. Seems like not needed anymore because WS returns standard integers. TODO #862karjre */
+
 import { OrderData } from "@debridge-finance/dln-client";
 import { helpers } from "@debridge-finance/solana-utils";
 
@@ -40,7 +42,7 @@ export class U256 {
     const result = Buffer.alloc(32);
     const shifts = Array.from({ length: 8 })
       .fill(0n)
-      .map((/*v*/_, i) => BigInt(56 - 8 * i));
+      .map((/* v */_, i) => BigInt(56 - 8 * i));
     for (let i = 0; i < 32; i++) {
       switch (Math.floor(i / 8)) {
         case 0:
@@ -55,6 +57,7 @@ export class U256 {
         case 3:
           result[i] = Number((u.limb1 >> shifts[i % 8]) & 0xffn);
           break;
+        default: throw new Error("Unreachable")
       }
     }
     return result;

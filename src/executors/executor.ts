@@ -21,7 +21,10 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { Logger } from "pino";
 
-import { ChainDefinition, ExecutorLaunchConfig, SupportedChain } from "../config";
+import { TokensBucket, setSlippageOverloader } from "@debridge-finance/legacy-dln-profitability";
+import { DlnConfig } from "node_modules/@debridge-finance/dln-client/dist/types/evm/core/models/config.model";
+import BigNumber from "bignumber.js";
+import { ChainDefinition, ExecutorLaunchConfig, SupportedChain , DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
 import { PRODUCTION } from "../environments";
 import * as filters from "../filters";
 import { OrderFilter } from "../filters";
@@ -33,12 +36,8 @@ import { ProviderAdapter } from "../providers/provider.adapter";
 import { SolanaProviderAdapter } from "../providers/solana.provider.adapter";
 import { HooksEngine } from "../hooks/HooksEngine";
 import { NonFinalizedOrdersBudgetController } from "../processors/NonFinalizedOrdersBudgetController";
-import { DstOrderConstraints as RawDstOrderConstraints, SrcOrderConstraints as RawSrcOrderConstraints } from "../config";
 import { TVLBudgetController } from "../processors/TVLBudgetController";
-import { TokensBucket, setSlippageOverloader } from "@debridge-finance/legacy-dln-profitability";
-import { DlnConfig } from "node_modules/@debridge-finance/dln-client/dist/types/evm/core/models/config.model";
 import { DataStore } from "../processors/DataStore";
-import BigNumber from "bignumber.js";
 import { createClientLogger } from "../logger";
 
 
@@ -124,18 +123,26 @@ export interface IExecutor {
 export class Executor implements IExecutor {
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   tokenPriceService: PriceTokenService;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   swapConnector: SwapConnector;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   orderFeed: GetNextOrder;
+
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   client: DlnClient;
+
   chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
+
   buckets: TokensBucket[] = [];
+
   dlnApi: DataStore = new DataStore(this)
 
   private isInitialized = false;
+
   private readonly url1Inch = "https://nodes.debridge.finance";
+
   constructor(private readonly logger: Logger) { }
 
   async usdValueOfAsset(chain: ChainId, token: Address, amount: bigint): Promise<number> {
@@ -163,9 +170,9 @@ export class Executor implements IExecutor {
     const delta = decimalsIn - decimalsOut;
     if (delta > 0) {
       return amountIn / 10n ** BigInt(delta);
-    } else {
-      return amountIn * 10n ** BigInt(-delta);
     }
+      return amountIn * 10n ** BigInt(-delta);
+
   }
 
   async usdValueOfOrder(order: OrderData): Promise<number> {
@@ -182,7 +189,7 @@ export class Executor implements IExecutor {
     return Object.values(this.chains).map(chain => chain.chain)
   }
 
-  private getTokenBuckets(config: ExecutorLaunchConfig['buckets']): Array<TokensBucket> {
+  private static getTokenBuckets(config: ExecutorLaunchConfig['buckets']): Array<TokensBucket> {
     return config.map(metaBucket => {
       const tokens = Object.fromEntries(
         Object.entries(metaBucket).map(
@@ -209,13 +216,13 @@ export class Executor implements IExecutor {
       jupiterConnector
     );
 
-    this.buckets = this.getTokenBuckets(config.buckets);
+    this.buckets = Executor.getTokenBuckets(config.buckets);
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
 
     const addresses = {} as any;
+    // special case for EVM: collect addresses into a shared collection
     for (const chain of config.chains) {
-      switch (getEngineByChainId(chain.chain)) {
-        case ChainEngine.EVM: {
+      if (ChainEngine.EVM === getEngineByChainId(chain.chain)) {
           addresses[chain.chain] = {
             pmmSourceAddress:
               chain.environment?.pmmSrc ||
@@ -234,7 +241,6 @@ export class Executor implements IExecutor {
               PRODUCTION.chains[chain.chain]?.evm?.forwarderContract ||
               PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract
           };
-        }
       }
     }
 
@@ -247,7 +253,7 @@ export class Executor implements IExecutor {
         throw new Error(`${ChainId[chain.chain]} is not supported, remove it from the config`)
       }
 
-      let client, unlockProvider, fulfillProvider;
+      let client; let unlockProvider; let fulfillProvider;
       let contractsForApprove: string[] = [];
 
       if (chain.chain === ChainId.Solana) {
@@ -295,9 +301,11 @@ export class Executor implements IExecutor {
           undefined,
           chain.environment?.solana?.environment
         );
-        await client.destination.debridge.init();
+          // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+          await client.destination.debridge.init();
 
         // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
+        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
         const altInitTx = await client.initForFulfillPreswap(
           new PublicKey(client.parseAddress(chain.beneficiary)),
           config.chains.map(chainConfig => chainConfig.chain),
@@ -305,6 +313,7 @@ export class Executor implements IExecutor {
         );
         if (altInitTx) {
           this.logger.info(`Initializing Solana Address Lookup Table (ALT)`)
+          // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
           await fulfillProvider.sendTransaction(altInitTx, { logger: this.logger })
         } else {
           this.logger.info(`Solana Address Lookup Table (ALT) already exists`)
@@ -350,9 +359,10 @@ export class Executor implements IExecutor {
         chain: chain.chain,
         chainRpc: chain.chainRpc,
         unlockProvider,
-        fulfillProvider: fulfillProvider,
+        fulfillProvider,
         nonFinalizedTVLBudget: chain.constraints?.nonFinalizedTVLBudget,
       };
+      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
       const orderProcessor = await processorInitializer(chain.chain, this, {
         takeChain: initializingChain,
         buckets: this.buckets,
@@ -367,6 +377,7 @@ export class Executor implements IExecutor {
       }
 
       // append global filters to the list of dstFilters
+      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
       const dstFilters = await Promise.all(
         [...dstFiltersInitializers, ...(config.filters || [])].map((filter) =>
           filter(chain.chain, {
@@ -376,6 +387,7 @@ export class Executor implements IExecutor {
         )
       );
 
+      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
       const srcFilters = await Promise.all(
         (chain.srcFilters || []).map((initializer) =>
           initializer(chain.chain, {
@@ -401,12 +413,12 @@ export class Executor implements IExecutor {
         TVLBudgetController: new TVLBudgetController(chain.chain, this, chain.constraints?.TVLBudget || 0, this.logger),
         beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
         srcConstraints: {
-          ...this.getSrcConstraints(chain.constraints || {}),
-          perOrderValue: this.getSrcConstraintsPerOrderValue(chain.chain as unknown as SupportedChain, chain.constraints || {})
+          ...Executor.getSrcConstraints(chain.constraints || {}),
+          perOrderValue: Executor.getSrcConstraintsPerOrderValue(chain.chain as unknown as SupportedChain, chain.constraints || {})
         },
         dstConstraints: {
-          ...this.getDstConstraints(chain.dstConstraints || {}),
-          perOrderValue: this.getDstConstraintsPerOrderValue(chain.dstConstraints || {}),
+          ...Executor.getDstConstraints(chain.dstConstraints || {}),
+          perOrderValue: Executor.getDstConstraintsPerOrderValue(chain.dstConstraints || {}),
         }
       };
     }
@@ -433,12 +445,10 @@ export class Executor implements IExecutor {
     orderFeed.setLogger(this.logger);
     this.orderFeed = orderFeed;
 
-    const unlockAuthorities = Object.values(this.chains).map((chain) => {
-      return {
+    const unlockAuthorities = Object.values(this.chains).map((chain) => ({
         chainId: chain.chain,
         address: chain.unlockProvider.address as string,
-      };
-    });
+      }));
 
     const minConfirmationThresholds = Object.values(this.chains)
       .map(chain => ({
@@ -456,24 +466,24 @@ export class Executor implements IExecutor {
     this.isInitialized = true;
   }
 
-  private getDstConstraintsPerOrderValue(configDstConstraints: ChainDefinition['dstConstraints']): DstConstraintsPerOrderValue {
+  private static getDstConstraintsPerOrderValue(configDstConstraints: ChainDefinition['dstConstraints']): DstConstraintsPerOrderValue {
     return (configDstConstraints?.perOrderValueUpperThreshold || [])
       .map(constraint => ({
         upperThreshold: constraint.upperThreshold,
-        ...this.getDstConstraints(constraint, configDstConstraints)
+        ...Executor.getDstConstraints(constraint, configDstConstraints)
       }))
       // important to sort by upper bound ASC for easier finding of the corresponding range
       .sort((constraintA, constraintB) => constraintA.upperThreshold - constraintB.upperThreshold);
   }
 
-  private getDstConstraints(primaryConstraints: RawDstOrderConstraints, defaultConstraints?: RawDstOrderConstraints): DstOrderConstraints {
+  private static getDstConstraints(primaryConstraints: RawDstOrderConstraints, defaultConstraints?: RawDstOrderConstraints): DstOrderConstraints {
     return {
       fulfillmentDelay: primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0,
       preFulfillSwapChangeRecipient: primaryConstraints?.preFulfillSwapChangeRecipient || defaultConstraints?.preFulfillSwapChangeRecipient || "taker"
     }
   }
 
-  private getSrcConstraintsPerOrderValue(chain: SupportedChain, configDstConstraints: ChainDefinition['constraints']): SrcConstraintsPerOrderValue {
+  private static getSrcConstraintsPerOrderValue(chain: SupportedChain, configDstConstraints: ChainDefinition['constraints']): SrcConstraintsPerOrderValue {
     return (configDstConstraints?.requiredConfirmationsThresholds || [])
       .map(constraint => {
         if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= (constraint.minBlockConfirmations || 0)) {
@@ -483,21 +493,21 @@ export class Executor implements IExecutor {
         return {
           upperThreshold: constraint.thresholdAmountInUSD,
           minBlockConfirmations: constraint.minBlockConfirmations || 0,
-          ...this.getSrcConstraints(constraint, configDstConstraints)
+          ...Executor.getSrcConstraints(constraint, configDstConstraints)
         }
       })
       // important to sort by upper bound ASC for easier finding of the corresponding range
       .sort((constraintA, constraintB) => constraintA.upperThreshold - constraintB.upperThreshold);
   }
 
-  private getSrcConstraints(primaryConstraints: RawSrcOrderConstraints, defaultConstraints?: RawSrcOrderConstraints): SrcOrderConstraints {
+  private static getSrcConstraints(primaryConstraints: RawSrcOrderConstraints, defaultConstraints?: RawSrcOrderConstraints): SrcOrderConstraints {
     return {
       fulfillmentDelay: primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0
     }
   }
 
   async execute(nextOrderInfo: IncomingOrder<any>) {
-    const orderId = nextOrderInfo.orderId;
+    const {orderId} = nextOrderInfo;
     const logger = this.logger.child({ orderId });
     logger.info(`new order received, type: ${OrderInfoStatus[nextOrderInfo.status]}`)
     logger.debug(nextOrderInfo);

@@ -4,35 +4,36 @@ import path from "path";
 
 import { ExecutorEngine } from "./executors/executor.engine";
 
-(BigInt.prototype as any).toJSON = function () {
-  return this.toString();
-};
-
 // Almost never return exponential notation:
 BigNumber.config({ EXPONENTIAL_AT: 1e+9 })
 
 config();
 
 async function main() {
-  let configPath = process.argv[2];
+  let userConfigPath = process.argv[2];
 
-  if (configPath === undefined) {
-    configPath = path.resolve(__dirname, "..", "executor.config.ts");
+  if (userConfigPath === undefined) {
+    userConfigPath = path.resolve(__dirname, "..", "executor.config.ts");
   }
 
-  if (!configPath.startsWith("/")) {
-    configPath = process.cwd() + "/" + configPath;
+  if (!userConfigPath.startsWith("/")) {
+    userConfigPath = `${process.cwd()  }/${  userConfigPath}`;
   }
 
-  console.log(`Using config file: ${configPath}`);
-  const config = require(configPath)
+  // eslint-disable-next-line no-console -- Intentional usage in the entry point
+  console.log(`Using config file: ${userConfigPath}`);
 
-  const executor = new ExecutorEngine(config);
+  // eslint-disable-next-line global-require, import/no-dynamic-require -- Intentional usage to load user config
+  const userConfig = require(userConfigPath)
+
+  const executor = new ExecutorEngine(userConfig);
   await executor.init();
 }
 
 main().catch((e) => {
+  // eslint-disable-next-line no-console -- Intentional usage in the entry point
   console.error(`Launching executor failed`);
+  // eslint-disable-next-line no-console -- Intentional usage in the entry point
   console.error(e)
   process.exit(1);
 });

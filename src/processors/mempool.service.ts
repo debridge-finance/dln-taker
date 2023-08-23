@@ -1,12 +1,14 @@
 import { Logger } from "pino";
 
-import { ProcessOrder } from "../interfaces";
 import { setTimeout } from 'timers/promises'
+import { ProcessOrder } from "../interfaces";
 import { OrderId } from "./base";
 
 export class MempoolService {
   readonly #logger: Logger;
+
   readonly #trackedOrders = new Set<OrderId>();
+
   constructor(
     logger: Logger,
     private readonly processOrderFunction: ProcessOrder,
@@ -16,7 +18,7 @@ export class MempoolService {
     this.#logger = logger.child({ service: "MempoolService" });
   }
 
-  private getDelayPromise(delay: number) {
+  private static getDelayPromise(delay: number) {
     return setTimeout(delay * 1000)
   }
 
@@ -26,7 +28,7 @@ export class MempoolService {
    * @param params
    * @param triggerOrDelay
    */
-  addOrder(orderId: OrderId, triggerOrDelay?: Promise<any> | number, attempt: number = 0) {
+  addOrder(orderId: OrderId, delay?: number, attempt: number = 0) {
     const orderLogger = this.#logger.child({ orderId });
 
     if (this.#trackedOrders.has(orderId)) {
@@ -38,12 +40,9 @@ export class MempoolService {
     orderLogger.debug(`added to mempool, new mempool size: ${this.#trackedOrders.size} order(s)`);
 
     const promiseStartTime = new Date()
-    const maxTimeoutPromise = this.getDelayPromise(this.maxReprocessDelay + (this.delayStep * attempt))
-    if (triggerOrDelay && typeof triggerOrDelay === 'number')
-      triggerOrDelay = this.getDelayPromise(triggerOrDelay);
-
-    const trigger = triggerOrDelay
-      ? Promise.any([triggerOrDelay, maxTimeoutPromise])
+    const maxTimeoutPromise = MempoolService.getDelayPromise(this.maxReprocessDelay + (this.delayStep * attempt))
+    const trigger = delay
+      ? Promise.any([MempoolService.getDelayPromise(delay), maxTimeoutPromise])
       : maxTimeoutPromise;
 
     trigger

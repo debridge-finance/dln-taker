@@ -29,9 +29,11 @@ export class EvmProviderAdapter implements ProviderAdapter {
   private staleTx?: Tx;
 
   private rebroadcast: EvmRebroadcastAdapterOpts = {};
+
   public readonly connection: Web3;
 
   readonly #address: string;
+
   readonly #privateKey: string;
 
   constructor(
@@ -86,6 +88,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
     } as Tx;
     let currentTxHash: string;
 
+    // eslint-disable-next-line no-async-promise-executor -- This is a black magic promise, that handles errors gracefully. TODO #862karn81
     const transactionHash: string = await new Promise(async (resolve, reject) => {
       let rebroadcastInterval: NodeJS.Timer;
       let pollingInterval: NodeJS.Timer;
@@ -228,27 +231,31 @@ export class EvmProviderAdapter implements ProviderAdapter {
   }
 
   private async sendTx(tx: Tx, logger: Logger): Promise<string> {
+    // eslint-disable-next-line no-async-promise-executor -- This is a black magic promise, that handles errors gracefully. TODO #862karn81
     return new Promise(async (resolve, reject) => {
-      tx.from = this.address;
+      const txForSending = {
+        ...tx,
+        from: this.address
+      };
 
-      if (!tx.gas) {
+      if (!txForSending.gas) {
         let estimatedGas: number = 0;
         try {
-          estimatedGas = await this.connection.eth.estimateGas(tx);
+          estimatedGas = await this.connection.eth.estimateGas(txForSending);
         } catch (error) {
           const message = `estimation failed: ${error}`
           logger.error(message);
           logger.error(error);
-          logger.error(`tx which caused estimation failure: ${JSON.stringify(tx)}`)
+          logger.error(`tx which caused estimation failure: ${JSON.stringify(txForSending)}`)
           reject(new Error(message));
           return;
         }
-        tx.gas = estimatedGas * GAS_MULTIPLIER;
+        txForSending.gas = estimatedGas * GAS_MULTIPLIER;
       }
 
-      tx.gas = Math.round(tx.gas);
+      txForSending.gas = Math.round(txForSending.gas);
 
-      logger.info(`sending tx: ${JSON.stringify(tx)}`);
+      logger.info(`sending tx: ${JSON.stringify(txForSending)}`);
       const errorHandler = (error: any) => {
         logger.error("sending failed");
         logger.error(error);
@@ -257,7 +264,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
       // kinda weird code below: THREE checks
       try { // this is needed because sendSignedTransaction() may throw an error during tx preparation (e.g., incorrect gas value)
-        const signedTx = await this.connection.eth.accounts.signTransaction(tx, this.#privateKey);
+        const signedTx = await this.connection.eth.accounts.signTransaction(txForSending, this.#privateKey);
         logger.info("Signed tx", signedTx);
 
         if (!signedTx.rawTransaction) {

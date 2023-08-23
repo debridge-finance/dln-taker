@@ -48,12 +48,11 @@ export class HooksEngine {
         hookEnum: Hooks,
         params: HookParams<T>
     ): Promise<void> {
-        const handlers = this.hookHandlers[hookEnum];
-        if (!handlers) return;
+        const handlers = this.hookHandlers[hookEnum] || [];
         for (const handler of handlers) {
             try {
-                // @ts-ignore
-                await handler(params, { logger: this.logger });
+                // eslint-disable-next-line no-await-in-loop -- Used to track hook errors. TODO make hooks asynchronous DEV-3490
+                await handler(params as any, { logger: this.logger });
             } catch (e) {
                 this.logger.error(`Error in execution hook handler in ${hookEnum}`);
                 this.logger.error(e);
