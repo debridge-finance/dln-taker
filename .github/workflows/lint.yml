@@ -1,0 +1,17 @@
+name: lint
+on: [push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Run eslint
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm rebuild && npm run prepare --if-present
+      - run: npm run lint
