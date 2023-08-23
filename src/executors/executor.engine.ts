@@ -1,11 +1,11 @@
-import { config } from "dotenv";
-import pino, { Logger } from "pino";
-import pretty from "pino-pretty";
-import { createWriteStream } from "pino-sentry";
+import { config } from 'dotenv';
+import pino, { Logger } from 'pino';
+import pretty from 'pino-pretty';
+import { createWriteStream } from 'pino-sentry';
 
-import { ExecutorLaunchConfig } from "../config";
+import { ExecutorLaunchConfig } from '../config';
 
-import { Executor } from "./executor";
+import { Executor } from './executor';
 
 config();
 
@@ -15,7 +15,7 @@ export class ExecutorEngine {
   private executor: Executor;
 
   constructor(private readonly executorConfig: ExecutorLaunchConfig) {
-    this.logger = ExecutorEngine.createLogger()
+    this.logger = ExecutorEngine.createLogger();
     this.executor = new Executor(this.logger);
   }
 
@@ -32,7 +32,7 @@ export class ExecutorEngine {
     });
     const streams: any[] = [
       {
-        level: "debug",
+        level: 'debug',
         stream: prettyStream,
       },
     ];
@@ -40,12 +40,12 @@ export class ExecutorEngine {
       const sentryStream = createWriteStream({
         dsn: process.env.SENTRY_DSN,
       });
-      streams.push({ level: "error", stream: sentryStream });
+      streams.push({ level: 'error', stream: sentryStream });
     }
     return pino(
       {
-        level: process.env.LOG_LEVEL || "info",
-        translateFormat: 'd mmm yyyy H:MM'
+        level: process.env.LOG_LEVEL || 'info',
+        translateFormat: 'd mmm yyyy H:MM',
       },
       pino.multistream(streams, {}),
     );

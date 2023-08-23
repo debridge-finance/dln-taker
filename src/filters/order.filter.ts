@@ -1,11 +1,11 @@
-import { ChainId, OrderData } from "@debridge-finance/dln-client";
-import { Logger } from "pino";
+import { ChainId, OrderData } from '@debridge-finance/dln-client';
+import { Logger } from 'pino';
 
 import {
   ExecutorInitializingChain,
   ExecutorSupportedChain,
   IExecutor,
-} from "../executors/executor";
+} from '../executors/executor';
 
 export interface FilterContext {
   logger: Logger;
@@ -21,7 +21,7 @@ export type OrderFilterInitContext = {
 
 export type OrderFilterInitializer = (
   chainId: ChainId,
-  context: OrderFilterInitContext
+  context: OrderFilterInitContext,
 ) => Promise<OrderFilter>;
 
 /**
@@ -29,7 +29,4 @@ export type OrderFilterInitializer = (
  * Returns true if order can be processed, false otherwise.
  *
  */
-export type OrderFilter = (
-  order: OrderData,
-  context: FilterContext
-) => Promise<boolean>;
+export type OrderFilter = (order: OrderData, context: FilterContext) => Promise<boolean>;

@@ -1,1 +1,1 @@
-export const isRevertedError = (error: Error) => error.message?.toLowerCase()?.includes("reverted");
+export const isRevertedError = (error: Error) => error.message?.toLowerCase()?.includes('reverted');

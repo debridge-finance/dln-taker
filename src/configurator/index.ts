@@ -1,11 +1,9 @@
 /* eslint-disable import/no-default-export -- Allowed to simplify references in the configuration file */
 
-import { tokenPriceService } from "./tokenPriceService";
+import { tokenPriceService } from './tokenPriceService';
 
-export {
-    tokenPriceService
-}
+export { tokenPriceService };
 
 export default {
-    tokenPriceService
-}
+  tokenPriceService,
+};

@@ -1,8 +1,8 @@
-import { ChainId, CommonDlnClient, Evm, OrderData, Solana } from "@debridge-finance/dln-client";
-import { Logger } from "pino";
+import { ChainId, CommonDlnClient, Evm, OrderData, Solana } from '@debridge-finance/dln-client';
+import { Logger } from 'pino';
 
-import { OrderId, OrderProcessorContext } from "./processors/base";
-import { HooksEngine } from "./hooks/HooksEngine";
+import { OrderId, OrderProcessorContext } from './processors/base';
+import { HooksEngine } from './hooks/HooksEngine';
 
 export enum OrderInfoStatus {
   Created,
@@ -13,27 +13,30 @@ export enum OrderInfoStatus {
   UnlockSent,
   UnlockClaim,
   TakeOfferDecreased,
-  GiveOfferIncreased
+  GiveOfferIncreased,
 }
 
-type FinalizationInfo = {
-  Finalized: {
-    transaction_hash:  string;
-  }
-} | {
-  Confirmed: {
-    confirmation_blocks_count: number;
-    transaction_hash:  string;
-  }
-} | "Revoked";
+type FinalizationInfo =
+  | {
+      Finalized: {
+        transaction_hash: string;
+      };
+    }
+  | {
+      Confirmed: {
+        confirmation_blocks_count: number;
+        transaction_hash: string;
+      };
+    }
+  | 'Revoked';
 
 export type IncomingOrder<T extends OrderInfoStatus> = {
   orderId: string;
   status: OrderInfoStatus;
   order: OrderData;
-} & (T extends OrderInfoStatus.ArchivalFulfilled ? { unlockAuthority: string } : {}
-) & (T extends OrderInfoStatus.Fulfilled ? { unlockAuthority: string } : {}
-) & (T extends OrderInfoStatus.Created ? { finalization_info: FinalizationInfo } : {})
+} & (T extends OrderInfoStatus.ArchivalFulfilled ? { unlockAuthority: string } : {}) &
+  (T extends OrderInfoStatus.Fulfilled ? { unlockAuthority: string } : {}) &
+  (T extends OrderInfoStatus.Created ? { finalization_info: FinalizationInfo } : {});
 
 export type ProcessOrder = (orderId: OrderId) => Promise<void>;
 
@@ -64,7 +67,7 @@ export abstract class GetNextOrder {
     UnlockAuthority: UnlockAuthority[],
     minConfirmationThresholds: Array<{
       chainId: ChainId;
-      points: number[]
+      points: number[];
     }>,
     hooksEngine: HooksEngine,
   ): void;
@@ -79,4 +82,4 @@ export abstract class GetNextOrder {
 }
 
 type ActiveClients = Solana.DlnClient | Evm.DlnClient;
-export type DlnClient = CommonDlnClient<ActiveClients>
+export type DlnClient = CommonDlnClient<ActiveClients>;

@@ -1,8 +1,8 @@
-import { Logger } from "pino";
+import { Logger } from 'pino';
 
-import { setTimeout } from 'timers/promises'
-import { ProcessOrder } from "../interfaces";
-import { OrderId } from "./base";
+import { setTimeout } from 'timers/promises';
+import { ProcessOrder } from '../interfaces';
+import { OrderId } from './base';
 
 export class MempoolService {
   readonly #logger: Logger;
@@ -13,13 +13,13 @@ export class MempoolService {
     logger: Logger,
     private readonly processOrderFunction: ProcessOrder,
     private readonly maxReprocessDelay: number,
-    private readonly delayStep: number = 30
+    private readonly delayStep: number = 30,
   ) {
-    this.#logger = logger.child({ service: "MempoolService" });
+    this.#logger = logger.child({ service: 'MempoolService' });
   }
 
   private static getDelayPromise(delay: number) {
-    return setTimeout(delay * 1000)
+    return setTimeout(delay * 1000);
   }
 
   /**
@@ -32,42 +32,42 @@ export class MempoolService {
     const orderLogger = this.#logger.child({ orderId });
 
     if (this.#trackedOrders.has(orderId)) {
-      orderLogger.debug("already present in the mempool, not adding again");
+      orderLogger.debug('already present in the mempool, not adding again');
       return;
     }
 
     this.#trackedOrders.add(orderId);
     orderLogger.debug(`added to mempool, new mempool size: ${this.#trackedOrders.size} order(s)`);
 
-    const promiseStartTime = new Date()
-    const maxTimeoutPromise = MempoolService.getDelayPromise(this.maxReprocessDelay + (this.delayStep * attempt))
+    const promiseStartTime = new Date();
+    const maxTimeoutPromise = MempoolService.getDelayPromise(
+      this.maxReprocessDelay + this.delayStep * attempt,
+    );
     const trigger = delay
       ? Promise.any([MempoolService.getDelayPromise(delay), maxTimeoutPromise])
       : maxTimeoutPromise;
 
     trigger
       .catch((reason) => {
-        orderLogger.error(`mempool promise triggered error: ${reason}`)
+        orderLogger.error(`mempool promise triggered error: ${reason}`);
         orderLogger.error(reason);
       })
       .finally(() => {
         const settlementTime = new Date();
         const waitingTime = (settlementTime.getTime() - promiseStartTime.getTime()) / 1000;
-        orderLogger.debug(`mempool promise triggered after ${waitingTime}s`)
+        orderLogger.debug(`mempool promise triggered after ${waitingTime}s`);
         if (this.#trackedOrders.has(orderId)) {
-          orderLogger.debug(`invoking order processing routine`)
+          orderLogger.debug(`invoking order processing routine`);
           this.#trackedOrders.delete(orderId);
           this.processOrderFunction(orderId);
+        } else {
+          orderLogger.debug(`order does not exist in the mempool`);
         }
-        else {
-          orderLogger.debug(`order does not exist in the mempool`)
-        }
-      })
+      });
   }
 
   delete(orderId: string) {
     this.#trackedOrders.delete(orderId);
-    this.#logger.child({orderId})
-      .debug("order has been removed from the mempool")
+    this.#logger.child({ orderId }).debug('order has been removed from the mempool');
   }
 }

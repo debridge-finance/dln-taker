@@ -1,7 +1,7 @@
-import pino from "pino";
-import assert from "assert";
-import { ChainId } from "@debridge-finance/dln-client";
-import {NonFinalizedOrdersBudgetController} from "../src/processors/NonFinalizedOrdersBudgetController";
+import pino from 'pino';
+import assert from 'assert';
+import { ChainId } from '@debridge-finance/dln-client';
+import { NonFinalizedOrdersBudgetController } from '../src/processors/NonFinalizedOrdersBudgetController';
 
 describe('NonFinalizedOrdersBudgetController', () => {
   const logger = pino();

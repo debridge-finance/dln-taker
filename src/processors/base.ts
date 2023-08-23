@@ -1,19 +1,15 @@
-import {
-  ChainId,
-  OrderData,
-  OrderState,
-} from "@debridge-finance/dln-client";
-import { helpers } from "@debridge-finance/solana-utils";
-import { Logger } from "pino";
+import { ChainId, OrderData, OrderState } from '@debridge-finance/dln-client';
+import { helpers } from '@debridge-finance/solana-utils';
+import { Logger } from 'pino';
 
-import { TokensBucket } from "@debridge-finance/legacy-dln-profitability";
+import { TokensBucket } from '@debridge-finance/legacy-dln-profitability';
 import {
   ExecutorInitializingChain,
   ExecutorSupportedChain,
   IExecutor,
-} from "../executors/executor";
-import { IncomingOrderContext } from "../interfaces";
-import { HooksEngine } from "../hooks/HooksEngine";
+} from '../executors/executor';
+import { IncomingOrderContext } from '../interfaces';
+import { HooksEngine } from '../hooks/HooksEngine';
 
 export type OrderId = string;
 
@@ -22,7 +18,7 @@ export type OrderProcessorContext = {
   config: IExecutor;
   giveChain: ExecutorSupportedChain;
   takeChain: ExecutorSupportedChain;
-}
+};
 
 export type OrderProcessorInitContext = {
   takeChain: ExecutorInitializingChain;
@@ -30,12 +26,12 @@ export type OrderProcessorInitContext = {
   logger: Logger;
   hooksEngine: HooksEngine;
   contractsForApprove: string[];
-}
+};
 
 export type OrderProcessorInitializer = (
   chainId: ChainId,
   executor: IExecutor,
-  context: OrderProcessorInitContext
+  context: OrderProcessorInitContext,
 ) => Promise<IOrderProcessor>;
 
 export interface IOrderProcessor {
@@ -59,7 +55,7 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
   abstract init(
     chainId: ChainId,
     executor: IExecutor,
-    context: OrderProcessorInitContext
+    context: OrderProcessorInitContext,
   ): Promise<void>;
   abstract process(params: IncomingOrderContext): void;
 
@@ -67,7 +63,7 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
     orderId: string,
     order: OrderData,
     context: OrderProcessorContext,
-    logger: Logger
+    logger: Logger,
   ) {
     if (order.take.chainId === ChainId.Solana) {
       let state = await context.config.client.getTakeOrderState(
@@ -75,22 +71,20 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
           orderId,
           takeChain: order.take.chainId,
         },
-        {}
+        {},
       );
       const limit = 10;
       let iteration = 0;
       while (state === null || state.status !== OrderState.Fulfilled) {
         if (iteration === limit)
-          throw new Error(
-            "Failed to wait for order fulfillment, retries limit reached"
-          );
+          throw new Error('Failed to wait for order fulfillment, retries limit reached');
         // eslint-disable-next-line no-await-in-loop -- Very ugly, must be rewritten #862karqmr
         state = await context.config.client.getTakeOrderState(
           {
             orderId,
             takeChain: order.take.chainId,
           },
-          {}
+          {},
         );
         logger.debug(`state=${JSON.stringify(state)}`);
         // eslint-disable-next-line no-await-in-loop -- Very ugly, must be rewritten #862karqmr
