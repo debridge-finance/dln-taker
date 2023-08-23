@@ -1,17 +1,23 @@
 {
   "name": "@debridge-finance/dln-taker",
-  "version": "2.10.2",
+  "version": "2.11.0-alpha.0",
   "description": "DLN executor is the rule-based daemon service developed to automatically execute orders placed on the deSwap Liquidity Network (DLN) across supported blockchains",
   "license": "GPL-3.0-only",
   "author": "deBridge",
   "homepage": "https://debridge.finance",
   "repository": "github:debridge-finance/dln-taker",
-  "main": "dist/cjs/index.js",
+  "main": "dist/index.js",
+  "bin": {
+    "dln-taker": "./dist/cli/bootstrap.js"
+  },
+  "files": [
+    "dist/"
+  ],
   "scripts": {
-    "build": "npm run clean && npm run compile",
+    "build": "npm-run-all clean compile && chmod +x ./dist/cli/bootstrap.js",
     "clean": "rimraf ./dist",
     "compile": "tsc -P tsconfig.build.json",
-    "executor": "ts-node -P tsconfig.dev.json ./src/index.ts",
+    "executor": "ts-node -P tsconfig.dev.json ./src/cli/bootstrap.ts",
     "format": "npm-run-all lint pretty",
     "lint": "npm-run-all lint:ts",
     "lint:ts": "eslint --fix \"{src,tests}/**/*.ts\" sample.config.ts",
@@ -20,9 +26,10 @@
     "pretty": "npm-run-all pretty:package pretty:ts",
     "pretty:package": "prettier-package-json --write",
     "pretty:ts": "prettier --write \"{src,tests}/**/*.ts\" sample.config.ts",
-    "start:compiled": "ts-node -P tsconfig.dev.json ./dist/index.js",
+    "start:compiled": "./dist/cli/bootstrap.js",
     "test": "mocha -r ts-node/register -b -t 100000 ./tests/**/*.test.ts"
   },
+  "types": "./dist/index.d.ts",
   "dependencies": {
     "@debridge-finance/dln-client": "6.5.4",
     "@debridge-finance/legacy-dln-profitability": "1.1.1",
@@ -38,9 +45,20 @@
     "pino": "8.7.0",
     "pino-pretty": "9.1.1",
     "pino-sentry": "0.13.0",
-    "ts-node": "10.9.1",
     "web3": "1.8.0",
     "ws": "8.10.0"
+  },
+  "peerDependencies": {
+    "ts-node": "*",
+    "typescript": "*"
+  },
+  "peerDependenciesMeta": {
+    "ts-node": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/chai": "4.3.3",
@@ -58,7 +76,9 @@
     "mocha": "10.1.0",
     "npm-run-all": "^4.1.5",
     "prettier-package-json": "^2.8.0",
-    "rimraf": "3.0.2"
+    "rimraf": "3.0.2",
+    "ts-node": "10.9.1",
+    "typescript": "~5.1.6"
   },
   "keywords": [
     "DLN",
@@ -68,6 +88,6 @@
     "solana"
   ],
   "engines": {
-    "node": ">16"
+    "node": ">18"
   }
 }

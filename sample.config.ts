@@ -1,18 +1,14 @@
-/* eslint-disable import/no-default-export -- Allowed to simplify configuration file */
+/* eslint-disable import/no-default-export, @typescript-eslint/no-unused-vars -- Allowed to simplify configuration file */
 
-import { ChainId } from '@debridge-finance/dln-client';
-
-import { ExecutorLaunchConfig } from './src/config';
-import { CURRENT_ENVIRONMENT as environment } from './src/environments';
-import { WsNextOrder } from './src/orderFeeds/ws.order.feed';
-import * as processors from './src/processors';
-import configurator from './src/configurator';
-
-// sanity check to ensure that .env file is supplied
-if (process.env.WS_API_KEY === undefined)
-  throw new Error(
-    `Missing WS_API_KEY environment variable. Did you managed to create the .env file based on sample.env?`,
-  );
+import {
+  ChainId,
+  configurator,
+  ExecutorLaunchConfig,
+  filters,
+  processors,
+  WsNextOrder,
+  CURRENT_ENVIRONMENT as environment,
+} from '@debridge-finance/dln-taker';
 
 const config: ExecutorLaunchConfig = {
   orderFeed: new WsNextOrder(environment.WSS, {
@@ -232,9 +228,6 @@ const config: ExecutorLaunchConfig = {
       beneficiary: `${process.env.BASE_BENEFICIARY}`,
       takerPrivateKey: `${process.env.BASE_TAKER_PRIVATE_KEY}`,
       unlockAuthorityPrivateKey: `${process.env.BASE_UNLOCK_AUTHORITY_PRIVATE_KEY}`,
-      environment: {
-        deBridgeContract: '0xc1656B63D9EEBa6d114f6bE19565177893e5bCBF',
-      },
     },
 
     {

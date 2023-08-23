@@ -31,7 +31,6 @@ import {
   DstOrderConstraints as RawDstOrderConstraints,
   SrcOrderConstraints as RawSrcOrderConstraints,
 } from '../config';
-import { PRODUCTION } from '../environments';
 import * as filters from '../filters';
 import { OrderFilter } from '../filters';
 import { DlnClient, GetNextOrder, IncomingOrder, OrderInfoStatus } from '../interfaces';
@@ -45,6 +44,7 @@ import { NonFinalizedOrdersBudgetController } from '../processors/NonFinalizedOr
 import { TVLBudgetController } from '../processors/TVLBudgetController';
 import { DataStore } from '../processors/DataStore';
 import { createClientLogger } from '../logger';
+import { getCurrentEnvironment } from '../environments';
 
 const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Arbitrum]: 15,
@@ -248,20 +248,20 @@ export class Executor implements IExecutor {
         addresses[chain.chain] = {
           pmmSourceAddress:
             chain.environment?.pmmSrc ||
-            PRODUCTION.defaultEvmAddresses?.pmmSrc ||
-            PRODUCTION.chains[chain.chain]?.pmmSrc,
+            getCurrentEnvironment().defaultEvmAddresses?.pmmSrc ||
+            getCurrentEnvironment().chains[chain.chain]?.pmmSrc,
           pmmDestinationAddress:
             chain.environment?.pmmDst ||
-            PRODUCTION.chains[chain.chain]?.pmmDst ||
-            PRODUCTION.defaultEvmAddresses?.pmmDst,
+            getCurrentEnvironment().chains[chain.chain]?.pmmDst ||
+            getCurrentEnvironment().defaultEvmAddresses?.pmmDst,
           deBridgeGateAddress:
             chain.environment?.deBridgeContract ||
-            PRODUCTION.chains[chain.chain]?.deBridgeContract ||
-            PRODUCTION.defaultEvmAddresses?.deBridgeContract,
+            getCurrentEnvironment().chains[chain.chain]?.deBridgeContract ||
+            getCurrentEnvironment().defaultEvmAddresses?.deBridgeContract,
           crossChainForwarderAddress:
             chain.environment?.evm?.forwarderContract ||
-            PRODUCTION.chains[chain.chain]?.evm?.forwarderContract ||
-            PRODUCTION.defaultEvmAddresses?.evm?.forwarderContract,
+            getCurrentEnvironment().chains[chain.chain]?.evm?.forwarderContract ||
+            getCurrentEnvironment().defaultEvmAddresses?.evm?.forwarderContract,
         };
       }
     }
@@ -283,18 +283,18 @@ export class Executor implements IExecutor {
       if (chain.chain === ChainId.Solana) {
         const solanaConnection = new Connection(chain.chainRpc);
         const solanaPmmSrc = new PublicKey(
-          chain.environment?.pmmSrc || PRODUCTION.chains[ChainId.Solana]!.pmmSrc!,
+          chain.environment?.pmmSrc || getCurrentEnvironment().chains[ChainId.Solana]!.pmmSrc!,
         );
         const solanaPmmDst = new PublicKey(
-          chain.environment?.pmmDst || PRODUCTION.chains[ChainId.Solana]!.pmmDst!,
+          chain.environment?.pmmDst || getCurrentEnvironment().chains[ChainId.Solana]!.pmmDst!,
         );
         const solanaDebridge = new PublicKey(
           chain.environment?.deBridgeContract ||
-            PRODUCTION.chains![ChainId.Solana]!.deBridgeContract!,
+            getCurrentEnvironment().chains![ChainId.Solana]!.deBridgeContract!,
         );
         const solanaDebridgeSetting = new PublicKey(
           chain.environment?.solana?.debridgeSetting ||
-            PRODUCTION.chains![ChainId.Solana]!.solana!.debridgeSetting!,
+            getCurrentEnvironment().chains![ChainId.Solana]!.solana!.debridgeSetting!,
         );
 
         const decodeKey = (key: string) =>
@@ -356,20 +356,20 @@ export class Executor implements IExecutor {
           connection: fulfillProvider.connection, // connection is required for on-chain data reading. No connection .address is used
           dlnSourceAddress:
             chain.environment?.pmmSrc ||
-            PRODUCTION.chains[chain.chain]?.pmmSrc ||
-            PRODUCTION.defaultEvmAddresses!.pmmSrc!,
+            getCurrentEnvironment().chains[chain.chain]?.pmmSrc ||
+            getCurrentEnvironment().defaultEvmAddresses!.pmmSrc!,
           dlnDestinationAddress:
             chain.environment?.pmmDst ||
-            PRODUCTION.chains[chain.chain]?.pmmDst ||
-            PRODUCTION.defaultEvmAddresses!.pmmDst!,
+            getCurrentEnvironment().chains[chain.chain]?.pmmDst ||
+            getCurrentEnvironment().defaultEvmAddresses!.pmmDst!,
           deBridgeGateAddress:
             chain.environment?.deBridgeContract ||
-            PRODUCTION.chains[chain.chain]?.deBridgeContract ||
-            PRODUCTION.defaultEvmAddresses!.deBridgeContract!,
+            getCurrentEnvironment().chains[chain.chain]?.deBridgeContract ||
+            getCurrentEnvironment().defaultEvmAddresses!.deBridgeContract!,
           crossChainForwarderAddress:
             chain.environment?.evm?.forwarderContract ||
-            PRODUCTION.chains[chain.chain]?.evm?.forwarderContract ||
-            PRODUCTION.defaultEvmAddresses?.evm!.forwarderContract!,
+            getCurrentEnvironment().chains[chain.chain]?.evm?.forwarderContract ||
+            getCurrentEnvironment().defaultEvmAddresses?.evm!.forwarderContract!,
         };
 
         if (!chain.disabled) {
@@ -380,8 +380,7 @@ export class Executor implements IExecutor {
         }
       }
 
-      const processorInitializer =
-        chain.orderProcessor || config.orderProcessor || processors.universalProcessor();
+      const processorInitializer = processors.universalProcessor();
       const initializingChain = {
         chain: chain.chain,
         chainRpc: chain.chainRpc,

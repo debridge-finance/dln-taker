@@ -93,6 +93,19 @@ const PRODUCTION: Env = {
   },
 };
 
-const CURRENT_ENVIRONMENT = PRODUCTION;
+let CURRENT_ENVIRONMENT = PRODUCTION;
 
-export { CURRENT_ENVIRONMENT, PRODUCTION, PRERELEASE_ENVIRONMENT_CODENAME_MADRID };
+function setCurrentEnvironment(newEnvironment: Env) {
+  CURRENT_ENVIRONMENT = newEnvironment;
+}
+
+function getCurrentEnvironment(): Env {
+  return CURRENT_ENVIRONMENT;
+}
+
+export {
+  setCurrentEnvironment,
+  getCurrentEnvironment,
+  PRODUCTION,
+  PRERELEASE_ENVIRONMENT_CODENAME_MADRID,
+};
