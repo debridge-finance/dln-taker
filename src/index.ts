@@ -6,7 +6,7 @@ import { ExecutorLaunchConfig } from './config';
 import * as environments from './environments';
 import { setCurrentEnvironment } from './environments';
 import { WsNextOrder as TempWsNextOrder } from './orderFeeds/ws.order.feed';
-
+import { Hooks } from './hooks/HookEnums';
 /**
  * Mark this export as deprecated intentionally: this won't be exported in ExecutorLaunchConfig v3
  * @deprecated
@@ -27,6 +27,7 @@ export {
   ExecutorLaunchConfig,
   environments,
   setCurrentEnvironment,
+  Hooks,
 
   // The following exports are required to support legacy ExecutorLaunchConfig v2
   CURRENT_ENVIRONMENT,
