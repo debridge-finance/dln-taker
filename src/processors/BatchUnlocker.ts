@@ -19,6 +19,10 @@ import { createClientLogger } from '../logger';
 import { OrderProcessorContext } from './base';
 import { HooksEngine } from '../hooks/HooksEngine';
 
+// max size fo unlocks coming to giveChain=Solana
+// TODO must be reimplemented so that batchSize can be set per giveChain, not per takeChain: #862kawqy0
+const BATCH_UNLOCK_TO_SOLANA_MAX_SIZE = 7;
+
 export class BatchUnlocker {
   // @ts-ignore Initialized deferredly within the first call of the unlockOrder() method. Should be rewritten during the next major refactoring
   private executor: IExecutor;
@@ -111,7 +115,7 @@ export class BatchUnlocker {
     }
 
     const currentSize = this.unlockBatchesOrderIdMap.get(giveChainId)!.size;
-    if (currentSize < this.batchUnlockSize) {
+    if (currentSize < this.getBatchUnlockSize(giveChainId)) {
       this.logger.debug('batch is not fulled yet, not performing unlock procedures');
       return;
     }
@@ -147,7 +151,7 @@ export class BatchUnlocker {
 
   private peekNextBatch(): ChainId | undefined {
     for (const [chainId, orderIds] of this.unlockBatchesOrderIdMap.entries()) {
-      if (orderIds.size >= this.batchUnlockSize) {
+      if (orderIds.size >= this.getBatchUnlockSize(chainId)) {
         return chainId;
       }
     }
@@ -155,24 +159,31 @@ export class BatchUnlocker {
     return undefined;
   }
 
+  private getBatchUnlockSize(giveChainId: ChainId): number {
+    // batch_unlock EVM -> Solana: accept up to 7 orders coming from Solana
+    if (giveChainId === ChainId.Solana)
+      return Math.min(BATCH_UNLOCK_TO_SOLANA_MAX_SIZE, this.batchUnlockSize);
+    return this.batchUnlockSize;
+  }
+
   /**
    * returns true if batch unlock succeeded (e.g. all orders were successfully unlocked)
    */
-  private async performBatchUnlock(chainId: ChainId): Promise<boolean> {
-    const orderIds = Array.from(this.unlockBatchesOrderIdMap.get(chainId)!).slice(
+  private async performBatchUnlock(giveChainId: ChainId): Promise<boolean> {
+    const orderIds = Array.from(this.unlockBatchesOrderIdMap.get(giveChainId)!).slice(
       0,
-      this.batchUnlockSize,
+      this.getBatchUnlockSize(giveChainId),
     );
 
-    const unlockedOrders = await this.unlockOrders(chainId, orderIds);
+    const unlockedOrders = await this.unlockOrders(giveChainId, orderIds);
 
     // clean executed orders form queue
     unlockedOrders.forEach((id) => {
-      this.unlockBatchesOrderIdMap.get(chainId)!.delete(id);
+      this.unlockBatchesOrderIdMap.get(giveChainId)!.delete(id);
       this.ordersDataMap.delete(id);
     });
 
-    return unlockedOrders.length === this.batchUnlockSize;
+    return unlockedOrders.length === this.getBatchUnlockSize(giveChainId);
   }
 
   private async unlockOrders(giveChainId: ChainId, orderIds: string[]): Promise<string[]> {
