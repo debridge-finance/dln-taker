@@ -20,28 +20,30 @@
 
 ## TL;DR
 
-- Grab the source code:
+- Make a new directory:
 ```sh
-git clone --depth 1 --single-branch --branch v2.8-latest git@github.com:debridge-finance/dln-taker.git
+mkdir dln-taker-env
 ```
 - `cd` to the directory and install necessary production dependencies:
 ```sh
-cd dln-taker
-npm install --prod
+cd dln-taker-env
+npm i --save typescript ts-node @debridge-finance/dln-taker
 ```
 - Create a configuration file called `executor.config.ts` based on sample:
 ```sh
-cp sample.config.ts executor.config.ts
+wget https://raw.githubusercontent.com/debridge-finance/dln-taker/main/sample.config.ts
+mv sample.config.ts executor.config.ts
 ```
 - Create a secrets file called `.env` based on sample:
 ```sh
-cp sample.env .env
+wget https://raw.githubusercontent.com/debridge-finance/dln-taker/main/sample.env
+mv sample.env .env
 ```
 - Set the values to variables defined in the secrets `.env` file ([more info](#preparing-the-environment))
 - Deploy reserve funds to the addresses you have defined in the secrets `.env` file ([more info](#deploying-reserve-funds))
-- Launch `dln-taker`:
+- Launch `dln-taker` via `npx`:
 ```sh
-npm run executor executor.config.ts
+npx dln-taker executor.config.ts
 ```
 - You would see how `dln-taker` executes orders being placed on the DLN
 
@@ -63,34 +65,7 @@ From the high level perspective, `dln-taker` automates the process of order esti
 
 ## Installation
 
-Fetch the source code from Github, picking the given revision (current: `v2.8-latest`):
-
-```sh
-git clone --depth 1 --single-branch --branch v2.8-latest git@github.com:debridge-finance/dln-taker.git
-```
-
-`cd` to the directory and install necessary production dependencies:
-
-```sh
-cd dln-taker
-npm install --prod
-```
-
-Create a configuration file with the name `executor.config.ts` taking the `sample.config.ts` file as a sample:
-
-```sh
-cp sample.config.ts executor.config.ts
-```
-
-and prepare the environment for it, as described in the [following section](#preparing-the-environment).
-
-Finally, launch `dln-taker` specifying the name of the configuration file:
-
-```sh
-npm run executor executor.config.ts
-```
-
-This will keep `dln-taker` up and running, listening for new orders and executing those that satisfy the rules. A detailed execution log would appear in the console.
+See [TL;DR section](#tldr) for quick install.
 
 ### Preparing the environment
 
