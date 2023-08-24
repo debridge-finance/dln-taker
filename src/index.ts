@@ -8,25 +8,28 @@ import { setCurrentEnvironment } from './environments';
 import { WsNextOrder as TempWsNextOrder } from './orderFeeds/ws.order.feed';
 import { Hooks } from './hooks/HookEnums';
 /**
- * Mark this export as deprecated intentionally: this won't be exported in ExecutorLaunchConfig v3
- * @deprecated
+ * Will get rid of this when developing ExecutorLaunchConfigV3 #862kawyur
  */
 const CURRENT_ENVIRONMENT = environments.PRODUCTION;
 
 /**
- * Mark this export as deprecated intentionally: this won't be exported in ExecutorLaunchConfig v3
- * @deprecated
+ * Will get rid of this when developing ExecutorLaunchConfigV3 #862kawyur
  */
 const WsNextOrder = TempWsNextOrder;
 
 export {
+  // configuration
   ChainId,
   configurator,
   processors,
   filters,
   ExecutorLaunchConfig,
+
+  // environment
   environments,
   setCurrentEnvironment,
+
+  // hooks
   Hooks,
 
   // The following exports are required to support legacy ExecutorLaunchConfig v2
