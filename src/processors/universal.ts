@@ -51,6 +51,13 @@ const EVM_FULFILL_GAS_MULTIPLIER = 1.25;
 // bump until
 const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.3;
 
+// defines max batch_unlock size
+const BATCH_UNLOCK_MAX_SIZE = 10;
+
+// max size fo unlocks coming to giveChain=Solana. Must be less than
+// TODO must be reimplemented so that batchSize can be set per giveChain, not per takeChain: #862kawqy0
+const BATCH_UNLOCK_TO_SOLANA_MAX_SIZE = 7;
+
 // dummy slippage used before any estimations are performed, this is needed only for estimation purposes
 const DUMMY_SLIPPAGE_BPS = 400; // 4%
 
@@ -130,8 +137,11 @@ class UniversalProcessor extends BaseOrderProcessor {
   constructor(params?: Partial<UniversalProcessorParams>) {
     super();
     const batchUnlockSize = params?.batchUnlockSize;
-    if (batchUnlockSize !== undefined && (batchUnlockSize > 10 || batchUnlockSize < 1)) {
-      throw new Error('batchUnlockSize should be in [1, 10]');
+    if (
+      batchUnlockSize !== undefined &&
+      (batchUnlockSize > BATCH_UNLOCK_MAX_SIZE || batchUnlockSize < 1)
+    ) {
+      throw new Error(`batchUnlockSize should be in [1, ${BATCH_UNLOCK_MAX_SIZE}]`);
     }
     Object.assign(this.params, params || {});
   }
@@ -714,12 +724,6 @@ class UniversalProcessor extends BaseOrderProcessor {
       }
     }
 
-    const batchSize =
-      orderInfo.order.give.chainId === ChainId.Solana ||
-      orderInfo.order.take.chainId === ChainId.Solana
-        ? null
-        : this.params.batchUnlockSize;
-
     const estimation = await calculateExpectedTakeAmount(
       orderInfo.order,
       this.params.minProfitabilityBps,
@@ -729,7 +733,10 @@ class UniversalProcessor extends BaseOrderProcessor {
         buckets: context.config.buckets,
         swapConnector: context.config.swapConnector,
         logger: createClientLogger(logger),
-        batchSize,
+        batchSize: this.getBatchUnlockSizeForProfitability(
+          orderInfo.order.give.chainId,
+          orderInfo.order.take.chainId,
+        ),
         evmFulfillGasLimit,
         evmFulfillCappedGasPrice: evmFulfillCappedGasPrice
           ? BigInt(evmFulfillCappedGasPrice.integerValue().toString())
@@ -944,6 +951,20 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
     logger.info(`order fulfilled: ${orderId}`);
 
     return Promise.resolve();
+  }
+
+  private getBatchUnlockSizeForProfitability(
+    giveChain: ChainId,
+    /* takeChain: ChainId */ {},
+  ): number {
+    // TODO must be reimplemented so that batchSize can be set per giveChain, not per takeChain: #862kawqy0
+
+    // batch_unlock EVM -> Solana: accept up to 7 orders coming from Solana
+    if (giveChain === ChainId.Solana)
+      return Math.min(BATCH_UNLOCK_TO_SOLANA_MAX_SIZE, this.params.batchUnlockSize);
+
+    // use default for any order
+    return this.params.batchUnlockSize;
   }
 
   private getPreFulfillSlippage(evaluatedTakeAmount: bigint, takeAmount: bigint): number {
