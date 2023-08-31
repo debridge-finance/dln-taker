@@ -81,7 +81,6 @@ export type ChainEnvironment = {
 
   solana?: {
     debridgeSetting?: string;
-    environment?: 'lima' | 'madrid' | 'prod';
   };
 };
 

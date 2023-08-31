@@ -1,4 +1,4 @@
-import { ChainId, Offer, Order, OrderData } from '@debridge-finance/dln-client';
+import { buffersAreEqual, ChainId, Offer, Order, OrderData } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import WebSocket from 'ws';
 
@@ -28,7 +28,9 @@ type WsOrder = {
   order_authority_address_dst: string;
   allowed_taker_dst: string | null;
   allowed_cancel_beneficiary_src: string | null;
-  external_call: null;
+  extcall: {
+    hash: number[] | null;
+  };
 };
 
 type FulfilledChangeStatus = { Fulfilled: { unlock_authority: string } };
@@ -77,6 +79,9 @@ type WsOrderInfo<T extends WsOrderInfoStatus> = {
     (T extends WsOrderInfoStatus.ArchivalFulfilled ? ArchivalFulfilledChangeStatus : {}) &
     (T extends WsOrderInfoStatus.Fulfilled ? FulfilledChangeStatus : {}) &
     (T extends WsOrderInfoStatus.Cancelled ? CancelledChangeStatus : {});
+  final_give_amount: null;
+  final_take_amount: null;
+  extcall: number[] | null;
 };
 
 type WsOrderEvent<T extends WsOrderInfoStatus> = {
@@ -199,39 +204,7 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     // Register message handler
-    this.socket.on('message', (event: Buffer) => {
-      const rawMessage = event.toString('utf-8');
-      const data = this.parseEvent(rawMessage);
-
-      if (typeof data === 'object') {
-        this.logger.info(`📨 ws received new message`);
-        this.logger.debug(data);
-        const parsedEvent = data as WsOrderEvent<any>;
-
-        if ('Order' in data) {
-          try {
-            const status = WsNextOrder.flattenStatus(parsedEvent.Order.order_info);
-            const order = WsNextOrder.wsOrderToOrderData(parsedEvent.Order.order_info);
-            const orderId = parsedEvent.Order.order_info.order_id;
-            const nextOrderInfo = WsNextOrder.transformToNextOrderInfo(
-              status,
-              orderId,
-              order,
-              parsedEvent,
-            );
-            this.processNextOrder(nextOrderInfo);
-          } catch (e) {
-            this.logger.error(`message processing failed: ${e}`);
-            this.logger.error(e);
-          }
-        } else {
-          this.logger.debug('message not handled');
-        }
-      } else {
-        this.logger.error(`unexpected message from WS`);
-        this.logger.error(rawMessage);
-      }
-    });
+    this.socket.on('message', (event: Buffer) => this.handleEvent(event));
 
     this.socket.on('error', async (err) => {
       this.logger.error(`WsConnection received error: ${err.message}`);
@@ -244,6 +217,40 @@ export class WsNextOrder extends GetNextOrder {
     });
 
     this.heartbeat();
+  }
+
+  private handleEvent(event: Buffer) {
+    const rawMessage = event.toString('utf-8');
+    const data = this.parseEvent(rawMessage);
+
+    if (typeof data === 'object') {
+      this.logger.info(`📨 ws received new message`);
+      this.logger.debug(data);
+      const parsedEvent = data as WsOrderEvent<any>;
+
+      if ('Order' in data) {
+        try {
+          const status = WsNextOrder.flattenStatus(parsedEvent.Order.order_info);
+          const order = WsNextOrder.wsOrderToOrderData(parsedEvent.Order.order_info);
+          const orderId = parsedEvent.Order.order_info.order_id;
+          const nextOrderInfo = WsNextOrder.transformToNextOrderInfo(
+            status,
+            orderId,
+            order,
+            parsedEvent,
+          );
+          this.processNextOrder(nextOrderInfo);
+        } catch (e) {
+          this.logger.error(`message processing failed: ${e}`);
+          this.logger.error(e);
+        }
+      } else {
+        this.logger.debug('message not handled');
+      }
+    } else {
+      this.logger.error(`unexpected message from WS`);
+      this.logger.error(rawMessage);
+    }
   }
 
   private parseEvent(message: string): any | undefined {
@@ -362,6 +369,10 @@ export class WsNextOrder extends GetNextOrder {
   }
 
   private static wsOrderToOrderData(info: WsOrderInfo<any>): OrderData {
+    if (!!info.order.extcall.hash && !info.extcall) {
+      throw new Error('WS_FATAL: Discrepancy between extcall existence and extcall hash existence');
+    }
+
     const order: OrderData = {
       nonce: BigInt(info.order.maker_order_nonce),
       give: WsNextOrder.wsOfferToOffer(info.order.give),
@@ -376,13 +387,29 @@ export class WsNextOrder extends GetNextOrder {
       allowedTaker: info.order.allowed_taker_dst
         ? helpers.hexToBuffer(info.order.allowed_taker_dst)
         : undefined,
-      externalCall: undefined,
+      externalCall: info.order.extcall.hash
+        ? {
+            externalCallHash: Uint8Array.from(info.order.extcall.hash),
+            externalCallData: Uint8Array.from(info.extcall || []), // existence is checked in the beginning of the method
+          }
+        : undefined,
     };
     const calculatedId = Order.calculateId(order);
     if (calculatedId !== info.order_id)
       throw new Error(
         `OrderId mismatch!\nProbably error during conversions between formats\nexpected id: ${info.order_id}\ncalculated: ${calculatedId}\nReceived order: ${info.order}\nTransformed: ${order}`,
       );
+
+    // verify externalCall and externalCallHash received from WS
+    if (order.externalCall) {
+      const calculatedExternalCallHash = Order.getExternalCallHash({
+        externalCallData: order.externalCall.externalCallData,
+      });
+      if (!buffersAreEqual(calculatedExternalCallHash, order.externalCall.externalCallHash!)) {
+        throw new Error('WS_FATAL: hashed extcall differs from order.extcall.hash');
+      }
+    }
+
     return order;
   }
 

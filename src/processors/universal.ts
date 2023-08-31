@@ -24,6 +24,7 @@ import {
   findExpectedBucket,
   calculateExpectedTakeAmount,
 } from '@debridge-finance/legacy-dln-profitability';
+import { VersionedTransaction } from '@solana/web3.js';
 import { DlnClient, IncomingOrder, IncomingOrderContext, OrderInfoStatus } from '../interfaces';
 import { createClientLogger } from '../logger';
 import { EvmProviderAdapter, InputTransaction } from '../providers/evm.provider.adapter';
@@ -634,42 +635,25 @@ class UniversalProcessor extends BaseOrderProcessor {
         (orderInfo.order.take.amount * BigInt(BPS_DENOMINATOR - BigInt(DUMMY_SLIPPAGE_BPS))) /
           BigInt(BPS_DENOMINATOR);
       try {
-        let preliminaryEvmFulfillTx: EvmInstruction | undefined;
-        if (buffersAreEqual(pickedBucket.reserveDstToken, orderInfo.order.take.tokenAddress)) {
-          preliminaryEvmFulfillTx = await context.config.client.fulfillOrder<ChainEngine.EVM>(
-            {
-              order: Order.getVerified({
-                orderId: helpers.hexToBuffer(orderInfo.orderId),
-                ...orderInfo.order,
-              }),
-              loggerInstance: createClientLogger(logger),
-            },
-            {
-              permit: '0x',
-              unlockAuthority: this.takeChain.unlockProvider.bytesAddress,
-            },
-          );
-        } else {
-          const t = await this.createOrderFullfillTx<ChainEngine.EVM>(
-            Order.getVerified({
-              orderId: helpers.hexToBuffer(orderInfo.orderId),
-              ...orderInfo.order,
-            }),
-            pickedBucket.reserveDstToken,
-            roughReserveDstAmount.toString(),
-            roughlyEvaluatedTakeAmount,
-            undefined,
-            context,
-            logger,
-          );
+        const t = await this.createOrderFullfillTx<ChainEngine.EVM>(
+          Order.getVerified({
+            orderId: helpers.hexToBuffer(orderInfo.orderId),
+            ...orderInfo.order,
+          }),
+          pickedBucket.reserveDstToken,
+          roughReserveDstAmount.toString(),
+          roughlyEvaluatedTakeAmount,
+          undefined,
+          context,
+          logger,
+        );
 
-          preliminaryEvmFulfillTx = <EvmInstruction>t.transaction;
+        const preliminaryEvmFulfillTx = <EvmInstruction>t.transaction;
 
-          //
-          // this needed to preserve swap routes (1inch specific)
-          //
-          preswapTx = <SwapConnectorResult<EvmChains>>t.swapResult;
-        }
+        //
+        // this needed to preserve swap routes (1inch specific)
+        //
+        preswapTx = <SwapConnectorResult<EvmChains>>t.swapResult;
 
         //
         // predicting gas price cap
@@ -820,54 +804,34 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
     }
 
     // building fulfill transaction
-    let fulfillTx;
-    if (buffersAreEqual(reserveDstToken, orderInfo.order.take.tokenAddress)) {
-      fulfillTx = await context.config.client.fulfillOrder(
-        {
-          order: Order.getVerified({
-            orderId: helpers.hexToBuffer(orderInfo.orderId),
-            ...orderInfo.order,
-          }),
-          loggerInstance: createClientLogger(logger),
-        },
-        {
-          permit: '0x',
-          taker: this.takeChain.fulfillProvider.bytesAddress,
-          unlockAuthority: this.takeChain.unlockProvider.bytesAddress,
-        },
-      );
-    } else {
-      const t = await this.createOrderFullfillTx(
-        Order.getVerified({ orderId: helpers.hexToBuffer(orderInfo.orderId), ...orderInfo.order }),
-        reserveDstToken,
-        requiredReserveDstAmount,
-        BigInt(profitableTakeAmount),
-        preswapTx,
-        context,
-        logger,
-      );
-      fulfillTx = t.transaction;
-    }
-    logger.debug('fulfill transaction built');
-    logger.debug(fulfillTx);
+    const { transaction: fulfillTx } = await this.createOrderFullfillTx(
+      Order.getVerified({ orderId: helpers.hexToBuffer(orderInfo.orderId), ...orderInfo.order }),
+      reserveDstToken,
+      requiredReserveDstAmount,
+      BigInt(profitableTakeAmount),
+      preswapTx,
+      context,
+      logger,
+    );
 
+    let txToSend: VersionedTransaction | InputTransaction;
     if (getEngineByChainId(orderInfo.order.take.chainId) === ChainEngine.EVM) {
       // remap properties
-      const evmTx: InputTransaction = {
+      txToSend = <InputTransaction>{
         data: (<EvmInstruction>fulfillTx).data,
         to: (<EvmInstruction>fulfillTx).to,
         value: (<EvmInstruction>fulfillTx).value.toString(),
-      };
-
-      try {
-        evmTx.gasLimit = await (this.takeChain.fulfillProvider as EvmProviderAdapter).estimateGas(
-          evmTx,
-        );
-        logger.debug(`final fulfill tx gas estimation: ${evmTx.gasLimit}`);
 
         // we set cappedTxFee as (pre-gasPrice * pre-gasLimit) because pre-*s are the values the profitability has been
         // estimated against. Now, if gasLimit goes up BUT gasPrice goes down, we still comfortable executing a txn
-        evmTx.cappedFee = evmFulfillCappedGasPrice?.multipliedBy(evmFulfillGasLimit!);
+        cappedFee: evmFulfillCappedGasPrice!.multipliedBy(evmFulfillGasLimit!),
+      };
+
+      try {
+        txToSend.gasLimit = await (
+          this.takeChain.fulfillProvider as EvmProviderAdapter
+        ).estimateGas(txToSend);
+        logger.debug(`final fulfill tx gas estimation: ${txToSend.gasLimit}`);
       } catch (e) {
         const message = `unable to estimate fullfil tx: ${e}`;
         logger.error(message);
@@ -879,9 +843,11 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
           isFinalizedOrder,
         );
       }
-
-      fulfillTx = evmTx;
+    } else {
+      txToSend = <VersionedTransaction>fulfillTx;
     }
+    logger.debug('fulfill transaction built');
+    logger.debug(txToSend);
 
     try {
       // we add this order to the budget controller right before the txn is broadcasted
@@ -892,11 +858,13 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
         context.giveChain.nonFinalizedOrdersBudgetController.addOrder(orderId, usdWorth);
       }
 
-      const txFulfill = await this.takeChain.fulfillProvider.sendTransaction(fulfillTx, { logger });
-      logger.info(`fulfill tx broadcasted, txhash: ${txFulfill}`);
+      const fulfillTxHash = await this.takeChain.fulfillProvider.sendTransaction(txToSend, {
+        logger,
+      });
+      logger.info(`fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
       this.hooksEngine.handleOrderFulfilled({
         order: orderInfo,
-        txHash: txFulfill,
+        txHash: fulfillTxHash,
       });
     } catch (e) {
       const message = `fulfill transaction failed: ${e}`;
@@ -960,9 +928,27 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
     context: OrderProcessorContext,
     logger: Logger,
   ): Promise<{
-    swapResult: SwapConnectorRequest['preferEstimation'];
+    swapResult?: SwapConnectorRequest['preferEstimation'];
     transaction: Awaited<ReturnType<DlnClient['preswapAndFulfillOrder']>>;
   }> {
+    if (buffersAreEqual(reserveDstToken, order.take.tokenAddress)) {
+      return {
+        transaction: await context.config.client.fulfillOrder(
+          {
+            order,
+            loggerInstance: createClientLogger(logger),
+          },
+          {
+            permit: '0x',
+            taker: this.takeChain.fulfillProvider.bytesAddress,
+            unlockAuthority: this.takeChain.unlockProvider.bytesAddress,
+            externalCallRewardBeneficiary: this.executor.getSupportedChain(order.take.chainId)
+              .beneficiary,
+          },
+        ),
+      };
+    }
+
     // in dln client 6.0+ swaps are prepared outside of preswapAndFulfill method
     const swapResult = await context.config.swapConnector.getSwap<
       T extends ChainEngine.Solana ? ChainId.Solana : EvmChains
@@ -993,6 +979,8 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
       },
       {
         unlockAuthority: this.takeChain.unlockProvider.bytesAddress,
+        externalCallRewardBeneficiary: this.executor.getSupportedChain(order.take.chainId)
+          .beneficiary,
       },
     );
 

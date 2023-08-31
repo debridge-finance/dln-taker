@@ -319,7 +319,7 @@ export class Executor implements IExecutor {
           undefined,
           undefined,
           undefined,
-          chain.environment?.solana?.environment,
+          getCurrentEnvironment().environment,
         );
         // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
         await client.destination.debridge.init();
@@ -460,10 +460,13 @@ export class Executor implements IExecutor {
 
     if (Object.keys(evmChainConfig).length !== 0) {
       clients.push(
-        new Evm.DlnClient({
-          chainConfig: evmChainConfig,
-          enableContractsCache: true,
-        }),
+        new Evm.DlnClient(
+          {
+            chainConfig: evmChainConfig,
+            enableContractsCache: true,
+          },
+          getCurrentEnvironment().environment,
+        ),
       );
     }
     this.client = new CommonDlnClient<Evm.DlnClient | Solana.DlnClient>(
