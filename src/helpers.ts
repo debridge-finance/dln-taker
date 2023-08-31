@@ -119,13 +119,7 @@ export function eventToOrderData(event: Order): OrderData {
       ? Buffer.from(event.allowedCancelBeneficiarySrc.address)
       : undefined,
     allowedTaker: event.allowedTakerDst ? Buffer.from(event.allowedTakerDst.address) : undefined,
-    externalCall: event.externalCall
-      ? {
-          executionFee: U256.toBigInt(event.externalCall.executionFee!),
-          externalCallHash: U256.toBytesBE(event.externalCall.hashOfExternalCall!),
-          fallbackDstAddress: Buffer.from(event.externalCall.fallbackAddressDst!.address),
-        }
-      : undefined,
+    externalCall: event.externalCall,
   };
   return orderData;
 }
