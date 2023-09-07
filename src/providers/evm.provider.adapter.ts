@@ -49,7 +49,8 @@ export type InputTransaction = {
   value?: string;
   gasLimit?: number;
 
-  cappedGasPrice?: BigNumber;
+  // represents a max gas*gasPrice this tx is allowed to increase to during re-broadcasting
+  cappedFee?: BigNumber;
 };
 
 export class EvmProviderAdapter implements ProviderAdapter {
@@ -161,14 +162,14 @@ export class EvmProviderAdapter implements ProviderAdapter {
     return fees;
   }
 
-  private async getOptimisticLegacyFee(): Promise<string> {
+  private async getOptimisticLegacyFee(): Promise<BigNumber> {
     if (!this.isLegacy) {
       throw new Error('Unsupported method');
     }
-    return this.connection.eth.getGasPrice();
+    return BigNumber(await this.connection.eth.getGasPrice());
   }
 
-  private async getRequiredLegacyFee(replaceTx?: BroadcastedTx): Promise<string> {
+  private async getRequiredLegacyFee(replaceTx?: BroadcastedTx): Promise<BigNumber> {
     if (!this.isLegacy) {
       throw new Error('Unsupported method');
     }
@@ -180,7 +181,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
         new BigNumber(replaceTx.tx.gasPrice as string).multipliedBy(
           this.rebroadcast.bumpGasPriceMultiplier!,
         ),
-      ).toFixed(0);
+      );
     }
 
     return gasPrice;
@@ -213,30 +214,37 @@ export class EvmProviderAdapter implements ProviderAdapter {
    * Populates txn with fees, taking capped gas price into consideration
    */
   private async tryPopulateTxPricing(
-    tx: TransactionConfig,
+    inputTx: TransactionConfig,
     replaceTx?: BroadcastedTx,
-    cappedGasPrice?: BigNumber,
+    cappedFee?: BigNumber,
   ): Promise<TransactionConfig> {
-    const mutatedTransaction = { ...tx };
+    const tx = await this.populateTransaction(inputTx);
+
     if (this.isLegacy) {
       const gasPrice = await this.getRequiredLegacyFee(replaceTx);
-      if (cappedGasPrice && cappedGasPrice.lt(gasPrice)) {
-        const message = `Unable to populate pricing: required gasPrice (${gasPrice}) is greater than cappedGasPrice (${cappedGasPrice})`;
+      if (cappedFee && cappedFee.lt(gasPrice.multipliedBy(tx.gas))) {
+        const message = `Unable to populate pricing: transaction fee (gasPrice=${gasPrice}, gasLimit=${
+          inputTx.gas
+        }, fee=${gasPrice.multipliedBy(tx.gas)}) is greater than cappedFee (${cappedFee})`;
         throw new Error(message);
       }
-      mutatedTransaction.gasPrice = gasPrice;
-      return mutatedTransaction;
+      tx.gasPrice = gasPrice.toFixed(0);
+      return tx;
     }
 
     const fees = await this.getRequiredFee(replaceTx);
-    if (cappedGasPrice && cappedGasPrice.lt(fees.maxFeePerGas)) {
-      const message = `Unable to populate pricing: required maxFeePerGas (${fees.maxFeePerGas}) is greater than cappedGasPrice (${cappedGasPrice})`;
+    if (cappedFee && cappedFee.lt(fees.maxFeePerGas.multipliedBy(tx.gas))) {
+      const message = `Unable to populate pricing: transaction fee (maxFeePerGas=${
+        fees.maxFeePerGas
+      }, gasLimit=${inputTx.gas}, fee=${fees.maxFeePerGas.multipliedBy(
+        tx.gas,
+      )}) is greater than cappedFee (${cappedFee})`;
       throw new Error(message);
     }
-    mutatedTransaction.maxFeePerGas = fees.maxFeePerGas.toFixed(0);
-    mutatedTransaction.maxPriorityFeePerGas = fees.maxPriorityFeePerGas.toFixed(0);
+    tx.maxFeePerGas = fees.maxFeePerGas.toFixed(0);
+    tx.maxPriorityFeePerGas = fees.maxPriorityFeePerGas.toFixed(0);
 
-    return mutatedTransaction;
+    return tx;
   }
 
   private async getTransactionTemplate(tx: InputTransaction): Promise<TransactionConfig> {
@@ -298,7 +306,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
         const txForSending: TransactionConfig = await this.tryPopulateTxPricing(
           template,
           template.nonce === this.staleTx?.tx.nonce ? this.staleTx : undefined,
-          tx.cappedGasPrice,
+          tx.cappedFee,
         );
 
         broadcastedTx = await this.sendTx(txForSending, logger);
@@ -365,7 +373,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
                 const txForRebroadcast = await this.tryPopulateTxPricing(
                   rebroadcastTemplate,
                   broadcastedTx,
-                  tx.cappedGasPrice,
+                  tx.cappedFee,
                 );
                 attemptsRebroadcast++;
                 broadcastedTx = await this.sendTx(txForRebroadcast, logger);
@@ -396,14 +404,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
     return transactionHash;
   }
 
-  private async populateTransaction(inputTx: TransactionConfig): Promise<TransactionConfig> {
-    const tx = { ...inputTx };
-
-    if (!tx.gas) {
-      tx.gas = await this.connection.eth.estimateGas(inputTx);
-    }
-
-    return tx;
+  private async populateTransaction(
+    inputTx: TransactionConfig,
+  ): Promise<Required<Pick<TransactionConfig, 'gas'>> & Omit<TransactionConfig, 'gas'>> {
+    return { ...inputTx, gas: inputTx.gas || (await this.connection.eth.estimateGas(inputTx)) };
   }
 
   private async sendTx(tx: TransactionConfig, logger: Logger): Promise<BroadcastedTx> {

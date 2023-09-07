@@ -42,13 +42,9 @@ import { isRevertedError } from './utils/isRevertedError';
 import { DexlessChains } from '../config';
 import { IExecutor } from '../executors/executor';
 
-// reasonable multiplier for gas estimated for the fulfill txn to define max
-// gas we are willing to estimate
-const EVM_FULFILL_GAS_MULTIPLIER = 1.1;
-
 // reasonable multiplier for gas price to define max gas price we are willing to
-// bump until
-const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.11;
+// bump until. Must cover up to 12.5% block base fee increase
+const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.125;
 
 // defines max batch_unlock size
 const BATCH_UNLOCK_MAX_SIZE = 10;
@@ -699,11 +695,6 @@ class UniversalProcessor extends BaseOrderProcessor {
         logger.debug(
           `estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${evmFulfillGasLimit} gas units`,
         );
-
-        evmFulfillGasLimit = Math.round(evmFulfillGasLimit * EVM_FULFILL_GAS_MULTIPLIER);
-        logger.debug(
-          `declared gas limit for the fulfill tx to be used in further estimations: ${evmFulfillGasLimit} gas units`,
-        );
       } catch (e) {
         let message;
         if (e instanceof ClientError) {
@@ -869,26 +860,14 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
       };
 
       try {
-        const evmFulfillGas = await (
-          this.takeChain.fulfillProvider as EvmProviderAdapter
-        ).estimateGas(evmTx);
-        logger.debug(`final fulfill tx gas estimation: ${evmFulfillGas}`);
-        if (evmFulfillGas > evmFulfillGasLimit!) {
-          const message = `final fulfill tx requires more gas units (${evmFulfillGas}) than it was declared during pre-estimation (${evmFulfillGasLimit})`;
+        evmTx.gasLimit = await (this.takeChain.fulfillProvider as EvmProviderAdapter).estimateGas(
+          evmTx,
+        );
+        logger.debug(`final fulfill tx gas estimation: ${evmTx.gasLimit}`);
 
-          // reprocess order after 5s delay, but no more than two times in a row
-          const maxFastTrackAttempts = 2; // attempts
-          const fastTrackDelay = 5; // seconds
-          const delay = metadata.attempts <= maxFastTrackAttempts ? fastTrackDelay : undefined;
-
-          return this.postponeOrder(
-            metadata,
-            message,
-            PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_EXCEEDED_PREESTIMATION,
-            isFinalizedOrder,
-            delay,
-          );
-        }
+        // we set cappedTxFee as (pre-gasPrice * pre-gasLimit) because pre-*s are the values the profitability has been
+        // estimated against. Now, if gasLimit goes up BUT gasPrice goes down, we still comfortable executing a txn
+        evmTx.cappedFee = evmFulfillCappedGasPrice?.multipliedBy(evmFulfillGasLimit!);
       } catch (e) {
         const message = `unable to estimate fullfil tx: ${e}`;
         logger.error(message);
@@ -900,9 +879,6 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
           isFinalizedOrder,
         );
       }
-
-      evmTx.gasLimit = evmFulfillGasLimit;
-      evmTx.cappedGasPrice = evmFulfillCappedGasPrice;
 
       fulfillTx = evmTx;
     }
