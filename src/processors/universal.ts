@@ -14,7 +14,6 @@ import {
 } from '@debridge-finance/dln-client';
 import BigNumber from 'bignumber.js';
 import { Logger } from 'pino';
-import Web3 from 'web3';
 
 import {
   SwapConnectorRequest,
@@ -27,7 +26,7 @@ import {
 } from '@debridge-finance/legacy-dln-profitability';
 import { DlnClient, IncomingOrder, IncomingOrderContext, OrderInfoStatus } from '../interfaces';
 import { createClientLogger } from '../logger';
-import { EvmProviderAdapter, Tx } from '../providers/evm.provider.adapter';
+import { EvmProviderAdapter, InputTransaction } from '../providers/evm.provider.adapter';
 
 import {
   BaseOrderProcessor,
@@ -45,11 +44,11 @@ import { IExecutor } from '../executors/executor';
 
 // reasonable multiplier for gas estimated for the fulfill txn to define max
 // gas we are willing to estimate
-const EVM_FULFILL_GAS_MULTIPLIER = 1.25;
+const EVM_FULFILL_GAS_MULTIPLIER = 1.1;
 
 // reasonable multiplier for gas price to define max gas price we are willing to
 // bump until
-const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.3;
+const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.11;
 
 // defines max batch_unlock size
 const BATCH_UNLOCK_MAX_SIZE = 10;
@@ -679,9 +678,9 @@ class UniversalProcessor extends BaseOrderProcessor {
         //
         // predicting gas price cap
         //
-        const currentGasPrice = BigNumber(
-          await (this.takeChain.fulfillProvider.connection as Web3).eth.getGasPrice(),
-        );
+        const currentGasPrice = await (
+          this.takeChain.fulfillProvider as EvmProviderAdapter
+        ).getRequiredGasPrice();
         evmFulfillCappedGasPrice = currentGasPrice
           .multipliedBy(EVM_FULFILL_GAS_PRICE_MULTIPLIER)
           .integerValue();
@@ -863,11 +862,10 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
 
     if (getEngineByChainId(orderInfo.order.take.chainId) === ChainEngine.EVM) {
       // remap properties
-      const evmTx: Tx = {
+      const evmTx: InputTransaction = {
         data: (<EvmInstruction>fulfillTx).data,
         to: (<EvmInstruction>fulfillTx).to,
         value: (<EvmInstruction>fulfillTx).value.toString(),
-        from: (<EvmInstruction>fulfillTx).from || this.takeChain.fulfillProvider.address,
       };
 
       try {
@@ -903,7 +901,7 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
         );
       }
 
-      evmTx.gas = evmFulfillGasLimit;
+      evmTx.gasLimit = evmFulfillGasLimit;
       evmTx.cappedGasPrice = evmFulfillCappedGasPrice;
 
       fulfillTx = evmTx;

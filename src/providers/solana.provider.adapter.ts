@@ -5,10 +5,10 @@ import { Connection, Keypair, Transaction, VersionedTransaction } from '@solana/
 import { ProviderAdapter, SendTransactionContext } from './provider.adapter';
 
 export class SolanaProviderAdapter implements ProviderAdapter {
-  public wallet: Parameters<typeof helpers.sendAll>['1'];
+  private readonly wallet: Parameters<typeof helpers.sendAll>['1'];
 
   constructor(
-    public connection: Connection,
+    private readonly connection: Connection,
     wallet: Keypair,
   ) {
     this.wallet = new helpers.Wallet(wallet);
@@ -20,6 +20,10 @@ export class SolanaProviderAdapter implements ProviderAdapter {
 
   public get bytesAddress(): Uint8Array {
     return this.wallet.publicKey.toBuffer();
+  }
+
+  public get unsafeGetConnection(): Connection {
+    return this.connection;
   }
 
   async sendTransaction(data: unknown, context: SendTransactionContext) {
