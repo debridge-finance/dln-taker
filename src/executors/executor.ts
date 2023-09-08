@@ -281,7 +281,10 @@ export class Executor implements IExecutor {
       let contractsForApprove: string[] = [];
 
       if (chain.chain === ChainId.Solana) {
-        const solanaConnection = new Connection(chain.chainRpc);
+        const solanaConnection = new Connection(chain.chainRpc, {
+          // force using native fetch because node-fetch throws errors on some RPC providers sometimes
+          fetch,
+        });
         const solanaPmmSrc = new PublicKey(
           chain.environment?.pmmSrc || getCurrentEnvironment().chains[ChainId.Solana]!.pmmSrc!,
         );
