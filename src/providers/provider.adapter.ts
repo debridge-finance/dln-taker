@@ -5,7 +5,7 @@ export type SendTransactionContext = {
 };
 
 export interface ProviderAdapter {
-  connection: unknown;
+  unsafeGetConnection: unknown;
   address: string;
   bytesAddress: Uint8Array;
   sendTransaction: (data: unknown, context: SendTransactionContext) => Promise<string>;

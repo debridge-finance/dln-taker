@@ -353,7 +353,7 @@ export class Executor implements IExecutor {
         );
 
         evmChainConfig[chain.chain] = {
-          connection: fulfillProvider.connection, // connection is required for on-chain data reading. No connection .address is used
+          connection: fulfillProvider.unsafeGetConnection, // connection is required for on-chain data reading. No connection .address is used
           dlnSourceAddress:
             chain.environment?.pmmSrc ||
             getCurrentEnvironment().chains[chain.chain]?.pmmSrc ||
