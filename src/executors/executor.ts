@@ -30,6 +30,7 @@ import {
   SupportedChain,
   DstOrderConstraints as RawDstOrderConstraints,
   SrcOrderConstraints as RawSrcOrderConstraints,
+  BLOCK_CONFIRMATIONS_HARD_CAPS,
 } from '../config';
 import * as filters from '../filters';
 import { OrderFilter } from '../filters';
@@ -45,19 +46,6 @@ import { TVLBudgetController } from '../processors/TVLBudgetController';
 import { DataStore } from '../processors/DataStore';
 import { createClientLogger } from '../logger';
 import { getCurrentEnvironment } from '../environments';
-
-const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
-  [SupportedChain.Arbitrum]: 15,
-  [SupportedChain.Avalanche]: 15,
-  [SupportedChain.BSC]: 15,
-  [SupportedChain.Ethereum]: 12,
-  [SupportedChain.Fantom]: 15,
-  [SupportedChain.Linea]: 15,
-  [SupportedChain.Base]: 15,
-  [SupportedChain.Optimism]: 15,
-  [SupportedChain.Polygon]: 256,
-  [SupportedChain.Solana]: 32,
-};
 
 export type ExecutorInitializingChain = Readonly<{
   chain: ChainId;

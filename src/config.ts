@@ -21,6 +21,32 @@ export enum SupportedChain {
   Optimism = ChainId.Optimism,
 }
 
+export const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
+  [SupportedChain.Arbitrum]: 15,
+  [SupportedChain.Avalanche]: 15,
+  [SupportedChain.BSC]: 15,
+  [SupportedChain.Ethereum]: 12,
+  [SupportedChain.Fantom]: 15,
+  [SupportedChain.Linea]: 15,
+  [SupportedChain.Base]: 15,
+  [SupportedChain.Optimism]: 15,
+  [SupportedChain.Polygon]: 256,
+  [SupportedChain.Solana]: 32,
+};
+
+export const avgBlockSpeed: { [key in SupportedChain]: number } = {
+  [ChainId.Arbitrum]: 0.4,
+  [ChainId.Avalanche]: 2,
+  [ChainId.BSC]: 3,
+  [ChainId.Ethereum]: 12,
+  [ChainId.Polygon]: 2.3,
+  [ChainId.Fantom]: 2,
+  [ChainId.Linea]: 12,
+  [ChainId.Solana]: 0.4,
+  [ChainId.Base]: 2,
+  [ChainId.Optimism]: 2,
+};
+
 export enum DexlessChains {
   Base = ChainId.Base,
   Linea = ChainId.Linea,

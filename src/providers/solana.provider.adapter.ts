@@ -1,6 +1,7 @@
 import { ChainId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Connection, Keypair, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { avgBlockSpeed, BLOCK_CONFIRMATIONS_HARD_CAPS } from '../config';
 
 import { ProviderAdapter, SendTransactionContext } from './provider.adapter';
 
@@ -20,6 +21,16 @@ export class SolanaProviderAdapter implements ProviderAdapter {
 
   public get bytesAddress(): Uint8Array {
     return this.wallet.publicKey.toBuffer();
+  }
+
+  // eslint-disable-next-line class-methods-use-this -- interface requirement
+  get avgBlockSpeed(): number {
+    return avgBlockSpeed[ChainId.Solana];
+  }
+
+  // eslint-disable-next-line class-methods-use-this -- interface requirement
+  get finalizedBlockCount(): number {
+    return BLOCK_CONFIRMATIONS_HARD_CAPS[ChainId.Solana];
   }
 
   public get unsafeGetConnection(): Connection {

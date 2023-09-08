@@ -4,7 +4,12 @@ import { Logger } from 'pino';
 import { clearInterval } from 'timers';
 import Web3 from 'web3';
 
-import { EvmRebroadcastAdapterOpts, SupportedChain } from '../config';
+import {
+  avgBlockSpeed,
+  BLOCK_CONFIRMATIONS_HARD_CAPS,
+  EvmRebroadcastAdapterOpts,
+  SupportedChain,
+} from '../config';
 
 import { ProviderAdapter, SendTransactionContext } from './provider.adapter';
 import { approve, isApproved } from './utils/approve';
@@ -14,19 +19,6 @@ type BroadcastedTx = {
   tx: TransactionConfig;
   hash: string;
   time: Date;
-};
-
-const avgBlockSpeed: { [key in SupportedChain]: number } = {
-  [ChainId.Arbitrum]: 0.4,
-  [ChainId.Avalanche]: 2,
-  [ChainId.BSC]: 3,
-  [ChainId.Ethereum]: 12,
-  [ChainId.Polygon]: 2.3,
-  [ChainId.Fantom]: 2,
-  [ChainId.Linea]: 12,
-  [ChainId.Solana]: 0.4,
-  [ChainId.Base]: 2,
-  [ChainId.Optimism]: 2,
 };
 
 // see https://docs.rs/ethers-core/latest/src/ethers_core/types/chain.rs.html#55-166
@@ -91,6 +83,10 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
   get avgBlockSpeed(): number {
     return avgBlockSpeed[this.chainId as unknown as SupportedChain];
+  }
+
+  get finalizedBlockCount(): number {
+    return BLOCK_CONFIRMATIONS_HARD_CAPS[this.chainId as unknown as SupportedChain];
   }
 
   get isLegacy(): boolean {
