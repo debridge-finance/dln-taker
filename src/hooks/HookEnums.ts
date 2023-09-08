@@ -109,4 +109,9 @@ export enum RejectionReason {
    * performed because swaps are not available on the take chain
    */
   UNAVAILABLE_PRE_FULFILL_SWAP,
+
+  /**
+   * Received malformed order from ws
+   */
+  MALFORMED_ORDER,
 }

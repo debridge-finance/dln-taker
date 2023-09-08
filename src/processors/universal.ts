@@ -388,6 +388,28 @@ class UniversalProcessor extends BaseOrderProcessor {
     const { orderId } = orderInfo;
     const { logger } = context;
 
+    //
+    // verify order integrity
+    //
+    const calculatedId = Order.calculateId(orderInfo.order);
+    if (calculatedId !== orderInfo.orderId) {
+      const message = 'orderId mismatch';
+      return this.rejectOrder(metadata, message, RejectionReason.MALFORMED_ORDER);
+    }
+
+    // verify externalCall and externalCallHash received from WS
+    if (orderInfo.order.externalCall) {
+      const calculatedExternalCallHash = Order.getExternalCallHash({
+        externalCallData: orderInfo.order.externalCall.externalCallData,
+      });
+      if (
+        !buffersAreEqual(calculatedExternalCallHash, orderInfo.order.externalCall.externalCallHash!)
+      ) {
+        const message = 'extcallHash mismatch';
+        return this.rejectOrder(metadata, message, RejectionReason.MALFORMED_ORDER);
+      }
+    }
+
     const bucket = context.config.buckets.find(
       (iteratedBucket) =>
         iteratedBucket.isOneOf(orderInfo.order.give.chainId, orderInfo.order.give.tokenAddress) &&
