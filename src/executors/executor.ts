@@ -380,7 +380,8 @@ export class Executor implements IExecutor {
         }
       }
 
-      const processorInitializer = processors.universalProcessor();
+      const processorInitializer =
+        chain.orderProcessor || config.orderProcessor || processors.universalProcessor();
       const initializingChain = {
         chain: chain.chain,
         chainRpc: chain.chainRpc,
