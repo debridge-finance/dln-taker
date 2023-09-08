@@ -902,17 +902,16 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
       );
     }
 
-    await BaseOrderProcessor.waitIsOrderFulfilled(
-      orderInfo.orderId,
-      orderInfo.order,
-      context,
-      logger,
-    );
-
     // order is fulfilled, remove it from queues (the order may have come again thru WS)
     this.clearInternalQueues(orderInfo.orderId);
     context.giveChain.TVLBudgetController.flushCache();
     logger.info(`order fulfilled: ${orderId}`);
+
+    // putting the order to the mempool, in case fulfill_txn gets lost
+    const fulfillCheckDelay: number =
+      this.takeChain.fulfillProvider.avgBlockSpeed *
+      this.takeChain.fulfillProvider.finalizedBlockCount;
+    this.mempoolService.addOrder(metadata.orderId, fulfillCheckDelay, metadata.attempts);
 
     return Promise.resolve();
   }
