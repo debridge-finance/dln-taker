@@ -8,7 +8,8 @@ import {
   Evm,
   getEngineByChainId,
   JupiterWrapper,
-  OneInchConnector,
+  OneInchV4Connector,
+  OneInchV5Connector,
   OrderData,
   PriceTokenService,
   Solana,
@@ -30,6 +31,7 @@ import {
   SupportedChain,
   DstOrderConstraints as RawDstOrderConstraints,
   SrcOrderConstraints as RawSrcOrderConstraints,
+  BLOCK_CONFIRMATIONS_HARD_CAPS,
 } from '../config';
 import * as filters from '../filters';
 import { OrderFilter } from '../filters';
@@ -45,19 +47,6 @@ import { TVLBudgetController } from '../processors/TVLBudgetController';
 import { DataStore } from '../processors/DataStore';
 import { createClientLogger } from '../logger';
 import { getCurrentEnvironment } from '../environments';
-
-const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
-  [SupportedChain.Arbitrum]: 15,
-  [SupportedChain.Avalanche]: 15,
-  [SupportedChain.BSC]: 15,
-  [SupportedChain.Ethereum]: 12,
-  [SupportedChain.Fantom]: 15,
-  [SupportedChain.Linea]: 15,
-  [SupportedChain.Base]: 15,
-  [SupportedChain.Optimism]: 15,
-  [SupportedChain.Polygon]: 256,
-  [SupportedChain.Solana]: 32,
-};
 
 export type ExecutorInitializingChain = Readonly<{
   chain: ChainId;
@@ -234,9 +223,12 @@ export class Executor implements IExecutor {
     if (config.swapConnector) {
       throw new Error('Custom swapConnector not implemented');
     }
-    const oneInchConnector = new OneInchConnector(this.url1Inch);
     const jupiterConnector = new JupiterWrapper();
-    this.swapConnector = new SwapConnectorImpl(oneInchConnector, jupiterConnector);
+    this.swapConnector = new SwapConnectorImpl(
+      new OneInchV4Connector(this.url1Inch),
+      new OneInchV5Connector(this.url1Inch),
+      jupiterConnector,
+    );
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
@@ -281,7 +273,10 @@ export class Executor implements IExecutor {
       let contractsForApprove: string[] = [];
 
       if (chain.chain === ChainId.Solana) {
-        const solanaConnection = new Connection(chain.chainRpc);
+        const solanaConnection = new Connection(chain.chainRpc, {
+          // force using native fetch because node-fetch throws errors on some RPC providers sometimes
+          fetch,
+        });
         const solanaPmmSrc = new PublicKey(
           chain.environment?.pmmSrc || getCurrentEnvironment().chains[ChainId.Solana]!.pmmSrc!,
         );
@@ -319,7 +314,7 @@ export class Executor implements IExecutor {
           undefined,
           undefined,
           undefined,
-          chain.environment?.solana?.environment,
+          getCurrentEnvironment().environment,
         );
         // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
         await client.destination.debridge.init();
@@ -460,10 +455,13 @@ export class Executor implements IExecutor {
 
     if (Object.keys(evmChainConfig).length !== 0) {
       clients.push(
-        new Evm.DlnClient({
-          chainConfig: evmChainConfig,
-          enableContractsCache: true,
-        }),
+        new Evm.DlnClient(
+          {
+            chainConfig: evmChainConfig,
+            enableContractsCache: true,
+          },
+          getCurrentEnvironment().environment,
+        ),
       );
     }
     this.client = new CommonDlnClient<Evm.DlnClient | Solana.DlnClient>(

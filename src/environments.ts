@@ -1,4 +1,4 @@
-import { ChainId } from '@debridge-finance/dln-client';
+import { ChainId, Env as DlnClientEnv } from '@debridge-finance/dln-client';
 
 import { ChainEnvironment } from './config';
 
@@ -8,12 +8,50 @@ type Env = {
   chains: {
     [key in ChainId]?: ChainEnvironment;
   };
+  environment?: DlnClientEnv;
+};
+
+const PRERELEASE_ENVIRONMENT_CODENAME_HANOI: Env = {
+  WSS: 'wss://dln-ws-test.debridge.finance/ws',
+
+  defaultEvmAddresses: {},
+  environment: DlnClientEnv.Hanoi,
+
+  chains: {
+    [ChainId.Solana]: {
+      deBridgeContract: 'Lima82j8YvHFYe8qa4kGgb3fvPFEnR3PoV6UyGUpHLq',
+      pmmSrc: 'srch38nzfcgwJnfKE6xWD8vfNJtudazwisdcociAuQt',
+      pmmDst: 'dsthjxvgzUiQYgoqSf7r5BbENqf2b34sSXkPvxuKS8d',
+      solana: {
+        debridgeSetting: 'settFZVDbqC9zBmV2ZCBfNMCtTzia2R7mVeR6ccK2nN',
+      },
+    },
+
+    [ChainId.Polygon]: {
+      deBridgeContract: '0xa9a617e8BE4efb0aC315691D2b4dbEC94f5Bb27b',
+      pmmSrc: '0x3c7010F5a2eCC2B56BeAE085B6528e492c8b36B6',
+      pmmDst: '0x08F20E7Ace48dAe4806A96b88386E62b2C161054',
+      evm: {
+        forwarderContract: '0x4f824487f7C0AB5A6B8B8411E472eaf7dDef2BBd',
+      },
+    },
+
+    [ChainId.BSC]: {
+      deBridgeContract: '0xa9a617e8BE4efb0aC315691D2b4dbEC94f5Bb27b',
+      pmmSrc: '0x3c7010F5a2eCC2B56BeAE085B6528e492c8b36B6',
+      pmmDst: '0x08F20E7Ace48dAe4806A96b88386E62b2C161054',
+      evm: {
+        forwarderContract: '0xce1705632Ced3A1d18Ed2b87ECe5B74526f59b8A',
+      },
+    },
+  },
 };
 
 const PRERELEASE_ENVIRONMENT_CODENAME_MADRID: Env = {
   WSS: 'wss://dln-ws-madrid.debridge.finance/ws',
 
   defaultEvmAddresses: {},
+  environment: DlnClientEnv.Madrid,
 
   chains: {
     [ChainId.Solana]: {
@@ -22,7 +60,6 @@ const PRERELEASE_ENVIRONMENT_CODENAME_MADRID: Env = {
       pmmDst: 'MADDfEEeW23M5owdXSXeBKAsb5zmT9oaLxDC4oLPfq7',
       solana: {
         debridgeSetting: 'settFZVDbqC9zBmV2ZCBfNMCtTzia2R7mVeR6ccK2nN',
-        environment: 'madrid',
       },
     },
 
@@ -108,4 +145,5 @@ export {
   getCurrentEnvironment,
   PRODUCTION,
   PRERELEASE_ENVIRONMENT_CODENAME_MADRID,
+  PRERELEASE_ENVIRONMENT_CODENAME_HANOI,
 };

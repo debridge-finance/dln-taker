@@ -1,5 +1,4 @@
-import { ChainId, OrderData, OrderState } from '@debridge-finance/dln-client';
-import { helpers } from '@debridge-finance/solana-utils';
+import { ChainId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 
 import { TokensBucket } from '@debridge-finance/legacy-dln-profitability';
@@ -58,39 +57,4 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
     context: OrderProcessorInitContext,
   ): Promise<void>;
   abstract process(params: IncomingOrderContext): void;
-
-  protected static async waitIsOrderFulfilled(
-    orderId: string,
-    order: OrderData,
-    context: OrderProcessorContext,
-    logger: Logger,
-  ) {
-    if (order.take.chainId === ChainId.Solana) {
-      let state = await context.config.client.getTakeOrderState(
-        {
-          orderId,
-          takeChain: order.take.chainId,
-        },
-        {},
-      );
-      const limit = 10;
-      let iteration = 0;
-      while (state === null || state.status !== OrderState.Fulfilled) {
-        if (iteration === limit)
-          throw new Error('Failed to wait for order fulfillment, retries limit reached');
-        // eslint-disable-next-line no-await-in-loop -- Very ugly, must be rewritten #862karqmr
-        state = await context.config.client.getTakeOrderState(
-          {
-            orderId,
-            takeChain: order.take.chainId,
-          },
-          {},
-        );
-        logger.debug(`state=${JSON.stringify(state)}`);
-        // eslint-disable-next-line no-await-in-loop -- Very ugly, must be rewritten #862karqmr
-        await helpers.sleep(2000);
-        iteration += 1;
-      }
-    }
-  }
 }
