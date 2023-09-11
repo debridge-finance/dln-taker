@@ -8,7 +8,8 @@ import {
   Evm,
   getEngineByChainId,
   JupiterWrapper,
-  OneInchConnector,
+  OneInchV4Connector,
+  OneInchV5Connector,
   OrderData,
   PriceTokenService,
   Solana,
@@ -222,9 +223,12 @@ export class Executor implements IExecutor {
     if (config.swapConnector) {
       throw new Error('Custom swapConnector not implemented');
     }
-    const oneInchConnector = new OneInchConnector(this.url1Inch);
     const jupiterConnector = new JupiterWrapper();
-    this.swapConnector = new SwapConnectorImpl(oneInchConnector, jupiterConnector);
+    this.swapConnector = new SwapConnectorImpl(
+      new OneInchV4Connector(this.url1Inch),
+      new OneInchV5Connector(this.url1Inch),
+      jupiterConnector,
+    );
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
