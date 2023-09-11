@@ -403,7 +403,10 @@ class UniversalProcessor extends BaseOrderProcessor {
         externalCallData: orderInfo.order.externalCall.externalCallData,
       });
       if (
-        !buffersAreEqual(calculatedExternalCallHash, orderInfo.order.externalCall.externalCallHash!)
+        !buffersAreEqual(
+          calculatedExternalCallHash,
+          orderInfo.order.externalCall.externalCallHash || Buffer.alloc(0),
+        )
       ) {
         const message = 'extcallHash mismatch';
         return this.rejectOrder(metadata, message, RejectionReason.MALFORMED_ORDER);
