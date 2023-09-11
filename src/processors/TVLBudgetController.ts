@@ -17,7 +17,11 @@ export class TVLBudgetController {
 
   private readonly executor: IExecutor;
 
-  private readonly cache = new NodeCache({ stdTTL: DEFAULT_TVL_CACHE_TTL });
+  private readonly cache = new NodeCache({
+    stdTTL: DEFAULT_TVL_CACHE_TTL,
+    // this cache is intended to store Promises. Using clones causes node to crash when a race condition occurs
+    useClones: false,
+  });
 
   private readonly logger: Logger;
 
