@@ -32,8 +32,8 @@
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@debridge-finance/dln-client": "6.5.7-calldata.8",
-    "@debridge-finance/legacy-dln-profitability": "1.2.0-extcall-dev8",
+    "@debridge-finance/dln-client": "7.0.0",
+    "@debridge-finance/legacy-dln-profitability": "1.3.1",
     "@debridge-finance/solana-utils": "4.1.0",
     "@protobuf-ts/plugin": "2.8.1",
     "@solana/web3.js": "1.66.2",
