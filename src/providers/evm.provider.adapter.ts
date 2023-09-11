@@ -346,7 +346,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
               failWithUndeterminedBehavior('poller reached timeout');
             } else if (
               new Date().getTime() - broadcastedTx.time.getTime() >
-              this.rebroadcast.rebroadcastInterval!
+              this.rebroadcast.rebroadcastInterval
             ) {
               pollingLogger.debug(`rebroadcasting...`);
 
@@ -356,15 +356,11 @@ export class EvmProviderAdapter implements ProviderAdapter {
                 pollingLogger.debug(
                   `seems like txn has been confirmed (nonce has been incremented), postponing rebroadcast`,
                 );
+              } else if (this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast) {
+                failWithUndeterminedBehavior(
+                  `no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts})`,
+                );
               } else {
-                if (this.rebroadcast.rebroadcastMaxAttempts === attemptsRebroadcast) {
-                  pollingLogger.debug(
-                    `no more attempts (${attemptsRebroadcast}/${this.rebroadcast.rebroadcastMaxAttempts})`,
-                  );
-
-                  throw new Error(`rebroadcasting aborted`);
-                }
-
                 // try rebroadcast, bumping price up from previously broadcasted txn
                 const txForRebroadcast = await this.tryPopulateTxPricing(
                   rebroadcastTemplate,
@@ -379,13 +375,13 @@ export class EvmProviderAdapter implements ProviderAdapter {
                 });
               }
             }
-
-            locked = false;
           } catch (e) {
             pollingLogger.error(`poller raised an error: ${e}`);
             pollingLogger.error(e);
             failWithUndeterminedBehavior(`poller raised an error: ${e}`);
           }
+
+          locked = false;
         }, this.rebroadcast.pollingInterval);
       } catch (e) {
         const message = `sending tx failed: ${e}`;
