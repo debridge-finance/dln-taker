@@ -3,7 +3,6 @@ import {
   buffersAreEqual,
   ChainEngine,
   ChainId,
-  ClientError,
   EvmChains,
   EvmInstruction,
   getEngineByChainId,
@@ -659,41 +658,41 @@ class UniversalProcessor extends BaseOrderProcessor {
         orderInfo.order.take.amount +
         (orderInfo.order.take.amount * BigInt(BPS_DENOMINATOR - BigInt(DUMMY_SLIPPAGE_BPS))) /
           BigInt(BPS_DENOMINATOR);
+      const t = await this.createOrderFullfillTx<ChainEngine.EVM>(
+        Order.getVerified({
+          orderId: helpers.hexToBuffer(orderInfo.orderId),
+          ...orderInfo.order,
+        }),
+        pickedBucket.reserveDstToken,
+        roughReserveDstAmount.toString(),
+        roughlyEvaluatedTakeAmount,
+        undefined,
+        context,
+        logger,
+      );
+
+      const preliminaryEvmFulfillTx = <EvmInstruction>t.transaction;
+
+      //
+      // this needed to preserve swap routes (1inch specific)
+      //
+      preswapTx = <SwapConnectorResult<EvmChains>>t.swapResult;
+
+      //
+      // predicting gas price cap
+      //
+      const currentGasPrice = await (
+        this.takeChain.fulfillProvider as EvmProviderAdapter
+      ).getRequiredGasPrice();
+      evmFulfillCappedGasPrice = currentGasPrice
+        .multipliedBy(EVM_FULFILL_GAS_PRICE_MULTIPLIER)
+        .integerValue();
+      logger.debug(`capped gas price: ${evmFulfillCappedGasPrice.toFixed(0)}`);
+
+      //
+      // predicting gas limit
+      //
       try {
-        const t = await this.createOrderFullfillTx<ChainEngine.EVM>(
-          Order.getVerified({
-            orderId: helpers.hexToBuffer(orderInfo.orderId),
-            ...orderInfo.order,
-          }),
-          pickedBucket.reserveDstToken,
-          roughReserveDstAmount.toString(),
-          roughlyEvaluatedTakeAmount,
-          undefined,
-          context,
-          logger,
-        );
-
-        const preliminaryEvmFulfillTx = <EvmInstruction>t.transaction;
-
-        //
-        // this needed to preserve swap routes (1inch specific)
-        //
-        preswapTx = <SwapConnectorResult<EvmChains>>t.swapResult;
-
-        //
-        // predicting gas price cap
-        //
-        const currentGasPrice = await (
-          this.takeChain.fulfillProvider as EvmProviderAdapter
-        ).getRequiredGasPrice();
-        evmFulfillCappedGasPrice = currentGasPrice
-          .multipliedBy(EVM_FULFILL_GAS_PRICE_MULTIPLIER)
-          .integerValue();
-        logger.debug(`capped gas price: ${evmFulfillCappedGasPrice.toFixed(0)}`);
-
-        //
-        // predicting gas limit
-        //
         evmFulfillGasLimit = await (
           this.takeChain.fulfillProvider as EvmProviderAdapter
         ).estimateGas({
@@ -705,15 +704,12 @@ class UniversalProcessor extends BaseOrderProcessor {
           `estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${evmFulfillGasLimit} gas units`,
         );
       } catch (e) {
-        let message;
-        if (e instanceof ClientError) {
-          message = `preliminary fullfil tx estimation failed: ${e}, reason: ${e.type}`;
-          logger.error(message);
-        } else {
-          message = `unable to estimate preliminary fullfil tx: ${e}; this can be because the order is not profitable`;
-          logger.error(message);
-          logger.error(e);
-        }
+        const message = `unable to estimate preliminary fullfil tx: ${e}`;
+        logger.error(message);
+        logger.error({
+          ...preliminaryEvmFulfillTx,
+          from: this.takeChain.fulfillProvider.address,
+        });
         return this.postponeOrder(
           metadata,
           message,
@@ -993,6 +989,12 @@ while calculateExpectedTakeAmount returned ${tokenAddressToString(
         logger: createClientLogger(logger),
       },
     );
+
+    if (swapResult.amountOut < order.take.amount) {
+      throw new Error(
+        `Pre-fulfill swap gives amount (${swapResult.amountOut.toString()}) lesser than order.takeAmount`,
+      );
+    }
 
     const transaction = await context.config.client.preswapAndFulfillOrder(
       {
