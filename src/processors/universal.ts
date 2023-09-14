@@ -36,7 +36,7 @@ import {
   OrderProcessorInitializer,
 } from './base';
 import { BatchUnlocker } from './BatchUnlocker';
-import { MempoolService } from './mempool.service';
+import { MempoolOpts, MempoolService } from './mempool.service';
 import { PostponingReason, RejectionReason } from '../hooks/HookEnums';
 import { isRevertedError } from './utils/isRevertedError';
 import { DexlessChains } from '../config';
@@ -64,14 +64,6 @@ export type UniversalProcessorParams = {
    */
   minProfitabilityBps: number;
   /**
-   * Mempool: max amount of seconds to wait before second attempt to process an order; default: 60s
-   */
-  mempoolInterval: number;
-  /**
-   * Mempool: amount of seconds to add to the max amount of seconds on each subsequent attempt; default: 30s
-   */
-  mempoolMaxDelayStep: number;
-  /**
    * Number of orders (per every chain where orders are coming from and to) to accumulate to unlock them in batches
    *     Min: 1; max: 10, default: 10.
    *     This means that the executor would accumulate orders (that were fulfilled successfully) rather then unlock
@@ -93,6 +85,8 @@ export type UniversalProcessorParams = {
    * Max slippage that can be used for swap from reserveToken to takeToken when calculated automatically
    */
   preFulfillSwapMaxAllowedSlippageBps: number;
+
+  mempool: MempoolOpts;
 };
 
 // Represents all necessary information about Created order during its internal lifecycle
@@ -123,11 +117,15 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
-    mempoolInterval: 60,
-    mempoolMaxDelayStep: 30,
     batchUnlockSize: 10,
     preFulfillSwapMinAllowedSlippageBps: 5,
     preFulfillSwapMaxAllowedSlippageBps: 400,
+    mempool: {
+      baseDelay: 5,
+      baseArchivalDelay: 60 * 2,
+      delayStep: 10,
+      archivalDelayStep: 60 * 5,
+    },
   };
 
   constructor(params?: Partial<UniversalProcessorParams>) {
@@ -165,8 +163,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     this.mempoolService = new MempoolService(
       logger.child({ takeChainId: chainId }),
+      this.params.mempool,
       (orderId: string) => this.consume(orderId),
-      this.params.mempoolInterval,
     );
 
     if (chainId !== ChainId.Solana) {
@@ -371,7 +369,15 @@ class UniversalProcessor extends BaseOrderProcessor {
       attempts,
     });
 
-    if (addToMempool) this.mempoolService.addOrder(metadata.orderId, remainingDelay, attempts);
+    if (addToMempool) {
+      if (remainingDelay) {
+        this.mempoolService.addOrder(metadata.orderId, remainingDelay);
+      } else if (metadata.context.orderInfo.status === OrderInfoStatus.ArchivalCreated) {
+        this.mempoolService.delayArchivalOrder(metadata.orderId, attempts);
+      } else {
+        this.mempoolService.delayOrder(metadata.orderId, attempts);
+      }
+    }
   }
 
   private rejectOrder(
@@ -922,7 +928,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     const fulfillCheckDelay: number =
       this.takeChain.fulfillProvider.avgBlockSpeed *
       this.takeChain.fulfillProvider.finalizedBlockCount;
-    this.mempoolService.addOrder(metadata.orderId, fulfillCheckDelay, metadata.attempts);
+    this.mempoolService.addOrder(metadata.orderId, fulfillCheckDelay);
 
     return Promise.resolve();
   }
