@@ -56,11 +56,14 @@ export class MempoolService {
   }
 
   delete(orderId: string) {
+    if (this.#trackedOrders.has(orderId)) {
+      clearTimeout(this.#trackedOrders.get(orderId));
+    }
     this.#trackedOrders.delete(orderId);
     this.#logger.child({ orderId }).debug('order has been removed from the mempool');
   }
 
-  getTimeoutFunc(orderId: OrderId, logger: Logger) {
+  private getTimeoutFunc(orderId: OrderId, logger: Logger) {
     const promiseStartTime = new Date();
     return () => {
       const settlementTime = new Date();
