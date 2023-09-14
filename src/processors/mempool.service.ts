@@ -1,8 +1,9 @@
 import { Logger } from 'pino';
 
 import { setTimeout } from 'timers/promises';
-import { ProcessOrder } from '../interfaces';
 import { OrderId } from './base';
+
+export type OrderConsumer = (orderId: OrderId) => void;
 
 export class MempoolService {
   readonly #logger: Logger;
@@ -11,7 +12,7 @@ export class MempoolService {
 
   constructor(
     logger: Logger,
-    private readonly processOrderFunction: ProcessOrder,
+    private readonly orderConsumer: OrderConsumer,
     private readonly maxReprocessDelay: number,
     private readonly delayStep: number = 30,
   ) {
@@ -59,7 +60,7 @@ export class MempoolService {
         if (this.#trackedOrders.has(orderId)) {
           orderLogger.debug(`invoking order processing routine`);
           this.#trackedOrders.delete(orderId);
-          this.processOrderFunction(orderId);
+          this.orderConsumer(orderId);
         } else {
           orderLogger.debug(`order does not exist in the mempool`);
         }
