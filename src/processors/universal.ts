@@ -41,6 +41,7 @@ import { PostponingReason, RejectionReason } from '../hooks/HookEnums';
 import { isRevertedError } from './utils/isRevertedError';
 import { DexlessChains } from '../config';
 import { IExecutor } from '../executors/executor';
+import { die, assert } from '../errors';
 
 // reasonable multiplier for gas price to define max gas price we are willing to
 // bump until. Must cover up to 12.5% block base fee increase
@@ -132,12 +133,11 @@ class UniversalProcessor extends BaseOrderProcessor {
   constructor(params?: Partial<UniversalProcessorParams>) {
     super();
     const batchUnlockSize = params?.batchUnlockSize;
-    if (
-      batchUnlockSize !== undefined &&
-      (batchUnlockSize > BATCH_UNLOCK_MAX_SIZE || batchUnlockSize < 1)
-    ) {
-      throw new Error(`batchUnlockSize should be in [1, ${BATCH_UNLOCK_MAX_SIZE}]`);
-    }
+    assert(
+      batchUnlockSize === undefined ||
+        (batchUnlockSize <= BATCH_UNLOCK_MAX_SIZE && batchUnlockSize >= 1),
+      `batchUnlockSize should be in [1, ${BATCH_UNLOCK_MAX_SIZE}]`,
+    );
     Object.assign(this.params, params || {});
   }
 
@@ -165,7 +165,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     this.mempoolService = new MempoolService(
       logger.child({ takeChainId: chainId }),
-      this.tryProcess.bind(this),
+      (orderId: string) => this.consume(orderId),
       this.params.mempoolInterval,
     );
 
@@ -210,7 +210,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         // override order params because there can be refreshed data (patches, newer confirmations, etc)
         this.#createdOrdersMetadata.get(orderId)!.context = params;
 
-        this.tryProcess(orderId);
+        this.consume(orderId);
         return;
       }
       case OrderInfoStatus.ArchivalFulfilled: {
@@ -253,52 +253,64 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.#createdOrdersMetadata.delete(orderId);
   }
 
-  private async tryProcess(orderId: string): Promise<void> {
+  private consume(orderId: string) {
     const metadata = this.getCreatedOrderMetadata(orderId);
-    const params = metadata.context;
-
-    const { logger } = params.context;
-    const { orderInfo } = params;
 
     // already processing an order
     if (this.isLocked) {
+      const { status } = metadata.context.orderInfo;
+      const { logger } = metadata.context.context;
+
       logger.debug(`Processor is currently processing an order, postponing`);
 
-      switch (orderInfo.status) {
+      switch (status) {
         case OrderInfoStatus.ArchivalCreated: {
-          this.queue.add(orderInfo.orderId);
+          this.queue.add(orderId);
           logger.debug(`postponed to secondary queue`);
           break;
         }
         case OrderInfoStatus.Created: {
-          this.priorityQueue.add(orderInfo.orderId);
+          this.priorityQueue.add(orderId);
           logger.debug(`postponed to primary queue`);
           break;
         }
-        default:
-          throw new Error(`Unexpected order status: ${OrderInfoStatus[orderInfo.status]}`);
+        default: {
+          die(`Unexpected order status: ${OrderInfoStatus[status]}`);
+        }
       }
+
       return;
     }
+
+    metadata.attempts++;
+    // mind that order is being processed in a separate context
+    this.processOrder(metadata);
+  }
+
+  private async processOrder(metadata: CreatedOrderMetadata): Promise<void> {
+    assert(
+      this.isLocked === false,
+      `Processor invoked when being locked (orderId: ${metadata.orderId})`,
+    );
 
     // process this order
     this.isLocked = true;
     try {
-      await this.processOrder(metadata);
+      await this.evaluateAndFulfill(metadata);
     } catch (e) {
+      const { logger } = metadata.context.context;
       const message = `processing order failed with an unhandled error: ${e}`;
       logger.error(message);
       logger.error(e);
       this.postponeOrder(metadata, message, PostponingReason.UNHANDLED_ERROR, true);
     }
-    metadata.attempts++;
     this.isLocked = false;
 
     // forward to the next order
     // TODO try to get rid of recursion here. Use setInterval?
     const nextOrderId = this.pickNextOrderId();
     if (nextOrderId) {
-      this.tryProcess(nextOrderId);
+      this.consume(nextOrderId);
     }
   }
 
@@ -331,8 +343,10 @@ class UniversalProcessor extends BaseOrderProcessor {
   }
 
   private getCreatedOrderMetadata(orderId: OrderId): CreatedOrderMetadata {
-    if (!this.#createdOrdersMetadata.has(orderId))
-      throw new Error(`Unexpected: missing created order data`);
+    assert(
+      this.#createdOrdersMetadata.has(orderId),
+      `Unexpected: missing created order data (orderId: ${orderId})`,
+    );
     return this.#createdOrdersMetadata.get(orderId)!;
   }
 
@@ -382,7 +396,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     return Promise.resolve();
   }
 
-  private async processOrder(metadata: CreatedOrderMetadata): Promise<void> {
+  private async evaluateAndFulfill(metadata: CreatedOrderMetadata): Promise<void> {
     const { context, orderInfo } = metadata.context;
     const { orderId } = orderInfo;
     const { logger } = context;
@@ -811,18 +825,16 @@ class UniversalProcessor extends BaseOrderProcessor {
       );
     }
 
-    if (!buffersAreEqual(reserveDstToken, pickedBucket.reserveDstToken)) {
-      const message = `internal error: \
-dln-taker has picked ${tokenAddressToString(
+    assert(
+      buffersAreEqual(reserveDstToken, pickedBucket.reserveDstToken),
+      `internal error: dln-taker has picked ${tokenAddressToString(
         orderInfo.order.take.chainId,
         pickedBucket.reserveDstToken,
-      )} as reserve token, \
-while calculateExpectedTakeAmount returned ${tokenAddressToString(
+      )} as reserve token, while calculateExpectedTakeAmount returned ${tokenAddressToString(
         orderInfo.order.take.chainId,
         reserveDstToken,
-      )}`;
-      throw new Error(message);
-    }
+      )}`,
+    );
 
     // building fulfill transaction
     const { transaction: fulfillTx } = await this.createOrderFullfillTx(
