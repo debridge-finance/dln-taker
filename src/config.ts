@@ -48,7 +48,6 @@ export const avgBlockSpeed: { [key in SupportedChain]: number } = {
 };
 
 export enum DexlessChains {
-  Base = ChainId.Base,
   Linea = ChainId.Linea,
 }
 
