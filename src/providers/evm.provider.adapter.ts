@@ -162,7 +162,15 @@ export class EvmProviderAdapter implements ProviderAdapter {
     if (!this.isLegacy) {
       throw new Error('Unsupported method');
     }
-    return BigNumber(await this.connection.eth.getGasPrice());
+    let price = BigNumber(await this.connection.eth.getGasPrice());
+
+    // BNB chain: ensure gas price is between [3gwei, 5gwei]
+    if (this.chainId === ChainId.BSC) {
+      price = BigNumber.max(3e9, price); // >=3gwei
+      price = BigNumber.min(price, 5e9); // <=5gwei
+    }
+
+    return price;
   }
 
   private async getRequiredLegacyFee(replaceTx?: BroadcastedTx): Promise<BigNumber> {
