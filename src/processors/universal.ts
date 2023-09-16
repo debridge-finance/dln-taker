@@ -87,6 +87,13 @@ export type UniversalProcessorParams = {
   preFulfillSwapMaxAllowedSlippageBps: number;
 
   mempool: MempoolOpts;
+
+  /**
+   * Financially-unsafe mode: if taker's account has enough take_amount of take_token, then use them instead
+   * of making a swap from reserve token.
+   * Default: false
+   */
+  unsafeAllowDirectFulfills: boolean;
 };
 
 // Represents all necessary information about Created order during its internal lifecycle
@@ -126,6 +133,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       delayStep: 10,
       archivalDelayStep: 60 * 5,
     },
+    unsafeAllowDirectFulfills: false,
   };
 
   constructor(params?: Partial<UniversalProcessorParams>) {
@@ -1012,6 +1020,32 @@ class UniversalProcessor extends BaseOrderProcessor {
       throw new Error(
         `Pre-fulfill swap gives amount (${swapResult.amountOut.toString()}) lesser than order.takeAmount`,
       );
+    }
+
+    // Financially-unsafe mode (must be enabled explicitly): if taker's account has enough take_amount of take_token,
+    // then use them instead of making a swap from reserve token
+    if (this.params.unsafeAllowDirectFulfills) {
+      // check amount of take_token
+      const accountReserveBalance = await this.executor.client
+        .getClient(this.takeChain.chain)
+        .getBalance(
+          this.takeChain.chain,
+          order.take.tokenAddress,
+          this.takeChain.fulfillProvider.bytesAddress,
+        );
+      // if amount exceeds order's take amount, use these tokens
+      if (accountReserveBalance >= order.take.amount) {
+        logger.warn('Switching to UNSAFE MODE: pulling take tokens');
+        return this.createOrderFullfillTx(
+          order,
+          order.take.tokenAddress,
+          order.take.amount.toString(),
+          order.take.amount,
+          undefined,
+          context,
+          logger,
+        );
+      }
     }
 
     const transaction = await context.config.client.preswapAndFulfillOrder(
