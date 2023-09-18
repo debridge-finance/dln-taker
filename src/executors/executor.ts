@@ -223,7 +223,12 @@ export class Executor implements IExecutor {
     if (config.swapConnector) {
       throw new Error('Custom swapConnector not implemented');
     }
-    const jupiterConnector = new JupiterWrapper();
+    const jupiterConnector = new JupiterWrapper(
+      (route) =>
+        // allow all routes except partial swaps
+        // e.g. Lifinity swap is Ok, Lifinity (20%) + Orca (80%) is bad
+        route.marketInfos.find((marketInfo) => marketInfo.label.includes(' + ')) === undefined,
+    );
     this.swapConnector = new SwapConnectorImpl(
       new OneInchV4Connector(this.url1Inch),
       new OneInchV5Connector(this.url1Inch),
