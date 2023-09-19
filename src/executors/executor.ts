@@ -69,6 +69,7 @@ type DstConstraintsPerOrderValue = Array<
 
 type SrcOrderConstraints = Readonly<{
   fulfillmentDelay: number;
+  nonFinalizedTVLBudget: number;
 }>;
 
 type SrcConstraintsPerOrderValue = Array<
@@ -424,6 +425,13 @@ export class Executor implements IExecutor {
         ),
       );
 
+      const srcConstraints = {
+        ...Executor.getSrcConstraints(chain.constraints || {}),
+        perOrderValue: Executor.getSrcConstraintsPerOrderValue(
+          chain.chain as unknown as SupportedChain,
+          chain.constraints || {},
+        ),
+      };
       this.chains[chain.chain] = {
         chain: chain.chain,
         chainRpc: chain.chainRpc,
@@ -434,7 +442,12 @@ export class Executor implements IExecutor {
         fulfillProvider,
         nonFinalizedOrdersBudgetController: new NonFinalizedOrdersBudgetController(
           chain.chain,
-          chain.constraints?.nonFinalizedTVLBudget || 0,
+          BLOCK_CONFIRMATIONS_HARD_CAPS[chain.chain as unknown as SupportedChain],
+          srcConstraints.perOrderValue.map(constraint => ({
+            minBlockConfirmations: constraint.minBlockConfirmations,
+            tvlCap: constraint.nonFinalizedTVLBudget
+          })),
+          srcConstraints.nonFinalizedTVLBudget,
           this.logger,
         ),
         TVLBudgetController: new TVLBudgetController(
@@ -444,13 +457,7 @@ export class Executor implements IExecutor {
           this.logger,
         ),
         beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
-        srcConstraints: {
-          ...Executor.getSrcConstraints(chain.constraints || {}),
-          perOrderValue: Executor.getSrcConstraintsPerOrderValue(
-            chain.chain as unknown as SupportedChain,
-            chain.constraints || {},
-          ),
-        },
+        srcConstraints,
         dstConstraints: {
           ...Executor.getDstConstraints(chain.dstConstraints || {}),
           perOrderValue: Executor.getDstConstraintsPerOrderValue(chain.dstConstraints || {}),
@@ -537,10 +544,10 @@ export class Executor implements IExecutor {
 
   private static getSrcConstraintsPerOrderValue(
     chain: SupportedChain,
-    configDstConstraints: ChainDefinition['constraints'],
+    configSrcConstraints: ChainDefinition['constraints'],
   ): SrcConstraintsPerOrderValue {
     return (
-      (configDstConstraints?.requiredConfirmationsThresholds || [])
+      (configSrcConstraints?.requiredConfirmationsThresholds || [])
         .map((constraint) => {
           if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= (constraint.minBlockConfirmations || 0)) {
             throw new Error(
@@ -551,7 +558,7 @@ export class Executor implements IExecutor {
           return {
             upperThreshold: constraint.thresholdAmountInUSD,
             minBlockConfirmations: constraint.minBlockConfirmations || 0,
-            ...Executor.getSrcConstraints(constraint, configDstConstraints),
+            ...Executor.getSrcConstraints(constraint, configSrcConstraints),
           };
         })
         // important to sort by upper bound ASC for easier finding of the corresponding range
@@ -566,6 +573,7 @@ export class Executor implements IExecutor {
     return {
       fulfillmentDelay:
         primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0,
+      nonFinalizedTVLBudget: primaryConstraints?.nonFinalizedTVLBudget || defaultConstraints?.nonFinalizedTVLBudget || 0,
     };
   }
 

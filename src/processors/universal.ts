@@ -222,15 +222,22 @@ class UniversalProcessor extends BaseOrderProcessor {
         return;
       }
       case OrderInfoStatus.Fulfilled: {
-        context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
-
         this.clearInternalQueues(orderId);
         this.clearOrderStore(orderId);
-        context.giveChain.TVLBudgetController.flushCache();
         context.takeChain.TVLBudgetController.flushCache();
         context.logger.debug(`deleted from queues`);
 
         this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
+        return;
+      }
+      case OrderInfoStatus.UnlockClaim: {
+        context.giveChain.nonFinalizedOrdersBudgetController.finalizeOrder(orderId);
+
+        this.clearInternalQueues(orderId);
+        this.clearOrderStore(orderId);
+        context.giveChain.TVLBudgetController.flushCache();
+        context.logger.debug(`deleted from queues`);
+
         return;
       }
       default: {
@@ -462,6 +469,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
 
     let isFinalizedOrder = true;
+    let confirmationBlocksCount: number | undefined;
     let confirmationFloor: number | undefined;
 
     // compare worthiness of the order against block confirmation thresholds
@@ -500,6 +508,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         .finalization_info;
       if (finalizationInfo === 'Revoked') {
         this.clearInternalQueues(orderInfo.orderId);
+        context.giveChain.nonFinalizedOrdersBudgetController.revokeOrder(orderId);
 
         const message = 'order has been revoked by the order feed due to chain reorganization';
         return this.rejectOrder(metadata, message, RejectionReason.REVOKED);
@@ -508,13 +517,14 @@ class UniversalProcessor extends BaseOrderProcessor {
         // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
         // to avoid data discrepancy and rely on WS instead
         isFinalizedOrder = false;
-        const announcedConfirmation = finalizationInfo.Confirmed.confirmation_blocks_count;
+        confirmationBlocksCount = finalizationInfo.Confirmed.confirmation_blocks_count;
         logger.info(
-          `order arrived with non-guaranteed finality, announced confirmation: ${announcedConfirmation}`,
+          `order arrived with non-guaranteed finality, announced confirmation: ${confirmationBlocksCount}`,
         );
+        context.giveChain.nonFinalizedOrdersBudgetController.shiftOrder(orderId, confirmationBlocksCount);
 
         // ensure we can afford fulfilling this order and thus increasing our TVL
-        if (!context.giveChain.nonFinalizedOrdersBudgetController.isFitsBudget(orderId, usdWorth)) {
+        if (!context.giveChain.nonFinalizedOrdersBudgetController.fits(orderId, confirmationBlocksCount, usdWorth)) {
           const message = 'order does not fit the budget, rejecting';
           return this.rejectOrder(
             metadata,
@@ -529,8 +539,8 @@ class UniversalProcessor extends BaseOrderProcessor {
             `usdAmountConfirmationRange found: <=$${srcConstraintsByValue.upperThreshold}`,
           );
 
-          if (announcedConfirmation < srcConstraintsByValue.minBlockConfirmations) {
-            const message = `announced block confirmations (${announcedConfirmation}) is less than the block confirmation constraint (${
+          if (confirmationBlocksCount < srcConstraintsByValue.minBlockConfirmations) {
+            const message = `announced block confirmations (${confirmationBlocksCount}) is less than the block confirmation constraint (${
               srcConstraintsByValue.minBlockConfirmations
             } for order worth of $${usdWorth.toFixed(2)}`;
             return this.rejectOrder(
@@ -552,7 +562,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       } else if ('Finalized' in finalizationInfo) {
         // do nothing: order have stable finality according to the WS
         logger.debug('order source announced this order as finalized');
-        context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
+        context.giveChain.nonFinalizedOrdersBudgetController.finalizeOrder(orderId);
       }
     }
 
@@ -894,7 +904,8 @@ class UniversalProcessor extends BaseOrderProcessor {
       // controller because the error may occur because the txn was stuck in the mempool and reside there
       // for a long period of time
       if (!isFinalizedOrder) {
-        context.giveChain.nonFinalizedOrdersBudgetController.addOrder(orderId, usdWorth);
+        assert(confirmationBlocksCount !== undefined, `order is not finalized, but confirmationBlocksCount not available`);
+        context.giveChain.nonFinalizedOrdersBudgetController.addOrder(orderId, confirmationBlocksCount!, usdWorth);
       }
 
       const fulfillTxHash = await this.takeChain.fulfillProvider.sendTransaction(txToSend, {
