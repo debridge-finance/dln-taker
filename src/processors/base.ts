@@ -34,7 +34,7 @@ export type OrderProcessorInitializer = (
 ) => Promise<IOrderProcessor>;
 
 export interface IOrderProcessor {
-  process(params: IncomingOrderContext): void;
+  handleEvent(params: IncomingOrderContext): void;
 }
 
 /**
@@ -56,5 +56,5 @@ export abstract class BaseOrderProcessor implements IOrderProcessor {
     executor: IExecutor,
     context: OrderProcessorInitContext,
   ): Promise<void>;
-  abstract process(params: IncomingOrderContext): void;
+  abstract handleEvent(params: IncomingOrderContext): void;
 }

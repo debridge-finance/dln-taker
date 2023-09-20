@@ -645,7 +645,7 @@ export class Executor implements IExecutor {
     // run processor
     //
     logger.debug(`passing the order to the processor`);
-    takeChain.orderProcessor.process({
+    takeChain.orderProcessor.handleEvent({
       orderInfo: nextOrderInfo,
       context: {
         logger,

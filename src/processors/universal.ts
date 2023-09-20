@@ -41,7 +41,7 @@ import { PostponingReason, RejectionReason } from '../hooks/HookEnums';
 import { isRevertedError } from './utils/isRevertedError';
 import { DexlessChains } from '../config';
 import { IExecutor } from '../executors/executor';
-import { die, assert } from '../errors';
+import { assert } from '../errors';
 
 // reasonable multiplier for gas price to define max gas price we are willing to
 // bump until. Must cover up to 12.5% block base fee increase
@@ -111,6 +111,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   private queue = new Set<OrderId>(); // queue of orderid for retry processing order
 
+  private eventsQueue = new Array<IncomingOrderContext>();
+
   private isLocked: boolean = false;
 
   readonly #createdOrdersMetadata = new Map<OrderId, CreatedOrderMetadata>();
@@ -164,7 +166,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.mempoolService = new MempoolService(
       logger.child({ takeChainId: chainId }),
       this.params.mempool,
-      (orderId: string) => this.consume(orderId),
+      (orderId: string) => this.handleOrder(orderId),
     );
 
     if (chainId !== ChainId.Solana) {
@@ -186,59 +188,28 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
   }
 
-  process(params: IncomingOrderContext): void {
-    const { context, orderInfo } = params;
-    const { orderId } = orderInfo;
+  private handleOrder(orderId: string): void {
+    this.process(this.getCreatedOrderMetadata(orderId).context);
+  }
 
-    switch (orderInfo.status) {
-      case OrderInfoStatus.Created:
-      case OrderInfoStatus.ArchivalCreated: {
-        if (!this.#createdOrdersMetadata.has(orderId)) {
-          this.#createdOrdersMetadata.set(orderId, {
-            orderId,
-            arrivedAt: new Date(),
-            attempts: 0,
-            context: params,
-          });
-        }
+  handleEvent(context: IncomingOrderContext): void {
+    const { status, orderId } = context.orderInfo;
 
-        // dequeue everything? right now I don't see any possible side effect of not dequeueing
-        // this.clearInternalQueues(orderId);
-
-        // override order params because there can be refreshed data (patches, newer confirmations, etc)
-        this.#createdOrdersMetadata.get(orderId)!.context = params;
-
-        this.consume(orderId);
-        return;
-      }
-      case OrderInfoStatus.ArchivalFulfilled: {
-        this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
-        return;
-      }
-      case OrderInfoStatus.Cancelled: {
-        this.clearInternalQueues(orderId);
-        this.clearOrderStore(orderId);
-        context.logger.debug(`deleted from queues`);
-        return;
-      }
-      case OrderInfoStatus.Fulfilled: {
-        context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
-
-        this.clearInternalQueues(orderId);
-        this.clearOrderStore(orderId);
-        context.giveChain.TVLBudgetController.flushCache();
-        context.takeChain.TVLBudgetController.flushCache();
-        context.logger.debug(`deleted from queues`);
-
-        this.batchUnlocker.unlockOrder(orderId, orderInfo.order, context);
-        return;
-      }
-      default: {
-        context.logger.debug(
-          `status=${OrderInfoStatus[orderInfo.status]} not implemented, skipping`,
-        );
+    // creation events must be tracked in a separate storage
+    if ([OrderInfoStatus.Created, OrderInfoStatus.ArchivalCreated].includes(status)) {
+      if (this.#createdOrdersMetadata.has(orderId)) {
+        this.#createdOrdersMetadata.get(orderId)!.context = context;
+      } else {
+        this.#createdOrdersMetadata.set(orderId, {
+          orderId,
+          arrivedAt: new Date(),
+          attempts: 0,
+          context,
+        });
       }
     }
+
+    this.process(context);
   }
 
   private clearInternalQueues(orderId: string): void {
@@ -251,64 +222,88 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.#createdOrdersMetadata.delete(orderId);
   }
 
-  private consume(orderId: string) {
-    const metadata = this.getCreatedOrderMetadata(orderId);
+  private async process(context: IncomingOrderContext): Promise<void> {
+    const { status, orderId } = context.orderInfo;
+    const { context: orderContext } = context;
 
     // already processing an order
     if (this.isLocked) {
-      const { status } = metadata.context.orderInfo;
-      const { logger } = metadata.context.context;
-
-      logger.debug(`Processor is currently processing an order, postponing`);
+      orderContext.logger.debug(`Processor is currently processing an order, postponing`);
 
       switch (status) {
         case OrderInfoStatus.ArchivalCreated: {
           this.queue.add(orderId);
-          logger.debug(`postponed to secondary queue`);
+          orderContext.logger.debug(`postponed to secondary queue`);
           break;
         }
         case OrderInfoStatus.Created: {
           this.priorityQueue.add(orderId);
-          logger.debug(`postponed to primary queue`);
+          orderContext.logger.debug(`postponed to primary queue`);
           break;
         }
         default: {
-          die(`Unexpected order status: ${OrderInfoStatus[status]}`);
+          orderContext.logger.debug(`postponed to event queue`);
+          this.eventsQueue.push(context);
         }
       }
 
       return;
     }
 
-    metadata.attempts++;
-    // mind that order is being processed in a separate context
-    this.processOrder(metadata);
-  }
-
-  private async processOrder(metadata: CreatedOrderMetadata): Promise<void> {
-    assert(
-      this.isLocked === false,
-      `Processor invoked when being locked (orderId: ${metadata.orderId})`,
-    );
-
-    // process this order
     this.isLocked = true;
-    try {
-      await this.evaluateAndFulfill(metadata);
-    } catch (e) {
-      const { logger } = metadata.context.context;
-      const message = `processing order failed with an unhandled error: ${e}`;
-      logger.error(message);
-      logger.error(e);
-      this.postponeOrder(metadata, message, PostponingReason.UNHANDLED_ERROR, true);
+    switch (status) {
+      case OrderInfoStatus.Created:
+      case OrderInfoStatus.ArchivalCreated: {
+        const metadata = this.getCreatedOrderMetadata(context.orderInfo.orderId);
+        try {
+          metadata.attempts++;
+          await this.evaluateAndFulfill(metadata);
+        } catch (e) {
+          const message = `processing order failed with an unhandled error: ${e}`;
+          orderContext.logger.error(message);
+          orderContext.logger.error(e);
+          this.postponeOrder(metadata, message, PostponingReason.UNHANDLED_ERROR, true);
+        }
+
+        break;
+      }
+      case OrderInfoStatus.ArchivalFulfilled: {
+        this.batchUnlocker.unlockOrder(orderId, context.orderInfo.order, orderContext);
+        break;
+      }
+      case OrderInfoStatus.Cancelled: {
+        this.clearInternalQueues(orderId);
+        this.clearOrderStore(orderId);
+        orderContext.logger.debug(`deleted from queues`);
+        break;
+      }
+      case OrderInfoStatus.Fulfilled: {
+        // todo: must be called when Created event is finalized #DEV-3439
+        orderContext.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
+
+        this.clearInternalQueues(orderId);
+        this.clearOrderStore(orderId);
+        orderContext.giveChain.TVLBudgetController.flushCache();
+        orderContext.takeChain.TVLBudgetController.flushCache();
+        orderContext.logger.debug(`deleted from queues`);
+
+        this.batchUnlocker.unlockOrder(orderId, context.orderInfo.order, orderContext);
+        break;
+      }
+      default: {
+        orderContext.logger.debug(`status=${OrderInfoStatus[status]} not implemented, skipping`);
+      }
     }
     this.isLocked = false;
 
-    // forward to the next order
-    // TODO try to get rid of recursion here. Use setInterval?
+    if (this.eventsQueue.length > 0) {
+      this.handleEvent(this.eventsQueue.shift()!);
+      return;
+    }
+
     const nextOrderId = this.pickNextOrderId();
     if (nextOrderId) {
-      this.consume(nextOrderId);
+      this.handleOrder(nextOrderId);
     }
   }
 
