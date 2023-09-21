@@ -60,6 +60,11 @@ export enum PostponingReason {
    * (if being successfully fulfilled).
    */
   TVL_BUDGET_EXCEEDED,
+
+  /**
+   * triggered when throughput has reached its limit for the given give chain
+   */
+  CAPPED_THROUGHPUT,
 }
 
 export enum RejectionReason {
@@ -93,11 +98,6 @@ export enum RejectionReason {
    * indicates that announced block confirmations is less than the block confirmation constraint
    */
   NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
-
-  /**
-   * triggered when budget of unconfirmed orders exceeded
-   */
-  NON_FINALIZED_ORDERS_BUDGET_EXCEEDED,
 
   /**
    * indicates that non-finalized order is not covered by any custom block confirmation range

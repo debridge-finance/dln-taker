@@ -74,10 +74,7 @@ const config: ExecutorLaunchConfig = {
       chainRpc: `${process.env.SOLANA_RPC}`,
 
       // Defines constraints imposed on all orders coming from this chain
-      constraints: {
-        // Defines a TVL budget for orders coming from this chain that were fulfilled before getting guaranteedly finalized.
-        nonFinalizedTVLBudget: 10_000,
-      },
+      constraints: {},
 
       // if the order is created on Solana and fulfilled on another chain (e.g. Ethereum),
       // unlocked funds will be sent to this Solana address
@@ -106,9 +103,6 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
           // worth >$100: guaranteed block confirmations (15)
         ],
-
-        // Defines a TVL hard cap for orders coming from this chain that were fulfilled before getting guaranteedly finalized.
-        nonFinalizedTVLBudget: 10_000,
       },
 
       // if the order is created on Ethereum and fulfilled on another chain (e.g. Solana),
@@ -138,9 +132,6 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
           // worth >$100: guaranteed block confirmations (15)
         ],
-
-        // Defines a TVL hard cap for orders coming from this chain that were fulfilled before getting guaranteedly finalized.
-        nonFinalizedTVLBudget: 10_000,
       },
 
       beneficiary: `${process.env.AVALANCHE_BENEFICIARY}`,
@@ -158,9 +149,6 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
           // worth >$100: guaranteed block confirmations (15)
         ],
-
-        // Defines a TVL hard cap for orders coming from this chain that were fulfilled before getting guaranteedly finalized.
-        nonFinalizedTVLBudget: 10_000,
       },
 
       beneficiary: `${process.env.BNB_BENEFICIARY}`,
@@ -178,9 +166,6 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
           // worth >$100: guaranteed block confirmations (15)
         ],
-
-        // Defines a TVL hard cap for orders coming from this chain that were fulfilled before getting guaranteedly finalized.
-        nonFinalizedTVLBudget: 10_000,
       },
 
       beneficiary: `${process.env.ETHEREUM_BENEFICIARY}`,
@@ -198,9 +183,6 @@ const config: ExecutorLaunchConfig = {
           // {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
           // worth >$100: guaranteed block confirmations (256)
         ],
-
-        // Defines a TVL hard cap for orders coming from this chain that were fulfilled before getting guaranteedly finalized.
-        nonFinalizedTVLBudget: 10_000,
       },
 
       beneficiary: `${process.env.POLYGON_BENEFICIARY}`,

@@ -262,7 +262,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           const message = `processing order failed with an unhandled error: ${e}`;
           orderContext.logger.error(message);
           orderContext.logger.error(e);
-          this.postponeOrder(metadata, message, PostponingReason.UNHANDLED_ERROR, true);
+          this.postponeOrder(metadata, message, PostponingReason.UNHANDLED_ERROR);
         }
 
         break;
@@ -278,9 +278,6 @@ class UniversalProcessor extends BaseOrderProcessor {
         break;
       }
       case OrderInfoStatus.Fulfilled: {
-        // todo: must be called when Created event is finalized #DEV-3439
-        orderContext.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
-
         this.clearInternalQueues(orderId);
         this.clearOrderStore(orderId);
         orderContext.giveChain.TVLBudgetController.flushCache();
@@ -347,7 +344,6 @@ class UniversalProcessor extends BaseOrderProcessor {
     metadata: CreatedOrderMetadata,
     message: string,
     reason: PostponingReason,
-    addToMempool: boolean = true,
     remainingDelay?: number,
   ) {
     const {
@@ -364,14 +360,12 @@ class UniversalProcessor extends BaseOrderProcessor {
       attempts,
     });
 
-    if (addToMempool) {
-      if (remainingDelay) {
-        this.mempoolService.addOrder(metadata.orderId, remainingDelay);
-      } else if (metadata.context.orderInfo.status === OrderInfoStatus.ArchivalCreated) {
-        this.mempoolService.delayArchivalOrder(metadata.orderId, attempts);
-      } else {
-        this.mempoolService.delayOrder(metadata.orderId, attempts);
-      }
+    if (remainingDelay) {
+      this.mempoolService.addOrder(metadata.orderId, remainingDelay);
+    } else if (metadata.context.orderInfo.status === OrderInfoStatus.ArchivalCreated) {
+      this.mempoolService.delayArchivalOrder(metadata.orderId, attempts);
+    } else {
+      this.mempoolService.delayOrder(metadata.orderId, attempts);
     }
   }
 
@@ -452,12 +446,13 @@ class UniversalProcessor extends BaseOrderProcessor {
         const message = `order worth $${usdWorth} increases TVL of the ${
           ChainId[context.giveChain.chain]
         } over a budget of $${budget} (current TVL: $${currentGiveTVL}), thus postponing`;
-        return this.postponeOrder(metadata, message, PostponingReason.TVL_BUDGET_EXCEEDED, true);
+        return this.postponeOrder(metadata, message, PostponingReason.TVL_BUDGET_EXCEEDED);
       }
     }
 
     let isFinalizedOrder = true;
-    let confirmationFloor: number | undefined;
+    let confirmationBlocksCount: number | undefined;
+    let confirmationLevel: number | undefined;
 
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status === OrderInfoStatus.Created) {
@@ -482,13 +477,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       );
       if (remainingDelay > 0) {
         const message = `order should be delayed by ${remainingDelay}s (why: fulfillment delay is set to ${fulfillmentDelay}s)`;
-        return this.postponeOrder(
-          metadata,
-          message,
-          PostponingReason.FORCED_DELAY,
-          true,
-          remainingDelay,
-        );
+        return this.postponeOrder(metadata, message, PostponingReason.FORCED_DELAY, remainingDelay);
       }
 
       const finalizationInfo = (orderInfo as IncomingOrder<OrderInfoStatus.Created>)
@@ -503,20 +492,10 @@ class UniversalProcessor extends BaseOrderProcessor {
         // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
         // to avoid data discrepancy and rely on WS instead
         isFinalizedOrder = false;
-        const announcedConfirmation = finalizationInfo.Confirmed.confirmation_blocks_count;
+        confirmationBlocksCount = finalizationInfo.Confirmed.confirmation_blocks_count;
         logger.info(
-          `order arrived with non-guaranteed finality, announced confirmation: ${announcedConfirmation}`,
+          `order arrived with non-guaranteed finality, announced confirmation: ${confirmationBlocksCount}`,
         );
-
-        // ensure we can afford fulfilling this order and thus increasing our TVL
-        if (!context.giveChain.nonFinalizedOrdersBudgetController.isFitsBudget(orderId, usdWorth)) {
-          const message = 'order does not fit the budget, rejecting';
-          return this.rejectOrder(
-            metadata,
-            message,
-            RejectionReason.NON_FINALIZED_ORDERS_BUDGET_EXCEEDED,
-          );
-        }
 
         // range found, ensure current block confirmation >= expected
         if (srcConstraintsByValue?.minBlockConfirmations) {
@@ -524,8 +503,8 @@ class UniversalProcessor extends BaseOrderProcessor {
             `usdAmountConfirmationRange found: <=$${srcConstraintsByValue.upperThreshold}`,
           );
 
-          if (announcedConfirmation < srcConstraintsByValue.minBlockConfirmations) {
-            const message = `announced block confirmations (${announcedConfirmation}) is less than the block confirmation constraint (${
+          if (confirmationBlocksCount < srcConstraintsByValue.minBlockConfirmations) {
+            const message = `announced block confirmations (${confirmationBlocksCount}) is less than the block confirmation constraint (${
               srcConstraintsByValue.minBlockConfirmations
             } for order worth of $${usdWorth.toFixed(2)}`;
             return this.rejectOrder(
@@ -535,7 +514,7 @@ class UniversalProcessor extends BaseOrderProcessor {
             );
           }
 
-          confirmationFloor = srcConstraintsByValue.minBlockConfirmations;
+          confirmationLevel = srcConstraintsByValue.minBlockConfirmations;
           logger.debug('accepting order for execution');
         } else {
           // range not found: we do not accept this order, let it come finalized
@@ -544,10 +523,21 @@ class UniversalProcessor extends BaseOrderProcessor {
           )} is not covered by any custom block confirmation range`;
           return this.rejectOrder(metadata, message, RejectionReason.NOT_YET_FINALIZED);
         }
+
+        // ensure we can afford fulfilling this order and thus increasing our TVL
+        const canBeAdded = context.giveChain.throughput.fitsThroughout(
+          orderId,
+          confirmationBlocksCount,
+          usdWorth,
+        );
+        if (!canBeAdded) {
+          const message = 'order does not fit the budget, rejecting';
+          return this.postponeOrder(metadata, message, PostponingReason.CAPPED_THROUGHPUT);
+        }
       } else if ('Finalized' in finalizationInfo) {
         // do nothing: order have stable finality according to the WS
         logger.debug('order source announced this order as finalized');
-        context.giveChain.nonFinalizedOrdersBudgetController.removeOrder(orderId);
+        context.giveChain.throughput.removeOrder(orderId);
       }
     }
 
@@ -574,7 +564,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         orderId: orderInfo.orderId,
         giveChain: orderInfo.order.give.chainId,
       },
-      { confirmationsCount: confirmationFloor },
+      { confirmationsCount: confirmationLevel },
     );
 
     if (giveOrderStatus?.status === undefined) {
@@ -646,12 +636,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           roughReserveDstAmount,
         )}`,
       ].join('');
-      return this.postponeOrder(
-        metadata,
-        message,
-        PostponingReason.NOT_ENOUGH_BALANCE,
-        isFinalizedOrder,
-      );
+      return this.postponeOrder(metadata, message, PostponingReason.NOT_ENOUGH_BALANCE);
     }
     logger.debug(
       `enough balance (${accountReserveBalance.toString()}) to cover order (${roughReserveDstAmount.toString()})`,
@@ -729,7 +714,6 @@ class UniversalProcessor extends BaseOrderProcessor {
           metadata,
           message,
           PostponingReason.FULFILLMENT_EVM_TX_PREESTIMATION_FAILED,
-          isFinalizedOrder,
         );
       }
     }
@@ -818,12 +802,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         ].join('');
       }
       logger.info(`order is not profitable: ${message}`);
-      return this.postponeOrder(
-        metadata,
-        message,
-        PostponingReason.NOT_PROFITABLE,
-        isFinalizedOrder,
-      );
+      return this.postponeOrder(metadata, message, PostponingReason.NOT_PROFITABLE);
     }
 
     assert(
@@ -874,7 +853,6 @@ class UniversalProcessor extends BaseOrderProcessor {
           metadata,
           message,
           PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
-          isFinalizedOrder,
         );
       }
     } else {
@@ -884,18 +862,23 @@ class UniversalProcessor extends BaseOrderProcessor {
     logger.debug(txToSend);
 
     try {
+      const fulfillTxHash = await this.takeChain.fulfillProvider.sendTransaction(txToSend, {
+        logger,
+      });
+      logger.info(`fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
+
       // we add this order to the budget controller right before the txn is broadcasted
       // Mind that in case of an error (see the catch{} block below) we don't remove it from the
       // controller because the error may occur because the txn was stuck in the mempool and reside there
       // for a long period of time
       if (!isFinalizedOrder) {
-        context.giveChain.nonFinalizedOrdersBudgetController.addOrder(orderId, usdWorth);
+        assert(
+          confirmationBlocksCount !== undefined,
+          `order is not finalized, but confirmationBlocksCount not available`,
+        );
+        context.giveChain.throughput.addOrder(orderId, confirmationBlocksCount!, usdWorth);
       }
 
-      const fulfillTxHash = await this.takeChain.fulfillProvider.sendTransaction(txToSend, {
-        logger,
-      });
-      logger.info(`fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
       this.hooksEngine.handleOrderFulfilled({
         order: orderInfo,
         txHash: fulfillTxHash,
@@ -910,7 +893,6 @@ class UniversalProcessor extends BaseOrderProcessor {
         isRevertedError(e as Error)
           ? PostponingReason.FULFILLMENT_TX_REVERTED
           : PostponingReason.FULFILLMENT_TX_FAILED,
-        isFinalizedOrder,
       );
     }
 

@@ -42,7 +42,7 @@ import { EvmProviderAdapter } from '../providers/evm.provider.adapter';
 import { ProviderAdapter } from '../providers/provider.adapter';
 import { SolanaProviderAdapter } from '../providers/solana.provider.adapter';
 import { HooksEngine } from '../hooks/HooksEngine';
-import { NonFinalizedOrdersBudgetController } from '../processors/NonFinalizedOrdersBudgetController';
+import { ThroughputController } from '../processors/throughput';
 import { TVLBudgetController } from '../processors/TVLBudgetController';
 import { DataStore } from '../processors/DataStore';
 import { createClientLogger } from '../logger';
@@ -69,6 +69,8 @@ type DstConstraintsPerOrderValue = Array<
 
 type SrcOrderConstraints = Readonly<{
   fulfillmentDelay: number;
+  maxFulfillThroughputUSD: number;
+  throughputTimeWindowSec: number;
 }>;
 
 type SrcConstraintsPerOrderValue = Array<
@@ -85,7 +87,7 @@ export type ExecutorSupportedChain = Readonly<{
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
   TVLBudgetController: TVLBudgetController;
-  nonFinalizedOrdersBudgetController: NonFinalizedOrdersBudgetController;
+  throughput: ThroughputController;
   srcConstraints: Readonly<
     SrcOrderConstraints & {
       perOrderValue: SrcConstraintsPerOrderValue;
@@ -387,7 +389,6 @@ export class Executor implements IExecutor {
         chainRpc: chain.chainRpc,
         unlockProvider,
         fulfillProvider,
-        nonFinalizedTVLBudget: chain.constraints?.nonFinalizedTVLBudget,
       };
       // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
       const orderProcessor = await processorInitializer(chain.chain, this, {
@@ -424,6 +425,14 @@ export class Executor implements IExecutor {
         ),
       );
 
+      const srcConstraints = {
+        ...Executor.getSrcConstraints(chain.constraints || {}),
+        perOrderValue: Executor.getSrcConstraintsPerOrderValue(
+          chain.chain as unknown as SupportedChain,
+          chain.constraints || {},
+        ),
+      };
+
       this.chains[chain.chain] = {
         chain: chain.chain,
         chainRpc: chain.chainRpc,
@@ -432,9 +441,24 @@ export class Executor implements IExecutor {
         orderProcessor,
         unlockProvider,
         fulfillProvider,
-        nonFinalizedOrdersBudgetController: new NonFinalizedOrdersBudgetController(
+        throughput: new ThroughputController(
           chain.chain,
-          chain.constraints?.nonFinalizedTVLBudget || 0,
+          [
+            // map all ranges
+            ...srcConstraints.perOrderValue.map((constraint) => ({
+              minBlockConfirmations: constraint.minBlockConfirmations,
+              maxFulfillThroughputUSD: constraint.maxFulfillThroughputUSD,
+              throughputTimeWindowSec: constraint.throughputTimeWindowSec,
+            })),
+
+            // and the final range covering the finalization (if any)
+            {
+              minBlockConfirmations:
+                BLOCK_CONFIRMATIONS_HARD_CAPS[chain.chain as unknown as SupportedChain],
+              maxFulfillThroughputUSD: srcConstraints.maxFulfillThroughputUSD,
+              throughputTimeWindowSec: srcConstraints.throughputTimeWindowSec,
+            },
+          ],
           this.logger,
         ),
         TVLBudgetController: new TVLBudgetController(
@@ -444,13 +468,7 @@ export class Executor implements IExecutor {
           this.logger,
         ),
         beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
-        srcConstraints: {
-          ...Executor.getSrcConstraints(chain.constraints || {}),
-          perOrderValue: Executor.getSrcConstraintsPerOrderValue(
-            chain.chain as unknown as SupportedChain,
-            chain.constraints || {},
-          ),
-        },
+        srcConstraints,
         dstConstraints: {
           ...Executor.getDstConstraints(chain.dstConstraints || {}),
           perOrderValue: Executor.getDstConstraintsPerOrderValue(chain.dstConstraints || {}),
@@ -537,10 +555,10 @@ export class Executor implements IExecutor {
 
   private static getSrcConstraintsPerOrderValue(
     chain: SupportedChain,
-    configDstConstraints: ChainDefinition['constraints'],
+    configSrcConstraints: ChainDefinition['constraints'],
   ): SrcConstraintsPerOrderValue {
     return (
-      (configDstConstraints?.requiredConfirmationsThresholds || [])
+      (configSrcConstraints?.requiredConfirmationsThresholds || [])
         .map((constraint) => {
           if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= (constraint.minBlockConfirmations || 0)) {
             throw new Error(
@@ -551,7 +569,7 @@ export class Executor implements IExecutor {
           return {
             upperThreshold: constraint.thresholdAmountInUSD,
             minBlockConfirmations: constraint.minBlockConfirmations || 0,
-            ...Executor.getSrcConstraints(constraint, configDstConstraints),
+            ...Executor.getSrcConstraints(constraint, configSrcConstraints),
           };
         })
         // important to sort by upper bound ASC for easier finding of the corresponding range
@@ -566,6 +584,14 @@ export class Executor implements IExecutor {
     return {
       fulfillmentDelay:
         primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0,
+      throughputTimeWindowSec:
+        primaryConstraints?.throughputTimeWindowSec ||
+        defaultConstraints?.throughputTimeWindowSec ||
+        0,
+      maxFulfillThroughputUSD:
+        primaryConstraints?.maxFulfillThroughputUSD ||
+        defaultConstraints?.maxFulfillThroughputUSD ||
+        0,
     };
   }
 
