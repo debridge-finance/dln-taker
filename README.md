@@ -12,7 +12,6 @@
 - [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
   - [Reducing transaction finality constraint](#reducing-transaction-finality-constraint)
   - [Setting a TVL budget](#setting-a-tvl-budget)
-  - [Setting a budget for non-finalized orders](#setting-a-budget-for-non-finalized-orders)
   - [Delayed fulfillments](#delayed-fulfillments)
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
   - [Restricting orders from fulfillment](#restricting-orders-from-fulfillment)
@@ -213,37 +212,6 @@ behalf, your TVL on Solana gets reduced by the value of each fulfilled order. Fo
 three orders got fulfilled, and the TVL on Solana is increased to its maximum of $100,000, an order of $20,000
 coming from Ethereum to Solana decreases the TVL on Solana to $80,000 if gets fulfilled on your behalf.
 
-### Setting a budget for non-finalized orders
-
-Imagine, you have allowed to fulfill orders worth $1 from this chain after 1 block confirmation:
-
-```ts
-      constraints: {
-        requiredConfirmationsThresholds: [
-           // worth <$100: 1+ block confirmation
-           {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
-        ],
-        // worth >$100: guaranteed block confirmations (12)
-     }
-```
-
-and there is an accidental flood of 100,000 orders worth $1 occurs, you probably want to prevent this by setting the budget for non-finalized orders. If you set `nonFinalizedTVLBudget` to "100", than only first hundred of one-dollar orders would be attempted to be fulfilled, and all other orders would be postponed to the internal queue where they would be pulled one by one as soon as fulfilled orders are being finalized:
-
-
-```ts
-      constraints: {
-        requiredConfirmationsThresholds: [
-           // worth <$100: 1+ block confirmation
-           {thresholdAmountInUSD: 100, minBlockConfirmations: 1},
-        ],
-        // worth >$100: guaranteed block confirmations (12)
-
-        // Defines a TVL hard cap for orders coming from this chain that were fulfilled before getting guaranteedly finalized.
-        nonFinalizedTVLBudget: 100,
-     }
-```
-
-This budged is a hard cap for orders that were not yet finalized after your `dln-taker`'s instance have successfully fulfilled them. As soon as such orders got a finalization status, they got removed effectively releasing the room for other non-finalized orders that can be attempted to be fulfulled.
 
 ### Delayed fulfillments
 
