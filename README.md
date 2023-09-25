@@ -12,6 +12,7 @@
 - [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
   - [Reducing transaction finality constraint](#reducing-transaction-finality-constraint)
   - [Setting a TVL budget](#setting-a-tvl-budget)
+  - [Setting throughput](#setting-throughput)
   - [Delayed fulfillments](#delayed-fulfillments)
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
   - [Restricting orders from fulfillment](#restricting-orders-from-fulfillment)
@@ -139,17 +140,17 @@ For every chain you as a taker would like to support:
 Executing cross-chain transactions is all about managing risks properly: no one wants to perform actions on the destination chain triggered from the source chain and later face a huge network reorg event which vanishes the triggering transaction. Thus, we at deBridge rely on safe block confirmations which ensure guaranteed transaction finality and help anyone avoid losing funds by fulfilling orders that get unexpectedly vanished:
 
 | Chain     | Guaranteed block confirmations |
-|-----------| ------------------------------ |
-| Arbitrum  | 12                  |
-| Avalanche | 12                  |
-| Base      | 12                  |
-| BNB Chain | 12                  |
-| Ethereum  | 12                  |
-| Fantom    | 12                  |
-| Linea     | 12                  |
-| Optimism  | 12                  |
-| Polygon   | 256                 |
-| Solana    | Finalized status    |
+| --------- | ------------------------------ |
+| Arbitrum  | 12                             |
+| Avalanche | 12                             |
+| Base      | 12                             |
+| BNB Chain | 12                             |
+| Ethereum  | 12                             |
+| Fantom    | 12                             |
+| Linea     | 12                             |
+| Optimism  | 12                             |
+| Polygon   | 256                            |
+| Solana    | Finalized status               |
 
 However, DLN is an open market with natural competitiveness, where some takers may be willing to put more risk on small amounts of their funds attempting to fulfill orders with lesser block confirmations to get ahead of other takers. For example, some may be willing to fulfill orders under $100 as soon as they appear on blockchains (after 1 block confirmation), because the reward of being the first no matter what beats the risk of losing this amount of money.
 
@@ -212,6 +213,40 @@ behalf, your TVL on Solana gets reduced by the value of each fulfilled order. Fo
 three orders got fulfilled, and the TVL on Solana is increased to its maximum of $100,000, an order of $20,000
 coming from Ethereum to Solana decreases the TVL on Solana to $80,000 if gets fulfilled on your behalf.
 
+### Setting throughput
+
+It is possible to throttle the TVL growth by defining a max throughput per time frame on a given chain for non-finalized
+and finalized origin transactions. Say, you would like to fulfill orders:
+- under $100 when they appear (on 1 block confirmation and up) with the speed not exceeding $2,500 per 30s;
+- under $1,000 after they reach 3 block confirmations with the speed not exceeding $10,000 per 1m;
+- any other order reached complete finality with the speed not exceeding $50,000 per 10m;
+
+Such logic can be achieved with the following simple rule set:
+
+```ts
+constraints: {
+  requiredConfirmationsThresholds: [
+    // 1+ block confirmation: accept orders <$100, fulfillment speed $2,500/0.5m
+    {
+      thresholdAmountInUSD: 100,
+      minBlockConfirmations: 1,
+      maxFulfillThroughputUSD: 2_500,
+      throughputTimeWindowSec: 30
+    },
+    // 3+ block confirmation: accept orders <$1,000, fulfillment speed $10,000/1m
+    {
+      thresholdAmountInUSD: 1_000,
+      minBlockConfirmations: 3,
+      maxFulfillThroughputUSD: 10_000,
+      throughputTimeWindowSec: 60
+    },
+  ],
+
+  // any other order reached complete finality: $50K/10m
+  maxFulfillThroughputUSD: 50_000,
+  throughputTimeWindowSec: 600
+}
+```
 
 ### Delayed fulfillments
 
