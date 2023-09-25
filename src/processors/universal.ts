@@ -39,7 +39,7 @@ import { BatchUnlocker } from './BatchUnlocker';
 import { MempoolOpts, MempoolService } from './mempool.service';
 import { PostponingReason, RejectionReason } from '../hooks/HookEnums';
 import { isRevertedError } from './utils/isRevertedError';
-import { DexlessChains } from '../config';
+import { BLOCK_CONFIRMATIONS_HARD_CAPS, DexlessChains, SupportedChain } from '../config';
 import { IExecutor } from '../executors/executor';
 import { assert } from '../errors';
 
@@ -450,9 +450,8 @@ class UniversalProcessor extends BaseOrderProcessor {
       }
     }
 
-    let isFinalizedOrder = true;
-    let confirmationBlocksCount: number | undefined;
-    let confirmationLevel: number | undefined;
+    let confirmationBlocksCount =
+      BLOCK_CONFIRMATIONS_HARD_CAPS[orderInfo.order.give.chainId as unknown as SupportedChain];
 
     // compare worthiness of the order against block confirmation thresholds
     if (orderInfo.status === OrderInfoStatus.Created) {
@@ -491,7 +490,6 @@ class UniversalProcessor extends BaseOrderProcessor {
       if ('Confirmed' in finalizationInfo) {
         // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
         // to avoid data discrepancy and rely on WS instead
-        isFinalizedOrder = false;
         confirmationBlocksCount = finalizationInfo.Confirmed.confirmation_blocks_count;
         logger.info(
           `order arrived with non-guaranteed finality, announced confirmation: ${confirmationBlocksCount}`,
@@ -514,7 +512,6 @@ class UniversalProcessor extends BaseOrderProcessor {
             );
           }
 
-          confirmationLevel = srcConstraintsByValue.minBlockConfirmations;
           logger.debug('accepting order for execution');
         } else {
           // range not found: we do not accept this order, let it come finalized
@@ -523,22 +520,21 @@ class UniversalProcessor extends BaseOrderProcessor {
           )} is not covered by any custom block confirmation range`;
           return this.rejectOrder(metadata, message, RejectionReason.NOT_YET_FINALIZED);
         }
-
-        // ensure we can afford fulfilling this order and thus increasing our TVL
-        const canBeAdded = context.giveChain.throughput.fitsThroughout(
-          orderId,
-          confirmationBlocksCount,
-          usdWorth,
-        );
-        if (!canBeAdded) {
-          const message = 'order does not fit the budget, rejecting';
-          return this.postponeOrder(metadata, message, PostponingReason.CAPPED_THROUGHPUT);
-        }
       } else if ('Finalized' in finalizationInfo) {
         // do nothing: order have stable finality according to the WS
         logger.debug('order source announced this order as finalized');
-        context.giveChain.throughput.removeOrder(orderId);
       }
+    }
+
+    // ensure we can afford fulfilling this order and thus increasing our TVL
+    const isThrottled = context.giveChain.throughput.isThrottled(
+      orderId,
+      confirmationBlocksCount,
+      usdWorth,
+    );
+    if (isThrottled) {
+      const message = 'order does not fit the budget, rejecting';
+      return this.postponeOrder(metadata, message, PostponingReason.CAPPED_THROUGHPUT);
     }
 
     // validate that order is not fullfilled
@@ -564,7 +560,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         orderId: orderInfo.orderId,
         giveChain: orderInfo.order.give.chainId,
       },
-      { confirmationsCount: confirmationLevel },
+      { confirmationsCount: confirmationBlocksCount },
     );
 
     if (giveOrderStatus?.status === undefined) {
@@ -871,13 +867,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       // Mind that in case of an error (see the catch{} block below) we don't remove it from the
       // controller because the error may occur because the txn was stuck in the mempool and reside there
       // for a long period of time
-      if (!isFinalizedOrder) {
-        assert(
-          confirmationBlocksCount !== undefined,
-          `order is not finalized, but confirmationBlocksCount not available`,
-        );
-        context.giveChain.throughput.addOrder(orderId, confirmationBlocksCount!, usdWorth);
-      }
+      context.giveChain.throughput.addOrder(orderId, confirmationBlocksCount, usdWorth);
 
       this.hooksEngine.handleOrderFulfilled({
         order: orderInfo,

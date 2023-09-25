@@ -72,14 +72,14 @@ export class ThroughputController {
     );
   }
 
-  fitsThroughout(orderId: string, confirmationBlocksCount: number, usdValue: number): boolean {
+  isThrottled(orderId: string, confirmationBlocksCount: number, usdValue: number): boolean {
     if (!this.enabled) {
-      return true;
+      return false;
     }
 
     const metric = this.getMetric(confirmationBlocksCount);
     if (!metric) {
-      return true;
+      return false;
     }
 
     const logger = this.#logger.child({ orderId });
@@ -93,10 +93,10 @@ export class ThroughputController {
         metric,
       )}`;
       logger.debug(message);
-      return false;
+      return true;
     }
 
-    return true;
+    return false;
   }
 
   addOrder(orderId: string, confirmationBlocksCount: number, usdValue: number): void {

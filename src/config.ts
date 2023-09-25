@@ -22,14 +22,14 @@ export enum SupportedChain {
 }
 
 export const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
-  [SupportedChain.Arbitrum]: 15,
-  [SupportedChain.Avalanche]: 15,
-  [SupportedChain.BSC]: 15,
+  [SupportedChain.Arbitrum]: 12,
+  [SupportedChain.Avalanche]: 12,
+  [SupportedChain.BSC]: 12,
   [SupportedChain.Ethereum]: 12,
-  [SupportedChain.Fantom]: 15,
-  [SupportedChain.Linea]: 15,
-  [SupportedChain.Base]: 15,
-  [SupportedChain.Optimism]: 15,
+  [SupportedChain.Fantom]: 12,
+  [SupportedChain.Linea]: 12,
+  [SupportedChain.Base]: 12,
+  [SupportedChain.Optimism]: 12,
   [SupportedChain.Polygon]: 256,
   [SupportedChain.Solana]: 32,
 };

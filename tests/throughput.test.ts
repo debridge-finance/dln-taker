@@ -24,14 +24,16 @@ describe('NonFinalizedOrdersBudgetController', () => {
 
   describe('validateOrder', () => {
     it('check throughout', async () => {
-      assert.equal(controller.fitsThroughout('1', 1, 99), true);
-      assert.equal(controller.fitsThroughout('1', 2, 100), true);
-      assert.equal(controller.fitsThroughout('1', 3, 101), false);
+      assert.equal(controller.isThrottled('1', 1, 99), false);
+      assert.equal(controller.isThrottled('1', 1, 100), false);
+      assert.equal(controller.isThrottled('1', 1, 101), true);
+      assert.equal(controller.isThrottled('1', 2, 100), false);
+      assert.equal(controller.isThrottled('1', 3, 101), false);
 
       controller.addOrder('1', 1, 99);
-      assert.equal(controller.fitsThroughout('2', 1, 1), true);
-      assert.equal(controller.fitsThroughout('2', 1, 2), false);
-      assert.equal(controller.fitsThroughout('2', 2, 100), true);
+      assert.equal(controller.isThrottled('2', 1, 1), false);
+      assert.equal(controller.isThrottled('2', 1, 2), true);
+      assert.equal(controller.isThrottled('2', 2, 100), false);
     });
 
     it('check automation', async () => {
@@ -41,13 +43,13 @@ describe('NonFinalizedOrdersBudgetController', () => {
       await new Promise((resolve) => {
         setTimeout(resolve, 300);
       });
-      assert.equal(controller.fitsThroughout('2', 1, 100), true);
+      assert.equal(controller.isThrottled('2', 1, 100), false);
     });
 
     it('check removal', async () => {
       controller.addOrder('1', 1, 99);
       controller.removeOrder('1');
-      assert.equal(controller.fitsThroughout('2', 1, 100), true);
+      assert.equal(controller.isThrottled('2', 1, 100), false);
     });
   });
 });
