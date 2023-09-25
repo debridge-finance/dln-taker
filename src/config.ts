@@ -22,14 +22,14 @@ export enum SupportedChain {
 }
 
 export const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
-  [SupportedChain.Arbitrum]: 15,
-  [SupportedChain.Avalanche]: 15,
-  [SupportedChain.BSC]: 15,
+  [SupportedChain.Arbitrum]: 12,
+  [SupportedChain.Avalanche]: 12,
+  [SupportedChain.BSC]: 12,
   [SupportedChain.Ethereum]: 12,
-  [SupportedChain.Fantom]: 15,
-  [SupportedChain.Linea]: 15,
-  [SupportedChain.Base]: 15,
-  [SupportedChain.Optimism]: 15,
+  [SupportedChain.Fantom]: 12,
+  [SupportedChain.Linea]: 12,
+  [SupportedChain.Base]: 12,
+  [SupportedChain.Optimism]: 12,
   [SupportedChain.Polygon]: 256,
   [SupportedChain.Solana]: 32,
 };
@@ -129,6 +129,19 @@ export type SrcOrderConstraints = {
    * coming from this chain after it first saw it.
    */
   fulfillmentDelay?: number;
+
+  /**
+   *
+   * Throughput is total value of orders from this range fulfilled across all the chains during the last N sec.
+   *
+   * The throughput should be set with throughputTimeWindowSec
+   */
+  maxFulfillThroughputUSD?: number;
+
+  /**
+   * Throughput is total value of orders from this range fulfilled across all the chains during the last N sec
+   */
+  throughputTimeWindowSec?: number;
 };
 
 /**
@@ -184,19 +197,6 @@ export interface ChainDefinition {
         minBlockConfirmations?: number;
       }
     >;
-
-    /**
-     * Defines a budget (a hard cap) of all successfully fulfilled orders' value (expressed in USD) that
-     * were not reached yet a guaranteed finality at the given point in time.
-     * For example, if you have allowed to fulfill orders worth $1 from this chain after 1 block confirmation
-     * (using the neighboring `requiredConfirmationsThresholds` property, while the guaranteed finalization is known
-     * to be 12 blocks), and there is an accidental flood of 100,000 orders worth $1 occurs, you probably want to
-     * prevent this by setting the budget for non-finalized orders.
-     * If you set `nonFinalizedTVLBudget` to "100", than only first hundred of one-dollar orders would be attempted
-     * to be fulfilled, and all other orders would be postponed to the internal queue where they would be pulled
-     * one by one as soon as fulfilled orders are being finalized.
-     */
-    nonFinalizedTVLBudget?: number;
 
     /**
      * Defines a budget (priced in the US dollar) of assets deployed and locked on the given chain. Any new order coming
