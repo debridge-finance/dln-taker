@@ -765,10 +765,13 @@ class UniversalProcessor extends BaseOrderProcessor {
       if (new BigNumber(requiredReserveDstAmount).isEqualTo('0')) {
         message = 'not enough give amount to cover operating expenses';
       } else {
-        const takeAmountDrop = new BigNumber(profitableTakeAmount)
-          .multipliedBy(100)
-          .div(orderInfo.order.take.amount.toString());
-        const takeAmountDropShare = BigNumber(100).minus(takeAmountDrop).toFixed(2);
+        let takeAmountDropShare: string = '100';
+        if (orderInfo.order.take.amount !== 0n) {
+          const takeAmountDrop = new BigNumber(profitableTakeAmount)
+            .multipliedBy(100)
+            .div(orderInfo.order.take.amount.toString());
+          takeAmountDropShare = BigNumber(100).minus(takeAmountDrop).toFixed(2);
+        }
 
         const reserveTokenDesc = tokenAddressToString(this.takeChain.chain, reserveDstToken);
         const takeTokenDesc = tokenAddressToString(
@@ -915,8 +918,11 @@ class UniversalProcessor extends BaseOrderProcessor {
   }
 
   private getPreFulfillSlippage(evaluatedTakeAmount: bigint, takeAmount: bigint): number {
-    const calculatedSlippageBps =
-      ((evaluatedTakeAmount - takeAmount) * BigInt(BPS_DENOMINATOR)) / evaluatedTakeAmount;
+    let calculatedSlippageBps: bigint = 10_000n;
+    if (takeAmount !== 0n) {
+      calculatedSlippageBps =
+        ((evaluatedTakeAmount - takeAmount) * BigInt(BPS_DENOMINATOR)) / evaluatedTakeAmount;
+    }
     if (calculatedSlippageBps < this.params.preFulfillSwapMinAllowedSlippageBps)
       return this.params.preFulfillSwapMinAllowedSlippageBps;
     if (calculatedSlippageBps > this.params.preFulfillSwapMaxAllowedSlippageBps)
