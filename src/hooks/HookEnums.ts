@@ -114,4 +114,9 @@ export enum RejectionReason {
    * Received malformed order from ws
    */
   MALFORMED_ORDER,
+
+  /**
+   * Indicates that order includes the provided allowedTakerDst, which differs from the taker's address
+   */
+  WRONG_TAKER,
 }
