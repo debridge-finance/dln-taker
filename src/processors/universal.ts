@@ -20,8 +20,8 @@ import {
 } from 'node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector';
 import { helpers } from '@debridge-finance/solana-utils';
 import {
-  findExpectedBucket,
   calculateExpectedTakeAmount,
+  findExpectedBucket,
 } from '@debridge-finance/legacy-dln-profitability';
 import { VersionedTransaction } from '@solana/web3.js';
 import { DlnClient, IncomingOrder, IncomingOrderContext, OrderInfoStatus } from '../interfaces';
@@ -395,6 +395,14 @@ class UniversalProcessor extends BaseOrderProcessor {
     const { context, orderInfo } = metadata.context;
     const { orderId } = orderInfo;
     const { logger } = context;
+
+    if (
+      orderInfo.order.allowedTaker &&
+      !buffersAreEqual(this.takeChain.fulfillProvider.bytesAddress, orderInfo.order.allowedTaker)
+    ) {
+      const message = `The order includes the provided allowedTakerDst, which differs from the taker's address`;
+      return this.rejectOrder(metadata, message, RejectionReason.WRONG_TAKER);
+    }
 
     //
     // verify order integrity
