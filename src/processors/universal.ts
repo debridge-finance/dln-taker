@@ -7,6 +7,7 @@ import {
   EvmInstruction,
   getEngineByChainId,
   Order,
+  OrderData,
   OrderDataWithId,
   OrderState,
   tokenAddressToString,
@@ -63,9 +64,10 @@ export type UniversalProcessorParams = {
    * the deBridge app and the API suggest users placing orders with as much margin as 4bps
    */
   minProfitabilityBps: number;
+
   /**
    * Number of orders (per every chain where orders are coming from and to) to accumulate to unlock them in batches
-   *     Min: 1; max: 10, default: 10.
+   *     Min: 1; max: 10(for Solana - 7), default: 10(for Solana - 7).
    *     This means that the executor would accumulate orders (that were fulfilled successfully) rather then unlock
    *     them on the go, and would send a batch of unlock commands every time enough orders were fulfilled, dramatically
    *     reducing the cost of the unlock command execution.
@@ -74,7 +76,14 @@ export type UniversalProcessorParams = {
    *     assuming that the order would be unlocked in a batch of size=10. Reducing the batch size to a lower value increases
    *     your unlock costs and thus reduces order profitability, making them unprofitable most of the time.
    */
-  batchUnlockSize: number;
+  minBatchUnlockSize: number;
+
+  /**
+   * The USD threshold that triggers a forced unlock of order.
+   * When the total value of pending orders (in USD) surpasses this threshold,
+   * the system initiates a forced unlock, regardless of the configured batch size.
+   */
+  forceUnlockOrderUsdThreshold: number;
 
   /**
    * Min slippage that can be used for swap from reserveToken to takeToken when calculated automatically
@@ -119,7 +128,8 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   private params: UniversalProcessorParams = {
     minProfitabilityBps: 4,
-    batchUnlockSize: 10,
+    minBatchUnlockSize: 10,
+    forceUnlockOrderUsdThreshold: 10_000,
     preFulfillSwapMinAllowedSlippageBps: 5,
     preFulfillSwapMaxAllowedSlippageBps: 400,
     mempool: {
@@ -132,7 +142,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
   constructor(params?: Partial<UniversalProcessorParams>) {
     super();
-    const batchUnlockSize = params?.batchUnlockSize;
+    const batchUnlockSize = params?.minBatchUnlockSize;
     assert(
       batchUnlockSize === undefined ||
         (batchUnlockSize <= BATCH_UNLOCK_MAX_SIZE && batchUnlockSize >= 1),
@@ -159,8 +169,9 @@ class UniversalProcessor extends BaseOrderProcessor {
     this.batchUnlocker = new BatchUnlocker(
       logger,
       this.takeChain,
-      this.params.batchUnlockSize,
+      this.params.minBatchUnlockSize,
       this.hooksEngine,
+      this.params.forceUnlockOrderUsdThreshold,
     );
 
     this.mempoolService = new MempoolService(
@@ -731,10 +742,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         buckets: context.config.buckets,
         swapConnector: context.config.swapConnector,
         logger: createClientLogger(logger),
-        batchSize: this.getBatchUnlockSizeForProfitability(
-          orderInfo.order.give.chainId,
-          orderInfo.order.take.chainId,
-        ),
+        batchSize: await this.#getBatchUnlockSizeForProfitability(orderInfo.order),
         evmFulfillGasLimit,
         evmFulfillCappedGasPrice: evmFulfillCappedGasPrice
           ? BigInt(evmFulfillCappedGasPrice.integerValue().toString())
@@ -908,18 +916,20 @@ class UniversalProcessor extends BaseOrderProcessor {
     return Promise.resolve();
   }
 
-  private getBatchUnlockSizeForProfitability(
-    giveChain: ChainId,
-    /* takeChain: ChainId */ {},
-  ): number {
+  async #getBatchUnlockSizeForProfitability(order: OrderData): Promise<number> {
     // TODO must be reimplemented so that batchSize can be set per giveChain, not per takeChain: #862kawqy0
 
+    const usdValue = await this.executor.usdValueOfOrder(order);
+    if (usdValue >= this.params.forceUnlockOrderUsdThreshold) {
+      return 1;
+    }
+
     // batch_unlock EVM -> Solana: accept up to 7 orders coming from Solana
-    if (giveChain === ChainId.Solana)
-      return Math.min(BATCH_UNLOCK_TO_SOLANA_MAX_SIZE, this.params.batchUnlockSize);
+    if (order.give.chainId === ChainId.Solana)
+      return Math.min(BATCH_UNLOCK_TO_SOLANA_MAX_SIZE, this.params.minBatchUnlockSize);
 
     // use default for any order
-    return this.params.batchUnlockSize;
+    return this.params.minBatchUnlockSize;
   }
 
   private getPreFulfillSlippage(evaluatedTakeAmount: bigint, takeAmount: bigint): number {
