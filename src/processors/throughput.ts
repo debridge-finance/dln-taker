@@ -51,7 +51,7 @@ export class ThroughputController {
           threshold.minBlockConfirmations,
       )
       .sort(
-        (thresholdA, thresholdB) =>
+        (thresholdB, thresholdA) =>
           thresholdA.minBlockConfirmations - thresholdB.minBlockConfirmations,
       )
       .map((threshold) => ({
@@ -63,7 +63,7 @@ export class ThroughputController {
 
     for (const threshold of this.#metrics) {
       this.#logger.debug(
-        `initializing maxFulfillThroughputUSD for the range <=${threshold.minBlockConfirmations}: $${threshold.maxFulfillThroughputUSD}, limit: ${threshold.throughputTimeWindowSec}s`,
+        `initializing maxFulfillThroughputUSD for the range #${threshold.minBlockConfirmations}: $${threshold.maxFulfillThroughputUSD}, limit: ${threshold.throughputTimeWindowSec}s`,
       );
     }
 
@@ -155,7 +155,8 @@ export class ThroughputController {
   }
 
   private getMetric(confirmationBlocksCount: number): Metric | undefined {
-    return this.#metrics.find((metric) => metric.minBlockConfirmations >= confirmationBlocksCount);
+    // #metrics must be sorted by minBlockConfirmations DESC, see constructor
+    return this.#metrics.find((metric) => metric.minBlockConfirmations <= confirmationBlocksCount);
   }
 
   private static getRangeAsString(tr: Metric): string {
