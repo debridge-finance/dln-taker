@@ -569,7 +569,7 @@ export class Executor implements IExecutor {
           return {
             upperThreshold: constraint.thresholdAmountInUSD,
             minBlockConfirmations: constraint.minBlockConfirmations || 0,
-            ...Executor.getSrcConstraints(constraint, configSrcConstraints),
+            ...Executor.getSrcConstraints(constraint),
           };
         })
         // important to sort by upper bound ASC for easier finding of the corresponding range
@@ -577,21 +577,11 @@ export class Executor implements IExecutor {
     );
   }
 
-  private static getSrcConstraints(
-    primaryConstraints: RawSrcOrderConstraints,
-    defaultConstraints?: RawSrcOrderConstraints,
-  ): SrcOrderConstraints {
+  private static getSrcConstraints(constraints: RawSrcOrderConstraints): SrcOrderConstraints {
     return {
-      fulfillmentDelay:
-        primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0,
-      throughputTimeWindowSec:
-        primaryConstraints?.throughputTimeWindowSec ||
-        defaultConstraints?.throughputTimeWindowSec ||
-        0,
-      maxFulfillThroughputUSD:
-        primaryConstraints?.maxFulfillThroughputUSD ||
-        defaultConstraints?.maxFulfillThroughputUSD ||
-        0,
+      fulfillmentDelay: constraints?.fulfillmentDelay || 0,
+      throughputTimeWindowSec: constraints?.throughputTimeWindowSec || 0,
+      maxFulfillThroughputUSD: constraints?.maxFulfillThroughputUSD || 0,
     };
   }
 

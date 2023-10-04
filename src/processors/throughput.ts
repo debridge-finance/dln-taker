@@ -25,8 +25,6 @@ type OrderRecord = {
 // This controller simply keeps track of orders' worth that were attempted to be fulfilled
 // while being non-finalized, to prevent TVL exceed the desired budget on a given chain
 export class ThroughputController {
-  readonly enabled: boolean;
-
   readonly #metrics: Array<Metric>;
 
   readonly #logger: Logger;
@@ -44,12 +42,6 @@ export class ThroughputController {
     });
 
     this.#metrics = thresholds
-      .filter(
-        (threshold) =>
-          threshold.maxFulfillThroughputUSD > 0 &&
-          threshold.throughputTimeWindowSec > 0 &&
-          threshold.minBlockConfirmations,
-      )
       .sort(
         (thresholdB, thresholdA) =>
           thresholdA.minBlockConfirmations - thresholdB.minBlockConfirmations,
@@ -59,24 +51,16 @@ export class ThroughputController {
         currentlyLocked: 0,
         orders: new Set(),
       }));
-    this.enabled = this.#metrics.length > 0;
 
     for (const threshold of this.#metrics) {
-      this.#logger.debug(
-        `initializing maxFulfillThroughputUSD for the range #${threshold.minBlockConfirmations}: $${threshold.maxFulfillThroughputUSD}, limit: ${threshold.throughputTimeWindowSec}s`,
-      );
+      if (ThroughputController.isActualMetric(threshold))
+        this.#logger.debug(
+          `initializing maxFulfillThroughputUSD for the range #${threshold.minBlockConfirmations}: $${threshold.maxFulfillThroughputUSD}, limit: ${threshold.throughputTimeWindowSec}s`,
+        );
     }
-
-    this.#logger.debug(
-      `${ThroughputController.name} state: ${this.enabled ? 'enabled' : 'disabled'}`,
-    );
   }
 
   isThrottled(orderId: string, confirmationBlocksCount: number, usdValue: number): boolean {
-    if (!this.enabled) {
-      return false;
-    }
-
     const metric = this.getMetric(confirmationBlocksCount);
     if (!metric) {
       return false;
@@ -100,10 +84,6 @@ export class ThroughputController {
   }
 
   addOrder(orderId: string, confirmationBlocksCount: number, usdValue: number): void {
-    if (!this.enabled) {
-      return;
-    }
-
     const metric = this.getMetric(confirmationBlocksCount);
     if (!metric) return;
 
@@ -156,7 +136,16 @@ export class ThroughputController {
 
   private getMetric(confirmationBlocksCount: number): Metric | undefined {
     // #metrics must be sorted by minBlockConfirmations DESC, see constructor
-    return this.#metrics.find((metric) => metric.minBlockConfirmations <= confirmationBlocksCount);
+    const metric = this.#metrics.find(
+      (iteratedMetric) => iteratedMetric.minBlockConfirmations <= confirmationBlocksCount,
+    );
+    if (metric && !ThroughputController.isActualMetric(metric)) return undefined;
+
+    return metric;
+  }
+
+  private static isActualMetric(metric: Metric) {
+    return metric.maxFulfillThroughputUSD > 0 && metric.throughputTimeWindowSec > 0;
   }
 
   private static getRangeAsString(tr: Metric): string {
