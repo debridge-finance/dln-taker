@@ -7,14 +7,10 @@ import {
   CommonDlnClient,
   Evm,
   getEngineByChainId,
-  JupiterWrapper,
-  OneInchV4Connector,
-  OneInchV5Connector,
   OrderData,
   PriceTokenService,
   Solana,
   SwapConnector,
-  SwapConnectorImpl,
   tokenStringToBuffer,
 } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
@@ -47,6 +43,7 @@ import { TVLBudgetController } from '../processors/TVLBudgetController';
 import { DataStore } from '../processors/DataStore';
 import { createClientLogger } from '../logger';
 import { getCurrentEnvironment } from '../environments';
+import { SwapConnectorImplementationService } from '../processors/swap-connector-implementation.service';
 
 export type ExecutorInitializingChain = Readonly<{
   chain: ChainId;
@@ -104,6 +101,82 @@ export type ExecutorSupportedChain = Readonly<{
   beneficiary: Address;
 }>;
 
+export async function waitSolanaTxFinalized(connection: Connection, txId: string) {
+  let finalized = false;
+  while (!finalized) {
+    // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+    const result = await connection.getTransaction(txId, {
+      commitment: 'finalized',
+      maxSupportedTransactionVersion: 1,
+    });
+    if (result !== null) {
+      finalized = true;
+      break;
+    }
+    // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+    await helpers.sleep(1000);
+  }
+}
+
+export async function tryInitTakerALT(
+  wallet: helpers.Wallet,
+  chains: ChainId[],
+  solanaClient: Solana.DlnClient,
+  logger: Logger,
+  retries = 3,
+) {
+  for (let i = 0; i < retries; i += 1) {
+    // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+    const maybeTxs = await solanaClient.initForTaker(wallet.publicKey, chains);
+    if (!maybeTxs) {
+      logger.info(
+        `ALT already initialized or was found: ${solanaClient.fulfillPreswapALT!.toBase58()}`,
+      );
+
+      return;
+    }
+
+    const solanaConnection = solanaClient.getConnection(ChainId.Solana);
+    try {
+      const [initTx, ...restTxs] = maybeTxs;
+      // initALT ix may yield errors like recentSlot is too old/broken blockhash, it's better to add retries
+      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+      const [initTxId] = await helpers.sendAll(solanaConnection, wallet, initTx, {
+        convertIntoTxV0: false,
+        blockhashCommitment: 'confirmed',
+      });
+      logger.info(`Initialized ALT: ${initTxId}`);
+
+      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+      await waitSolanaTxFinalized(solanaConnection, initTxId);
+      const txWithFreeze = restTxs.pop();
+      if (restTxs.length !== 0) {
+        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+        const fillIds = await helpers.sendAll(solanaConnection, wallet, restTxs, {
+          convertIntoTxV0: false,
+          blockhashCommitment: 'confirmed',
+        });
+        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+        await Promise.all(fillIds.map((txId) => waitSolanaTxFinalized(solanaConnection, txId)));
+        logger.info(`Fill ALT: ${fillIds.join(', ')}`);
+      }
+      if (txWithFreeze) {
+        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+        const [freezeId] = await helpers.sendAll(solanaConnection, wallet, txWithFreeze, {
+          convertIntoTxV0: false,
+          blockhashCommitment: 'confirmed',
+        });
+        logger.info(`Freezed ALT: ${freezeId}`);
+      }
+
+      return;
+    } catch (e) {
+      logger.error(e);
+    }
+  }
+  throw new Error('Failed to init ALT');
+}
+
 export interface IExecutor {
   readonly tokenPriceService: PriceTokenService;
   readonly swapConnector: SwapConnector;
@@ -147,9 +220,9 @@ export class Executor implements IExecutor {
 
   dlnApi: DataStore = new DataStore(this);
 
-  private isInitialized = false;
+  #isInitialized = false;
 
-  private readonly url1Inch = 'https://nodes.debridge.finance';
+  readonly #url1Inch = 'https://nodes.debridge.finance';
 
   constructor(private readonly logger: Logger) {}
 
@@ -218,24 +291,17 @@ export class Executor implements IExecutor {
   }
 
   async init(config: ExecutorLaunchConfig) {
-    if (this.isInitialized) return;
+    if (this.#isInitialized) return;
 
     this.tokenPriceService = config.tokenPriceService || new CoingeckoPriceFeed();
 
     if (config.swapConnector) {
       throw new Error('Custom swapConnector not implemented');
     }
-    const jupiterConnector = new JupiterWrapper(
-      (route) =>
-        // allow all routes except partial swaps
-        // e.g. Lifinity swap is Ok, Lifinity (20%) + Orca (80%) is bad
-        route.marketInfos.find((marketInfo) => marketInfo.label.includes(' + ')) === undefined,
-    );
-    this.swapConnector = new SwapConnectorImpl(
-      new OneInchV4Connector(this.url1Inch),
-      new OneInchV5Connector(this.url1Inch),
-      jupiterConnector,
-    );
+
+    this.swapConnector = new SwapConnectorImplementationService({
+      oneInchApi: this.#url1Inch,
+    });
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
@@ -283,7 +349,14 @@ export class Executor implements IExecutor {
         const solanaConnection = new Connection(chain.chainRpc, {
           // force using native fetch because node-fetch throws errors on some RPC providers sometimes
           fetch,
+          commitment: 'confirmed',
         });
+
+        (this.swapConnector as SwapConnectorImplementationService).initSolana({
+          solanaConnection,
+          jupiterApiToken: undefined,
+        });
+
         const solanaPmmSrc = new PublicKey(
           chain.environment?.pmmSrc || getCurrentEnvironment().chains[ChainId.Solana]!.pmmSrc!,
         );
@@ -318,20 +391,15 @@ export class Executor implements IExecutor {
           solanaPmmDst,
           solanaDebridge,
           solanaDebridgeSetting,
-          undefined,
-          undefined,
-          undefined,
-          getCurrentEnvironment().environment,
         );
         // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
         await client.destination.debridge.init();
 
         // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
-        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-        const altInitTx = await client.initForFulfillPreswap(
+
+        /* const altInitTx = await client.initForTaker(
           new PublicKey(client.parseAddress(chain.beneficiary)),
           config.chains.map((chainConfig) => chainConfig.chain),
-          jupiterConnector,
         );
         if (altInitTx) {
           this.logger.info(`Initializing Solana Address Lookup Table (ALT)`);
@@ -339,7 +407,16 @@ export class Executor implements IExecutor {
           await fulfillProvider.sendTransaction(altInitTx, { logger: this.logger });
         } else {
           this.logger.info(`Solana Address Lookup Table (ALT) already exists`);
-        }
+        } */
+
+        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+        await tryInitTakerALT(
+          new helpers.Wallet(decodeKey(chain.takerPrivateKey)),
+          config.chains.map((chainConfig) => chainConfig.chain),
+          client,
+          this.logger,
+        );
+
         clients.push(client);
       } else {
         unlockProvider = new EvmProviderAdapter(
@@ -522,7 +599,7 @@ export class Executor implements IExecutor {
     // Override internal slippage calculation: do not reserve slippage buffer for pre-fulfill swap
     setSlippageOverloader(() => 0);
 
-    this.isInitialized = true;
+    this.#isInitialized = true;
   }
 
   private static getDstConstraintsPerOrderValue(

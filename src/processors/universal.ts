@@ -3,21 +3,16 @@ import {
   buffersAreEqual,
   ChainEngine,
   ChainId,
-  EvmChains,
   EvmInstruction,
   getEngineByChainId,
   Order,
   OrderDataWithId,
   OrderState,
   tokenAddressToString,
+  SwapConnectorRequest,
 } from '@debridge-finance/dln-client';
 import BigNumber from 'bignumber.js';
 import { Logger } from 'pino';
-
-import {
-  SwapConnectorRequest,
-  SwapConnectorResult,
-} from 'node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector';
 import { helpers } from '@debridge-finance/solana-utils';
 import {
   calculateExpectedTakeAmount,
@@ -648,7 +643,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     let evmFulfillGasLimit: number | undefined;
     let evmFulfillCappedGasPrice: BigNumber | undefined;
-    let preswapTx: SwapConnectorResult<EvmChains> | undefined;
+    let preswapTx: SwapConnectorRequest['preferEstimation'] | undefined;
     if (getEngineByChainId(this.takeChain.chain) === ChainEngine.EVM) {
       // we need to perform fulfill estimation (to obtain planned gasLimit),
       // but we don't know yet how much reserveAmount should we pass. So, we simply pick
@@ -662,7 +657,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         orderInfo.order.take.amount +
         (orderInfo.order.take.amount * BigInt(BPS_DENOMINATOR - BigInt(DUMMY_SLIPPAGE_BPS))) /
           BigInt(BPS_DENOMINATOR);
-      const t = await this.createOrderFullfillTx<ChainEngine.EVM>(
+      const t = await this.createOrderFullfillTx(
         Order.getVerified({
           orderId: helpers.hexToBuffer(orderInfo.orderId),
           ...orderInfo.order,
@@ -680,7 +675,7 @@ class UniversalProcessor extends BaseOrderProcessor {
       //
       // this needed to preserve swap routes (1inch specific)
       //
-      preswapTx = <SwapConnectorResult<EvmChains>>t.swapResult;
+      preswapTx = t.swapResult;
 
       //
       // predicting gas price cap
@@ -932,7 +927,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     return Number(calculatedSlippageBps);
   }
 
-  private async createOrderFullfillTx<T extends ChainEngine>(
+  private async createOrderFullfillTx(
     order: OrderDataWithId,
     reserveDstToken: Uint8Array,
     reservedAmount: string,
@@ -963,9 +958,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     }
 
     // in dln client 6.0+ swaps are prepared outside of preswapAndFulfill method
-    const swapResult = await context.config.swapConnector.getSwap<
-      T extends ChainEngine.Solana ? ChainId.Solana : EvmChains
-    >(
+    const swapResult = await context.config.swapConnector.getSwap(
       {
         amountIn: BigInt(reservedAmount),
         chainId: order.take.chainId,
@@ -1000,6 +993,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         unlockAuthority: this.takeChain.unlockProvider.bytesAddress,
         externalCallRewardBeneficiary: this.executor.getSupportedChain(order.take.chainId)
           .beneficiary,
+        computeUnitsLimit: 600_000,
       },
     );
 
