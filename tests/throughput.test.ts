@@ -5,7 +5,7 @@ import { ThroughputController } from '../src/processors/throughput';
 
 describe('NonFinalizedOrdersBudgetController', () => {
   const logger = pino({
-    // level: "debug"
+    // level: 'debug',
   });
   const controller = new ThroughputController(
     ChainId.Arbitrum,
@@ -19,6 +19,11 @@ describe('NonFinalizedOrdersBudgetController', () => {
         maxFulfillThroughputUSD: 1000,
         minBlockConfirmations: 10,
         throughputTimeWindowSec: 0.2,
+      },
+      {
+        maxFulfillThroughputUSD: 0,
+        minBlockConfirmations: 100,
+        throughputTimeWindowSec: 0,
       },
     ],
     logger,
@@ -67,6 +72,10 @@ describe('NonFinalizedOrdersBudgetController', () => {
       controller.addOrder('1', 1, 99);
       controller.removeOrder('1');
       assert.equal(controller.isThrottled('2', 1, 100), false);
+    });
+
+    it('must use topmost range if empty', async () => {
+      assert.equal(controller.isThrottled('2', 100, 10_000), false);
     });
   });
 });
