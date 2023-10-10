@@ -22,15 +22,6 @@ export class SwapConnectorImplementationService implements SwapConnector {
     const oneInchV4Connector = new OneInch.OneInchV4Connector(config.oneInchApi);
     const oneInchV5Connector = new OneInch.OneInchV5Connector(config.oneInchApi);
 
-    let jupiterConnectorV6: Jupiter.JupiterConnectorV6 | null = null;
-    if (config.solanaConnection) {
-      jupiterConnectorV6 = new Jupiter.JupiterConnectorV6(
-        config.solanaConnection,
-        config.jupiterApiToken,
-        24,
-      );
-    }
-
     this.#connectors = {
       [ChainId.Ethereum]: oneInchV4Connector,
       [ChainId.BSC]: oneInchV4Connector,
@@ -44,19 +35,26 @@ export class SwapConnectorImplementationService implements SwapConnector {
       [ChainId.HecoTest]: null,
       [ChainId.PolygonTest]: null,
       [ChainId.ArbitrumTest]: null,
-      [ChainId.Solana]: jupiterConnectorV6,
+      [ChainId.Solana]: null,
       [ChainId.Fantom]: oneInchV4Connector,
       [ChainId.Linea]: oneInchV4Connector,
       [ChainId.Base]: oneInchV5Connector,
       [ChainId.Optimism]: oneInchV4Connector,
     };
+
+    if (config.solanaConnection) {
+      this.initSolana({
+        solanaConnection: config.solanaConnection,
+        jupiterApiToken: config.jupiterApiToken,
+      });
+    }
   }
 
   initSolana(config: { jupiterApiToken?: string; solanaConnection: Connection }) {
     this.#connectors[ChainId.Solana] = new Jupiter.JupiterConnectorV6(
       config.solanaConnection,
       config.jupiterApiToken,
-      38, //
+      24,
     );
   }
 

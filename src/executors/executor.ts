@@ -316,6 +316,9 @@ export class Executor implements IExecutor {
           solanaPmmDst,
           solanaDebridge,
           solanaDebridgeSetting,
+          undefined,
+          undefined,
+          getCurrentEnvironment().environment,
         );
         // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
         await client.destination.debridge.init();
