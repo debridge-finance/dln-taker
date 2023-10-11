@@ -7,14 +7,10 @@ import {
   CommonDlnClient,
   Evm,
   getEngineByChainId,
-  JupiterWrapper,
-  OneInchV4Connector,
-  OneInchV5Connector,
   OrderData,
   PriceTokenService,
   Solana,
   SwapConnector,
-  SwapConnectorImpl,
   tokenStringToBuffer,
 } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
@@ -47,6 +43,8 @@ import { TVLBudgetController } from '../processors/TVLBudgetController';
 import { DataStore } from '../processors/DataStore';
 import { createClientLogger } from '../logger';
 import { getCurrentEnvironment } from '../environments';
+import { SwapConnectorImplementationService } from '../processors/swap-connector-implementation.service';
+import { tryInitTakerALT } from '../providers/utils/tryInitAltSolana';
 
 export type ExecutorInitializingChain = Readonly<{
   chain: ChainId;
@@ -147,9 +145,9 @@ export class Executor implements IExecutor {
 
   dlnApi: DataStore = new DataStore(this);
 
-  private isInitialized = false;
+  #isInitialized = false;
 
-  private readonly url1Inch = 'https://nodes.debridge.finance';
+  readonly #url1Inch = 'https://nodes.debridge.finance';
 
   constructor(private readonly logger: Logger) {}
 
@@ -218,24 +216,17 @@ export class Executor implements IExecutor {
   }
 
   async init(config: ExecutorLaunchConfig) {
-    if (this.isInitialized) return;
+    if (this.#isInitialized) return;
 
     this.tokenPriceService = config.tokenPriceService || new CoingeckoPriceFeed();
 
     if (config.swapConnector) {
       throw new Error('Custom swapConnector not implemented');
     }
-    const jupiterConnector = new JupiterWrapper(
-      (route) =>
-        // allow all routes except partial swaps
-        // e.g. Lifinity swap is Ok, Lifinity (20%) + Orca (80%) is bad
-        route.marketInfos.find((marketInfo) => marketInfo.label.includes(' + ')) === undefined,
-    );
-    this.swapConnector = new SwapConnectorImpl(
-      new OneInchV4Connector(this.url1Inch),
-      new OneInchV5Connector(this.url1Inch),
-      jupiterConnector,
-    );
+
+    this.swapConnector = new SwapConnectorImplementationService({
+      oneInchApi: this.#url1Inch,
+    });
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
@@ -283,7 +274,14 @@ export class Executor implements IExecutor {
         const solanaConnection = new Connection(chain.chainRpc, {
           // force using native fetch because node-fetch throws errors on some RPC providers sometimes
           fetch,
+          commitment: 'confirmed',
         });
+
+        (this.swapConnector as SwapConnectorImplementationService).initSolana({
+          solanaConnection,
+          jupiterApiToken: undefined,
+        });
+
         const solanaPmmSrc = new PublicKey(
           chain.environment?.pmmSrc || getCurrentEnvironment().chains[ChainId.Solana]!.pmmSrc!,
         );
@@ -320,26 +318,21 @@ export class Executor implements IExecutor {
           solanaDebridgeSetting,
           undefined,
           undefined,
-          undefined,
           getCurrentEnvironment().environment,
         );
         // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
         await client.destination.debridge.init();
 
         // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
+
         // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-        const altInitTx = await client.initForFulfillPreswap(
-          new PublicKey(client.parseAddress(chain.beneficiary)),
+        await tryInitTakerALT(
+          new helpers.Wallet(decodeKey(chain.takerPrivateKey)),
           config.chains.map((chainConfig) => chainConfig.chain),
-          jupiterConnector,
+          client,
+          this.logger,
         );
-        if (altInitTx) {
-          this.logger.info(`Initializing Solana Address Lookup Table (ALT)`);
-          // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-          await fulfillProvider.sendTransaction(altInitTx, { logger: this.logger });
-        } else {
-          this.logger.info(`Solana Address Lookup Table (ALT) already exists`);
-        }
+
         clients.push(client);
       } else {
         unlockProvider = new EvmProviderAdapter(
@@ -522,7 +515,7 @@ export class Executor implements IExecutor {
     // Override internal slippage calculation: do not reserve slippage buffer for pre-fulfill swap
     setSlippageOverloader(() => 0);
 
-    this.isInitialized = true;
+    this.#isInitialized = true;
   }
 
   private static getDstConstraintsPerOrderValue(
