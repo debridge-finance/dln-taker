@@ -33,10 +33,6 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     return BLOCK_CONFIRMATIONS_HARD_CAPS[ChainId.Solana];
   }
 
-  public get unsafeGetConnection(): Connection {
-    return this.connection;
-  }
-
   async sendTransaction(data: unknown, context: SendTransactionContext) {
     const logger = context.logger.child({
       service: 'SolanaProviderAdapter',
