@@ -38,19 +38,21 @@ import {
 } from './config';
 import * as filters from './filters/index';
 import { OrderFilter } from './filters/index';
-import { DlnClient, GetNextOrder, IncomingOrder, OrderInfoStatus } from './interfaces';
+import { Authority, DlnClient, GetNextOrder, IncomingOrder, OrderInfoStatus } from './interfaces';
 import { WsNextOrder } from './orderFeeds/ws.order.feed';
-import { EvmProviderAdapter } from './providers/evm.provider.adapter';
-import { ProviderAdapter } from './providers/provider.adapter';
-import { SolanaProviderAdapter } from './providers/solana.provider.adapter';
+import { EvmProviderAdapter } from './chain-evm/evm.provider.adapter';
+import { SolanaProviderAdapter } from './chain-solana/solana.provider.adapter';
 import { HooksEngine } from './hooks/HooksEngine';
 import { ThroughputController } from './processors/throughput';
 import { TVLBudgetController } from './processors/TVLBudgetController';
 import { DataStore } from './processors/DataStore';
-import { createClientLogger } from './logger';
+import { createClientLogger } from './dln-ts-client.utils';
 import { getCurrentEnvironment } from './environments';
 import Web3 from 'web3';
 import { OrderProcessor } from './processor';
+import { TransactionBuilder } from './chain-common/tx-builder';
+import { SolanaTransactionBuilder } from './chain-solana/tx-builder';
+import { EvmTransactionBuilder } from './chain-evm/tx-builder';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
@@ -102,8 +104,8 @@ export type ExecutorSupportedChain = Readonly<{
       perOrderValue: DstConstraintsPerOrderValue;
     }
   >;
-  unlockProvider: ProviderAdapter;
-  fulfillProvider: ProviderAdapter;
+  unlockProvider: Authority;
+  fulfillProvider: Authority;
   beneficiary: Address;
 }>;
 
@@ -304,6 +306,7 @@ export class Executor implements IExecutor {
         }
       }
 
+      let transactionBuilder: TransactionBuilder | undefined = undefined;
       let client;
       let unlockProvider;
       let fulfillProvider;
@@ -332,7 +335,7 @@ export class Executor implements IExecutor {
         fulfillProvider = Executor.getSolanaProvider(chain, solanaConnection, chain.fulfillAuthority)
         unlockProvider = chain.unlockAuthority
           ? Executor.getSolanaProvider(chain, solanaConnection, chain.unlockAuthority)
-          : fulfillProvider
+          : fulfillProvider;
 
         client = new Solana.DlnClient(
           solanaConnection,
@@ -345,23 +348,7 @@ export class Executor implements IExecutor {
           undefined,
           getCurrentEnvironment().environment,
         );
-        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-        await client.destination.debridge.init();
-
-        // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
-        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-        const altInitTx = await client.initForFulfillPreswap(
-          new PublicKey(client.parseAddress(chain.beneficiary)),
-          config.chains.map((chainConfig) => chainConfig.chain),
-          jupiterConnector,
-        );
-        if (altInitTx) {
-          this.logger.info(`Initializing Solana Address Lookup Table (ALT)`);
-          // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-          await fulfillProvider.sendTransaction(altInitTx, { logger: this.logger });
-        } else {
-          this.logger.info(`Solana Address Lookup Table (ALT) already exists`);
-        }
+        transactionBuilder = new SolanaTransactionBuilder(client, fulfillProvider, this, jupiterConnector);
         clients.push(client);
       } else {
         const connection = new Web3(chain.chainRpc);
@@ -378,6 +365,7 @@ export class Executor implements IExecutor {
             chain.fulfillAuthority
           )
           : fulfillProvider
+
 
         evmChainConfig[chain.chain] = {
           connection,
@@ -405,6 +393,8 @@ export class Executor implements IExecutor {
             evmChainConfig[chain.chain]!.crossChainForwarderAddress,
           ];
         }
+
+        transactionBuilder = new EvmTransactionBuilder(chain.chain, contractsForApprove, connection, fulfillProvider, this)
       }
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -481,7 +471,7 @@ export class Executor implements IExecutor {
       };
 
       // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-      this.processors[chain.chain] = await OrderProcessor.initialize(this.chains[chain.chain]!, this, {
+      this.processors[chain.chain] = await OrderProcessor.initialize(transactionBuilder, this.chains[chain.chain]!, this, {
         logger: this.logger,
         contractsForApprove,
       });
@@ -536,7 +526,7 @@ export class Executor implements IExecutor {
     this.isInitialized = true;
   }
 
-  private static getEVMProvider(chain: ChainDefinition, connection: Web3, authority: SignerAuthority): ProviderAdapter {
+  private static getEVMProvider(chain: ChainDefinition, connection: Web3, authority: SignerAuthority): EvmProviderAdapter {
     switch (authority.type) {
       case "PK": {
         return new EvmProviderAdapter(
@@ -560,7 +550,7 @@ export class Executor implements IExecutor {
     }
   }
 
-  private static getSolanaProvider(chain: ChainDefinition, connection: Connection, authority: SignerAuthority): ProviderAdapter {
+  private static getSolanaProvider(chain: ChainDefinition, connection: Connection, authority: SignerAuthority): SolanaProviderAdapter {
     const decodeKey = (key: string) =>
       Keypair.fromSecretKey(
         key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key),

@@ -1,8 +1,9 @@
 import { ChainEngine } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
-import { createClientLogger } from "../logger";
+import { createClientLogger } from "../dln-ts-client.utils";
 import { CreatedOrder } from "../chain-common/order";
 import { OrderEstimation } from "../chain-common/order-estimator";
+import { VersionedTransaction } from "@solana/web3.js";
 
 export class SolanaOrderFulfillIntent {
   readonly #logger: Logger;
@@ -12,7 +13,8 @@ export class SolanaOrderFulfillIntent {
       this.#logger = logger.child({ service: SolanaOrderFulfillIntent.name })
   }
 
-  async createOrderFullfillTx() {
+  async createOrderFullfillTx(): Promise<VersionedTransaction> {
+
       if (this.estimation.preFulfillSwapResult) {
         return this.order.executor.client.preswapAndFulfillOrder<ChainEngine.Solana>(
           {

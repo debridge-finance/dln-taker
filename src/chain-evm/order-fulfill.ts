@@ -1,9 +1,13 @@
 
-import { ChainEngine } from "@debridge-finance/dln-client";
+import { ChainEngine, EvmInstruction } from "@debridge-finance/dln-client";
 import { Logger } from "pino";
-import { createClientLogger } from "../logger";
+import { createClientLogger } from "../dln-ts-client.utils";
 import { CreatedOrder } from "../chain-common/order";
 import { OrderEstimation } from "../chain-common/order-estimator";
+import { InputTransaction } from "src/chain-evm/evm.provider.adapter";
+import { EVMOrderEstimator } from "./order-estimator";
+import { assert } from "console";
+import BigNumber from "bignumber.js";
 
 export class EVMOrderFulfillIntent {
     readonly #logger: Logger;
@@ -13,7 +17,19 @@ export class EVMOrderFulfillIntent {
         this.#logger = logger.child({ service: EVMOrderFulfillIntent.name })
     }
 
-    async createOrderFullfillTx() {
+    async createOrderFullfillTx(): Promise<InputTransaction> {
+      const tx = await this._createOrderFullfillTx();
+      const cappedFee = <bigint>this.estimation.payload[EVMOrderEstimator.EVM_ESTIMATED_FEE_NAME];
+      assert(typeof cappedFee === 'bigint', 'capped fee not provided by EVMOrderEstimator')
+      return {
+        to: tx.to,
+        data: tx.data,
+        value: tx.value.toString(),
+        cappedFee: new BigNumber(cappedFee.toString()),
+      }
+    }
+
+    async _createOrderFullfillTx(): Promise<EvmInstruction> {
         if (this.estimation.preFulfillSwapResult) {
           return this.order.executor.client.preswapAndFulfillOrder<ChainEngine.EVM>(
             {

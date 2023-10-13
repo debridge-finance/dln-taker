@@ -104,8 +104,6 @@ export class CreatedOrder {
 
     get blockConfirmations(): number {
         if (this.finalization === 'Finalized') return BLOCK_CONFIRMATIONS_HARD_CAPS[this.giveChain.chain as unknown as SupportedChain]
-        else if (this.finalization === 'Revoked') return 0;
-
         return this.finalization;
     }
 
@@ -144,7 +142,7 @@ export class CreatedOrder {
         public readonly orderId: OrderId,
         public readonly orderData: OrderData,
         public readonly status: OrderInfoStatus,
-        public readonly finalization: "Finalized" | "Revoked" | number,
+        public readonly finalization: "Finalized" | number,
         context: CreatedOrderContext
     ) {
         assert(
@@ -157,7 +155,7 @@ export class CreatedOrder {
         this.#logger = context.logger.child({ orderId });
     }
 
-    update(finalization: "Finalized" | "Revoked" | number): CreatedOrder {
+    update(finalization: "Finalized" | number): CreatedOrder {
         const order = new CreatedOrder(
             this.orderId,
             this.orderData,
