@@ -1,7 +1,7 @@
 import { Address, buffersAreEqual, ChainId } from '@debridge-finance/dln-client';
 import NodeCache from 'node-cache';
 import { Logger } from 'pino';
-import { ExecutorSupportedChain, IExecutor } from '../executors/executor';
+import { ExecutorSupportedChain, IExecutor } from '../executor';
 
 enum TvlCacheKey {
   TVL,

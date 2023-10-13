@@ -1,7 +1,7 @@
 import { ChainId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
+import { OrderId } from 'src/interfaces';
 import { assert } from '../errors';
-import { OrderId } from './base';
 
 type Threshold = {
   minBlockConfirmations: number;

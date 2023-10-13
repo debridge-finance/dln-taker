@@ -1,6 +1,5 @@
 import { ChainId } from '@debridge-finance/dln-client';
 import configurator from './configurator/index';
-import * as processors from './processors';
 import * as filters from './filters';
 import { ExecutorLaunchConfig } from './config';
 import * as environments from './environments';
@@ -21,7 +20,6 @@ export {
   // configuration
   ChainId,
   configurator,
-  processors,
   filters,
   ExecutorLaunchConfig,
 

@@ -16,6 +16,8 @@ export enum OrderInfoStatus {
   GiveOfferIncreased,
 }
 
+export type OrderId = string;
+
 type FinalizationInfo =
   | {
       Finalized: {
