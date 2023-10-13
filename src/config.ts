@@ -1,8 +1,7 @@
-import { ChainId, PriceTokenService, SwapConnector } from '@debridge-finance/dln-client';
+import { ChainId, PriceTokenService } from '@debridge-finance/dln-client';
 
 import { OrderFilterInitializer } from './filters/order.filter';
 import { GetNextOrder } from './interfaces';
-import { OrderProcessorInitializer } from './processors';
 import { Hooks } from './hooks/HookEnums';
 import { HookHandler } from './hooks/HookHandler';
 
@@ -50,6 +49,22 @@ export const avgBlockSpeed: { [key in SupportedChain]: number } = {
 export enum DexlessChains {
   Linea = ChainId.Linea,
 }
+
+type PrivateKeyAuthority = {
+  type: "PK";
+  privateKey: string;
+}
+type ForDefiAuthority = {
+  type: "ForDefi";
+  forDefiVaultId: string;
+  forDefiAccessToken: string;
+}
+type SafeAuthority = {
+  type: "Safe";
+  safeAddress: string;
+  signerPrivateKey: string;
+}
+export type SignerAuthority = PrivateKeyAuthority | ForDefiAuthority | SafeAuthority
 
 export class EvmRebroadcastAdapterOpts {
   /**
@@ -123,6 +138,35 @@ export type DstOrderConstraints = {
   preFulfillSwapChangeRecipient?: 'taker' | 'maker';
 };
 
+export type SrcConstraints = {
+  /**
+   * Defines a budget (priced in the US dollar) of assets deployed and locked on the given chain. Any new order coming
+   * from the given chain to any other supported chain that potentially increases the TVL beyond the given budget
+   * (if being successfully fulfilled) gets rejected.
+   *
+   * The TVL is calculated as a sum of:
+   * - the total value of intermediary assets deployed on the taker account (represented as takerPrivateKey)
+   * - PLUS the total value of intermediary assets deployed on the unlock_beneficiary account (represented
+   *   as unlockAuthorityPrivateKey, if differs from takerPrivateKey)
+   * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
+   *   the unlock_beneficiary account as soon as the commands to unlock fulfilled (but not yet unlocked) orders
+   *   are sent from other chains
+   * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
+   *   the unlock_beneficiary account as soon as all active unlock commands (that were sent from other chains
+   *   but were not yet claimed/executed on the given chain) are executed.
+   */
+  TVLBudget?: number;
+
+  /**
+   * Sets the min profitability expected for orders coming from this chain
+   */
+  minProfitabilityBps?: number;
+
+  unlockBatchSize?: number;
+
+  immediateUnlockAtUsdValue?: number;
+}
+
 export type SrcOrderConstraints = {
   /**
    * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
@@ -175,7 +219,7 @@ export interface ChainDefinition {
   /**
    * Defines constraints imposed on all orders coming from this chain
    */
-  constraints?: SrcOrderConstraints & {
+  constraints?: SrcConstraints & SrcOrderConstraints & {
     /**
      * Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
      * For example, you may want to fulfill orders coming from Ethereum:
@@ -197,24 +241,6 @@ export interface ChainDefinition {
         minBlockConfirmations?: number;
       }
     >;
-
-    /**
-     * Defines a budget (priced in the US dollar) of assets deployed and locked on the given chain. Any new order coming
-     * from the given chain to any other supported chain that potentially increases the TVL beyond the given budget
-     * (if being successfully fulfilled) gets rejected.
-     *
-     * The TVL is calculated as a sum of:
-     * - the total value of intermediary assets deployed on the taker account (represented as takerPrivateKey)
-     * - PLUS the total value of intermediary assets deployed on the unlock_beneficiary account (represented
-     *   as unlockAuthorityPrivateKey, if differs from takerPrivateKey)
-     * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
-     *   the unlock_beneficiary account as soon as the commands to unlock fulfilled (but not yet unlocked) orders
-     *   are sent from other chains
-     * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
-     *   the unlock_beneficiary account as soon as all active unlock commands (that were sent from other chains
-     *   but were not yet claimed/executed on the given chain) are executed.
-     */
-    TVLBudget?: number;
   };
 
   /**
@@ -243,16 +269,28 @@ export interface ChainDefinition {
   beneficiary: StringifiedAddress;
 
   /**
+   * Authority responsible for creating fulfill txns
+   */
+  fulfillAuthority?: SignerAuthority;
+
+  /**
+   * Authority responsible for creating unlock txns
+   */
+  unlockAuthority?: SignerAuthority;
+
+  /**
    * The private key for the wallet with funds to fulfill orders. Must have enough reserves and native currency
    * to fulfill orders
+   * @deprecated Use fulfillAuthority
    */
-  takerPrivateKey: string;
+  takerPrivateKey?: string;
 
   /**
    * The private key for the wallet who is responsible for sending order unlocks (must differ from takerPrivateKey).
    * Must have enough ether to unlock orders
+   * @deprecated Use unlockAuthority
    */
-  unlockAuthorityPrivateKey: string;
+  unlockAuthorityPrivateKey?: string;
 
   /**
    * Represents a list of filters which filter out orders for fulfillment
@@ -263,11 +301,6 @@ export interface ChainDefinition {
    * Represents a list of filters which filter out orders for fulfillment
    */
   dstFilters?: OrderFilterInitializer[];
-
-  /**
-   * Defines an order processor that implements the fulfillment strategy
-   */
-  orderProcessor?: OrderProcessorInitializer;
 }
 
 export interface ExecutorLaunchConfig {
@@ -275,11 +308,6 @@ export interface ExecutorLaunchConfig {
    * Represents a list of filters which filter out orders for fulfillment
    */
   filters?: OrderFilterInitializer[];
-
-  /**
-   * Defines an order processor that implements the fulfillment strategy
-   */
-  orderProcessor?: OrderProcessorInitializer;
 
   /**
    * Hook handlers
@@ -295,14 +323,11 @@ export interface ExecutorLaunchConfig {
   tokenPriceService?: PriceTokenService;
 
   /**
-   * Swap connector
-   */
-  swapConnector?: SwapConnector;
-
-  /**
    * Source of orders
    */
   orderFeed?: string | GetNextOrder;
+
+  srcConstraints?: SrcConstraints,
 
   chains: ChainDefinition[];
 

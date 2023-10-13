@@ -1,7 +1,7 @@
 import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { StatsAPI } from './StatsAPI';
-import { IExecutor } from '../executors/executor';
+import { IExecutor } from '../executor';
 
 export class DataStore {
   private statsApi: StatsAPI = new StatsAPI();
