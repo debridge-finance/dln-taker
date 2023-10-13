@@ -2,7 +2,6 @@ import {
   buffersAreEqual,
   ChainId,
   OrderData,
-  OrderEstimationStage,
   OrderState,
   tokenAddressToString,
 } from '@debridge-finance/dln-client';
@@ -13,9 +12,9 @@ import {
   ExecutorSupportedChain,
   IExecutor,
 } from '../executor';
-import { createClientLogger } from '../logger';
 
 import { OrderProcessorContext } from './base';
+import { TransactionBuilder } from 'src/chain-common/tx-builder';
 
 export class BatchUnlocker {
   private ordersDataMap = new Map<string, OrderData>(); // orderId => orderData
@@ -30,6 +29,7 @@ export class BatchUnlocker {
     logger: Logger,
     private readonly executor: IExecutor,
     private readonly takeChain: ExecutorSupportedChain,
+    private readonly transactionBuilder: TransactionBuilder
   ) {
     this.logger = logger.child({
       service: 'batchUnlock',
@@ -46,7 +46,7 @@ export class BatchUnlocker {
     const orderState = await this.executor.client.getTakeOrderState(
       {
         orderId,
-        takeChain: order.take.chainId,
+        takeChain: this.takeChain.chain,
       },
       {},
     );
@@ -58,7 +58,7 @@ export class BatchUnlocker {
       return;
     }
 
-    const unlockAuthority = this.executor.chains[this.takeChain.chain]!.unlockProvider.bytesAddress;
+    const unlockAuthority = this.takeChain.unlockProvider.bytesAddress;
     // a FULFILLED order must have ours takerAddress to ensure successful unlock
     if (!buffersAreEqual(orderState.takerAddress, unlockAuthority)) {
       context.logger.debug(
@@ -208,7 +208,6 @@ export class BatchUnlocker {
 
     try {
       const sendBatchUnlockTransactionHash = await this.sendBatchUnlock(
-        giveChain,
         orderIds,
         logger,
       );
@@ -245,53 +244,14 @@ export class BatchUnlocker {
   }
 
   private async sendBatchUnlock(
-    giveChain: ExecutorSupportedChain,
     orderIds: string[],
     logger: Logger,
   ): Promise<string> {
-    const [giveNativePrice, takeNativePrice] = await Promise.all([
-      this.executor.tokenPriceService.getPrice(giveChain.chain, null, {
-        logger: createClientLogger(logger),
-      }),
-      this.executor.tokenPriceService.getPrice(this.takeChain.chain, null, {
-        logger: createClientLogger(logger),
-      }),
-    ]);
-
-    const fees = await this.executor.client.getClaimExecutionFee(
-      {
-        action: 'ClaimBatchUnlock',
-        giveChain: giveChain.chain,
-        giveNativePrice,
-        takeChain: this.takeChain.chain,
-        takeNativePrice,
-        batchSize: orderIds.length,
-        loggerInstance: createClientLogger(logger),
-      },
-      {
-        orderEstimationStage: OrderEstimationStage.OrderFulfillment,
-      },
-    );
-
-    const batchUnlockTx = await this.executor.client.sendBatchUnlock(
-      {
-        beneficiary: giveChain.beneficiary,
-        executionFee: fees.total,
-        loggerInstance: createClientLogger(logger),
-        orders: orderIds.map((orderId) => ({
-          ...this.ordersDataMap.get(orderId)!,
-          orderId: helpers.hexToBuffer(orderId),
-        })),
-      },
-      {
-        solanaInitWalletReward: fees.rewards[0],
-        solanaClaimUnlockReward: fees.rewards[1],
-        unlocker: this.takeChain.unlockProvider.bytesAddress,
-      },
-    );
-
-    return this.takeChain.unlockProvider.sendTransaction(batchUnlockTx, {
-      logger,
-    });
+    return this.transactionBuilder.getBatchOrderUnlockTxSender(
+      orderIds.map((orderId) => ({
+        ...this.ordersDataMap.get(orderId)!,
+        orderId: helpers.hexToBuffer(orderId),
+      })), logger
+    )();
   }
 }

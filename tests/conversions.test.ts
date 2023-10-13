@@ -1,8 +1,8 @@
 import { helpers } from '@debridge-finance/solana-utils';
 import assert from 'assert';
 import 'mocha';
+import { U256 } from 'src/orderFeeds/u256-utils';
 
-import { U256 } from '../src/helpers';
 
 function testConversion() {
   it('can convert hex to bigint', () => {
