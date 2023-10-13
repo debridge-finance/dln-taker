@@ -1,9 +1,19 @@
 /* eslint-disable no-bitwise -- This helpers implement U256 arithmetics. Seems like not needed anymore because WS returns standard integers. TODO #862karjre */
 
-import { OrderData } from '@debridge-finance/dln-client';
+import { ChainId, OrderData, tokenAddressToString } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 
 import { Order } from './pmm_common';
+
+declare global {
+  interface Uint8Array {
+      toAddress(chain: ChainId): string;
+  }
+}
+
+Uint8Array.prototype.toAddress = function(chain: ChainId): string {
+  return tokenAddressToString(chain, this)
+}
 
 export function timeDiff(timestamp: number) {
   return Date.now() / 1000 - timestamp;

@@ -10,23 +10,14 @@ import { Logger } from 'pino';
 
 import { helpers } from '@debridge-finance/solana-utils';
 import {
-  ExecutorInitializingChain,
   ExecutorSupportedChain,
   IExecutor,
-} from '../executors/executor';
+} from '../executor';
 import { createClientLogger } from '../logger';
 
 import { OrderProcessorContext } from './base';
-import { HooksEngine } from '../hooks/HooksEngine';
-
-// max size fo unlocks coming to giveChain=Solana
-// TODO must be reimplemented so that batchSize can be set per giveChain, not per takeChain: #862kawqy0
-const BATCH_UNLOCK_TO_SOLANA_MAX_SIZE = 7;
 
 export class BatchUnlocker {
-  // @ts-ignore Initialized deferredly within the first call of the unlockOrder() method. Should be rewritten during the next major refactoring
-  private executor: IExecutor;
-
   private ordersDataMap = new Map<string, OrderData>(); // orderId => orderData
 
   private unlockBatchesOrderIdMap = new Map<ChainId, Set<string>>(); // chainId => orderId[]
@@ -37,14 +28,12 @@ export class BatchUnlocker {
 
   constructor(
     logger: Logger,
-    private readonly takeChain: ExecutorInitializingChain,
-    private readonly batchUnlockSize: number,
-    private readonly hooksEngine: HooksEngine,
+    private readonly executor: IExecutor,
+    private readonly takeChain: ExecutorSupportedChain,
   ) {
     this.logger = logger.child({
       service: 'batchUnlock',
       takeChainId: this.takeChain.chain,
-      batchUnlockSize,
     });
   }
 
@@ -53,8 +42,6 @@ export class BatchUnlocker {
     order: OrderData,
     context: OrderProcessorContext,
   ): Promise<void> {
-    this.executor = context.config;
-
     // validate current order state:
     const orderState = await this.executor.client.getTakeOrderState(
       {
@@ -160,10 +147,7 @@ export class BatchUnlocker {
   }
 
   private getBatchUnlockSize(giveChainId: ChainId): number {
-    // batch_unlock EVM -> Solana: accept up to 7 orders coming from Solana
-    if (giveChainId === ChainId.Solana)
-      return Math.min(BATCH_UNLOCK_TO_SOLANA_MAX_SIZE, this.batchUnlockSize);
-    return this.batchUnlockSize;
+    return this.executor.getSupportedChain(giveChainId).srcConstraints.unlockBatchSize
   }
 
   /**
@@ -236,7 +220,7 @@ export class BatchUnlocker {
         } orders: ${orderIds.join(', ')}`,
       );
 
-      this.hooksEngine.handleOrderUnlockSent({
+      this.executor.hookEngine.handleOrderUnlockSent({
         fromChainId: this.takeChain.chain,
         toChainId: giveChain.chain,
         txHash: sendBatchUnlockTransactionHash,
@@ -244,7 +228,7 @@ export class BatchUnlocker {
       });
     } catch (e) {
       const error = e as Error;
-      this.hooksEngine.handleOrderUnlockFailed({
+      this.executor.hookEngine.handleOrderUnlockFailed({
         fromChainId: this.takeChain.chain,
         toChainId: giveChain.chain,
         message: `trying to unlock ${orderIds.length} orders from ${

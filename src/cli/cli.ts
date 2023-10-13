@@ -1,18 +1,39 @@
-import BigNumber from 'bignumber.js';
+import pino from 'pino';
+import pretty from 'pino-pretty';
+import { createWriteStream } from 'pino-sentry';
 import { config } from 'dotenv';
 import path from 'path';
-
-import { ExecutorEngine } from '../executors/executor.engine';
-
-// this is needed to serialize objects with a bigint inside
-(BigInt.prototype as any).toJSON = function () {
-  return this.toString();
-};
-
-// Almost never return exponential notation:
-BigNumber.config({ EXPONENTIAL_AT: 1e9 });
+import { Executor } from '../executor';
 
 config();
+
+function createLogger() {
+  const prettyStream = pretty({
+    colorize: process.stdout.isTTY,
+    sync: true,
+    singleLine: true,
+    translateTime: 'yyyy-mm-dd HH:MM:ss.l',
+  });
+  const streams: any[] = [
+    {
+      level: 'debug',
+      stream: prettyStream,
+    },
+  ];
+  if (process.env.SENTRY_DSN) {
+    const sentryStream = createWriteStream({
+      dsn: process.env.SENTRY_DSN,
+    });
+    streams.push({ level: 'error', stream: sentryStream });
+  }
+  return pino(
+    {
+      level: process.env.LOG_LEVEL || 'info',
+      translateFormat: 'd mmm yyyy H:MM',
+    },
+    pino.multistream(streams, {}),
+  );
+}
 
 async function main() {
   let userConfigPath = process.argv[2];
@@ -54,8 +75,11 @@ async function main() {
   const importedConfig = require(userConfigPath);
   const userConfig = importedConfig.default !== undefined ? importedConfig.default : importedConfig;
 
-  const executor = new ExecutorEngine(userConfig);
-  await executor.init();
+  // const executor = new ExecutorEngine(userConfig);
+  // await executor.init();
+
+  const executor = new Executor(createLogger());
+  await executor.init(userConfig);
 }
 
 main().catch((e) => {

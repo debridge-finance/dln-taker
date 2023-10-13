@@ -50,27 +50,20 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
   private readonly rebroadcast: Required<EvmRebroadcastAdapterOpts>;
 
-  private readonly connection: Web3;
-
   readonly #address: string;
 
   readonly #privateKey: string;
 
   constructor(
     private readonly chainId: ChainId,
-    rpc: string,
+    private readonly connection: Web3,
     privateKey: string,
     rebroadcast?: EvmRebroadcastAdapterOpts,
   ) {
-    this.connection = new Web3(rpc);
     const accountEvmFromPrivateKey = this.connection.eth.accounts.privateKeyToAccount(privateKey);
     this.#address = accountEvmFromPrivateKey.address;
     this.#privateKey = accountEvmFromPrivateKey.privateKey;
     this.rebroadcast = this.fillDefaultVariables(rebroadcast);
-  }
-
-  public get unsafeGetConnection(): Web3 {
-    return this.connection;
   }
 
   public get address(): string {
@@ -491,6 +484,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
 
     return Promise.resolve();
   }
+
 
   estimateGas(tx: InputTransaction): Promise<number> {
     return this.connection.eth.estimateGas({
