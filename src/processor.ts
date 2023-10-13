@@ -1,23 +1,14 @@
-import {
-  ChainEngine,
-  ChainId,
-  EvmInstruction,
-  getEngineByChainId,
-  tokenAddressToString,
-} from '@debridge-finance/dln-client';
-import { VersionedTransaction } from '@solana/web3.js';
 import {IncomingOrder, IncomingOrderContext, OrderId, OrderInfoStatus } from './interfaces';
-import { EvmProviderAdapter, InputTransaction } from './providers/evm.provider.adapter';
 import { BatchUnlocker } from './processors/BatchUnlocker';
 import { MempoolService } from './processors/mempool.service';
 import { PostponingReason, RejectionReason } from './hooks/HookEnums';
-import { isRevertedError } from './processors/utils/isRevertedError';
 import { IExecutor, ExecutorSupportedChain } from './executor';
 import { assert, die } from './errors';
 import { CreatedOrder } from './chain-common/order'
-import { OrderEstimator } from 'src/chain-common/order-estimator';
+import { explainEstimation, OrderEstimator } from 'src/chain-common/order-estimator';
 import { Logger } from 'pino';
 import { OrderValidation, OrderValidationResult } from './chain-common/order-validator';
+import { TransactionBuilder } from './chain-common/tx-builder';
 
 // Represents all necessary information about Created order during its internal lifecycle
 type CreatedOrderMetadata = {
@@ -32,6 +23,7 @@ export type OrderProcessorInitContext = {
   contractsForApprove: string[];
 };
 
+
 export class OrderProcessor {
   readonly #mempoolService: MempoolService;
   readonly #batchUnlocker: BatchUnlocker;
@@ -44,6 +36,7 @@ export class OrderProcessor {
   readonly #createdOrdersMetadata = new Map<OrderId, CreatedOrderMetadata>();
 
   private constructor(
+    private readonly transactionBuilder: TransactionBuilder,
     private readonly takeChain: ExecutorSupportedChain,
     private readonly executor: IExecutor,
     context: OrderProcessorInitContext
@@ -56,6 +49,7 @@ export class OrderProcessor {
         this.#logger,
         executor,
         this.takeChain,
+        transactionBuilder
       );
 
       this.#mempoolService = new MempoolService(
@@ -65,34 +59,21 @@ export class OrderProcessor {
   }
 
   public static async initialize(
+    transactionBuilder: TransactionBuilder,
     takeChain: ExecutorSupportedChain,
     executor: IExecutor,
     context: OrderProcessorInitContext): Promise<OrderProcessor> {
-    const me = new OrderProcessor(takeChain, executor, context);
-    return me.init(context.contractsForApprove);
+    const me = new OrderProcessor(transactionBuilder, takeChain, executor, context);
+    return me.init();
   }
 
   private async init(
-    contractsForApprove: string[]
   ): Promise<OrderProcessor> {
-    if (this.takeChain.chain !== ChainId.Solana) {
-      const tokens: string[] = [];
-      this.executor.buckets.forEach((bucket) => {
-        const tokensFromBucket = bucket.findTokens(this.takeChain.chain) || [];
-        tokensFromBucket.forEach((token) => {
-          tokens.push(tokenAddressToString(this.takeChain.chain, token));
-        });
-      });
-
-      const evmProvider = this.takeChain.fulfillProvider as EvmProviderAdapter;
-      for (const token of tokens) {
-        for (const contract of contractsForApprove) {
-          // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-          await evmProvider.approveToken(token, contract, this.#logger);
-        }
-      }
+    for (const txSender of await this.transactionBuilder.getInitTxSenders(this.#logger)) {
+      this.#logger.debug("Initializing...")
+      const txHash = await txSender();
+      this.#logger.info(`Initialization txn sent: ${txHash}`)
     }
-
     return this;
   }
 
@@ -296,11 +277,45 @@ export class OrderProcessor {
     const estimation = await estimator.getEstimation();
     if (!estimation.isProfitable) {
       // print nice msg and return
-      return this.postponeOrder(metadata, await estimation.explain(), PostponingReason.NOT_PROFITABLE);
+      return this.postponeOrder(metadata, await explainEstimation(estimation), PostponingReason.NOT_PROFITABLE);
     }
 
+    const { logger } = metadata.context.context;
 
+    try {
+      const fulfillTxHash = await this.transactionBuilder.getOrderFulfillTxSender(estimation, logger)();
+      logger.info(`fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
 
+      // we add this order to the budget controller right before the txn is broadcasted
+      // Mind that in case of an error (see the catch{} block below) we don't remove it from the
+      // controller because the error may occur because the txn was stuck in the mempool and reside there
+      // for a long period of time
+      estimation.order.giveChain.throughput.addOrder(estimation.order.orderId, estimation.order.blockConfirmations, await estimation.order.getUsdValue());
+
+      this.executor.hookEngine.handleOrderFulfilled({
+        order: metadata.context.orderInfo,
+        txHash: fulfillTxHash,
+      });
+    } catch (e) {
+      const message = `fulfill transaction failed: ${e}`;
+      logger.error(message);
+      logger.error(e);
+      return this.postponeOrder(
+        metadata,
+        message,
+        PostponingReason.FULFILLMENT_TX_FAILED
+      );
+    }
+
+    // order is fulfilled, remove it from queues (the order may have come again thru WS)
+    this.clearInternalQueues(estimation.order.orderId);
+    estimation.order.giveChain.TVLBudgetController.flushCache();
+
+    // putting the order to the mempool, in case fulfill_txn gets lost
+    const fulfillCheckDelay: number =
+      this.takeChain.fulfillProvider.avgBlockSpeed *
+      this.takeChain.fulfillProvider.finalizedBlockCount;
+    this.#mempoolService.addOrder(metadata.orderId, fulfillCheckDelay);
   }
 
   private async evaluateAndFulfill(metadata: CreatedOrderMetadata): Promise<void> {
@@ -345,94 +360,6 @@ export class OrderProcessor {
         die (`Unexpected verification result: ${verification.result}`)
       }
     }
-
-
-/*
-    // building fulfill transaction
-    const { transaction: fulfillTx } = await this.createOrderFullfillTx(
-      order.getWithId(),
-      reserveDstToken,
-      requiredReserveDstAmount,
-      BigInt(profitableTakeAmount),
-      preswapTx,
-      context,
-      logger,
-    );
-
-    let txToSend: VersionedTransaction | InputTransaction;
-    if (getEngineByChainId(orderInfo.order.take.chainId) === ChainEngine.EVM) {
-      // remap properties
-      txToSend = <InputTransaction>{
-        data: (<EvmInstruction>fulfillTx).data,
-        to: (<EvmInstruction>fulfillTx).to,
-        value: (<EvmInstruction>fulfillTx).value.toString(),
-
-        // we set cappedTxFee as (pre-gasPrice * pre-gasLimit) because pre-*s are the values the profitability has been
-        // estimated against. Now, if gasLimit goes up BUT gasPrice goes down, we still comfortable executing a txn
-        cappedFee: evmFulfillCappedGasPrice!.multipliedBy(evmFulfillGasLimit!),
-      };
-
-      try {
-        txToSend.gasLimit = await (
-          this.takeChain.fulfillProvider as EvmProviderAdapter
-        ).estimateGas(txToSend);
-        logger.debug(`final fulfill tx gas estimation: ${txToSend.gasLimit}`);
-      } catch (e) {
-        const message = `unable to estimate fullfil tx: ${e}`;
-        logger.error(message);
-        logger.error(e);
-        return this.postponeOrder(
-          metadata,
-          message,
-          PostponingReason.FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
-        );
-      }
-    } else {
-      txToSend = <VersionedTransaction>fulfillTx;
-    }
-    logger.debug('fulfill transaction built');
-    logger.debug(txToSend);
-
-    try {
-      const fulfillTxHash = await this.takeChain.fulfillProvider.sendTransaction(txToSend, {
-        logger,
-      });
-      logger.info(`fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
-
-      // we add this order to the budget controller right before the txn is broadcasted
-      // Mind that in case of an error (see the catch{} block below) we don't remove it from the
-      // controller because the error may occur because the txn was stuck in the mempool and reside there
-      // for a long period of time
-      context.giveChain.throughput.addOrder(orderId, confirmationBlocksCount, usdWorth);
-
-      this.executor.hookEngine.handleOrderFulfilled({
-        order: orderInfo,
-        txHash: fulfillTxHash,
-      });
-    } catch (e) {
-      const message = `fulfill transaction failed: ${e}`;
-      logger.error(message);
-      logger.error(e);
-      return this.postponeOrder(
-        metadata,
-        message,
-        isRevertedError(e as Error)
-          ? PostponingReason.FULFILLMENT_TX_REVERTED
-          : PostponingReason.FULFILLMENT_TX_FAILED,
-      );
-    }
-
-    // order is fulfilled, remove it from queues (the order may have come again thru WS)
-    this.clearInternalQueues(orderInfo.orderId);
-    context.giveChain.TVLBudgetController.flushCache();
-    logger.info(`order fulfilled: ${orderId}`);
-
-    // putting the order to the mempool, in case fulfill_txn gets lost
-    const fulfillCheckDelay: number =
-      this.takeChain.fulfillProvider.avgBlockSpeed *
-      this.takeChain.fulfillProvider.finalizedBlockCount;
-    this.#mempoolService.addOrder(metadata.orderId, fulfillCheckDelay);
-*/
     return Promise.resolve();
   }
 }

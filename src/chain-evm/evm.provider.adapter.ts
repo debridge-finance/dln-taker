@@ -1,6 +1,7 @@
-import { ChainId, tokenStringToBuffer } from '@debridge-finance/dln-client';
+import { ChainEngine, ChainId, tokenStringToBuffer } from '@debridge-finance/dln-client';
 import BigNumber from 'bignumber.js';
 import { Logger } from 'pino';
+import { Authority } from 'src/interfaces';
 import { clearInterval } from 'timers';
 import Web3 from 'web3';
 
@@ -11,14 +12,17 @@ import {
   SupportedChain,
 } from '../config';
 
-import { ProviderAdapter, SendTransactionContext } from './provider.adapter';
-import { approve, isApproved } from './utils/approve';
+import { getApproveTx, getAllowance } from './utils/approve.tx';
 
 type TransactionConfig = Parameters<Web3['eth']['sendTransaction']>[0];
 type BroadcastedTx = {
   tx: TransactionConfig;
   hash: string;
   time: Date;
+};
+
+export type SendTransactionContext = {
+  logger: Logger;
 };
 
 // see https://docs.rs/ethers-core/latest/src/ethers_core/types/chain.rs.html#55-166
@@ -45,7 +49,7 @@ export type InputTransaction = {
   cappedFee?: BigNumber;
 };
 
-export class EvmProviderAdapter implements ProviderAdapter {
+export class EvmProviderAdapter implements Authority {
   private staleTx?: BroadcastedTx;
 
   private readonly rebroadcast: Required<EvmRebroadcastAdapterOpts>;
@@ -259,7 +263,7 @@ export class EvmProviderAdapter implements ProviderAdapter {
     };
   }
 
-  async sendTransaction(data: unknown, context: SendTransactionContext): Promise<string> {
+  async sendTransaction(data: InputTransaction, context: SendTransactionContext): Promise<string> {
     const logger = context.logger.child({
       service: 'EvmProviderAdapter',
       currentChainId: await this.connection.eth.getChainId(),
@@ -454,35 +458,6 @@ export class EvmProviderAdapter implements ProviderAdapter {
       pollingTimeframe: rebroadcast?.pollingTimeframe || this.avgBlockSpeed * 24 * 1000,
       pollingInterval: rebroadcast?.pollingInterval || this.avgBlockSpeed * 1000,
     };
-  }
-
-  async approveToken(tokenAddress: string, contractAddress: string, logger: Logger) {
-    if (this.chainId === ChainId.Solana) return Promise.resolve();
-
-    logger.debug(
-      `Verifying approval given by ${
-        this.address
-      } to ${contractAddress} to trade on ${tokenAddress} on ${ChainId[this.chainId]}`,
-    );
-    if (tokenAddress === '0x0000000000000000000000000000000000000000') {
-      return Promise.resolve();
-    }
-    const tokenIsApproved = await isApproved(
-      this.connection,
-      this.address,
-      tokenAddress,
-      contractAddress,
-    );
-    if (!tokenIsApproved) {
-      logger.debug(`Approving ${tokenAddress} on ${ChainId[this.chainId]}`);
-      const data = approve(this.connection, tokenAddress, contractAddress);
-      await this.sendTransaction(data, { logger });
-      logger.debug(`Setting approval for ${tokenAddress} on ${ChainId[this.chainId]} succeeded`);
-    } else {
-      logger.debug(`${tokenAddress} already approved on ${ChainId[this.chainId]}`);
-    }
-
-    return Promise.resolve();
   }
 
 

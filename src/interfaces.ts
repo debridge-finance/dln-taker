@@ -52,6 +52,13 @@ export type UnlockAuthority = {
   address: string;
 };
 
+export interface Authority {
+  address: string;
+  bytesAddress: Uint8Array;
+  avgBlockSpeed: number;
+  finalizedBlockCount: number;
+}
+
 export abstract class GetNextOrder {
   // @ts-ignore Initialized deferredly within the setEnabledChains() method. Should be rewritten during the next major refactoring
   protected enabledChains: ChainId[];

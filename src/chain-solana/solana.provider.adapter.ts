@@ -1,11 +1,16 @@
 import { ChainId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Connection, Keypair, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { Logger } from 'pino';
+import { Authority } from 'src/interfaces';
 import { avgBlockSpeed, BLOCK_CONFIRMATIONS_HARD_CAPS } from '../config';
 
-import { ProviderAdapter, SendTransactionContext } from './provider.adapter';
 
-export class SolanaProviderAdapter implements ProviderAdapter {
+export type SendTransactionContext = {
+  logger: Logger;
+};
+
+export class SolanaProviderAdapter implements Authority {
   private readonly wallet: Parameters<typeof helpers.sendAll>['1'];
 
   constructor(
@@ -33,7 +38,7 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     return BLOCK_CONFIRMATIONS_HARD_CAPS[ChainId.Solana];
   }
 
-  async sendTransaction(data: unknown, context: SendTransactionContext) {
+  async sendTransaction(data: VersionedTransaction | Transaction, context: SendTransactionContext) {
     const logger = context.logger.child({
       service: 'SolanaProviderAdapter',
       currentChainId: ChainId.Solana,

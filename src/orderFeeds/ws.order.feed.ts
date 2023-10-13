@@ -2,7 +2,7 @@ import { ChainId, Offer, OrderData } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import WebSocket from 'ws';
 
-import { U256 } from '../helpers';
+import { U256 } from './u256-utils';
 import {
   GetNextOrder,
   IncomingOrder,
