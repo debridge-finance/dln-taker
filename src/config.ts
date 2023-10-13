@@ -1,8 +1,7 @@
-import { ChainId, PriceTokenService, SwapConnector } from '@debridge-finance/dln-client';
+import { ChainId, PriceTokenService } from '@debridge-finance/dln-client';
 
 import { OrderFilterInitializer } from './filters/order.filter';
 import { GetNextOrder } from './interfaces';
-import { OrderProcessorInitializer } from './processors';
 import { Hooks } from './hooks/HookEnums';
 import { HookHandler } from './hooks/HookHandler';
 
@@ -51,6 +50,12 @@ export enum DexlessChains {
   Linea = ChainId.Linea,
   Neon = ChainId.Neon,
 }
+
+type PrivateKeyAuthority = {
+  type: 'PK';
+  privateKey: string;
+};
+export type SignerAuthority = PrivateKeyAuthority;
 
 export class EvmRebroadcastAdapterOpts {
   /**
@@ -124,6 +129,35 @@ export type DstOrderConstraints = {
   preFulfillSwapChangeRecipient?: 'taker' | 'maker';
 };
 
+export type SrcConstraints = {
+  /**
+   * Defines a budget (priced in the US dollar) of assets deployed and locked on the given chain. Any new order coming
+   * from the given chain to any other supported chain that potentially increases the TVL beyond the given budget
+   * (if being successfully fulfilled) gets rejected.
+   *
+   * The TVL is calculated as a sum of:
+   * - the total value of intermediary assets deployed on the taker account (represented as takerPrivateKey)
+   * - PLUS the total value of intermediary assets deployed on the unlock_beneficiary account (represented
+   *   as unlockAuthorityPrivateKey, if differs from takerPrivateKey)
+   * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
+   *   the unlock_beneficiary account as soon as the commands to unlock fulfilled (but not yet unlocked) orders
+   *   are sent from other chains
+   * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
+   *   the unlock_beneficiary account as soon as all active unlock commands (that were sent from other chains
+   *   but were not yet claimed/executed on the given chain) are executed.
+   */
+  TVLBudget?: number;
+
+  /**
+   * Sets the min profitability expected for orders coming from this chain
+   */
+  minProfitabilityBps?: number;
+
+  unlockBatchSize?: number;
+
+  immediateUnlockAtUsdValue?: number;
+};
+
 export type SrcOrderConstraints = {
   /**
    * Defines a delay (in seconds) the dln-taker should wait before starting to process each new (non-archival) order
@@ -176,47 +210,30 @@ export interface ChainDefinition {
   /**
    * Defines constraints imposed on all orders coming from this chain
    */
-  constraints?: SrcOrderConstraints & {
-    /**
-     * Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
-     * For example, you may want to fulfill orders coming from Ethereum:
-     * - worth <$100 - immediately (after 1 block confirmation)
-     * - worth <$1,000 — after 6 block confirmations
-     * - everything else (worth $1,000+) - after default 12 block confirmations,
-     * then you can configure it:
-     *
-     * ```
-     * requiredConfirmationsThresholds: [
-     *  {thresholdAmountInUSD: 100, minBlockConfirmations: 1},     // worth <$100: 1+ block confirmation
-     *  {thresholdAmountInUSD: 1_000, minBlockConfirmations: 6},   // worth <$1,000: 6+ block confirmations
-     * ]
-     * ```
-     */
-    requiredConfirmationsThresholds?: Array<
-      SrcOrderConstraints & {
-        thresholdAmountInUSD: number;
-        minBlockConfirmations?: number;
-      }
-    >;
-
-    /**
-     * Defines a budget (priced in the US dollar) of assets deployed and locked on the given chain. Any new order coming
-     * from the given chain to any other supported chain that potentially increases the TVL beyond the given budget
-     * (if being successfully fulfilled) gets rejected.
-     *
-     * The TVL is calculated as a sum of:
-     * - the total value of intermediary assets deployed on the taker account (represented as takerPrivateKey)
-     * - PLUS the total value of intermediary assets deployed on the unlock_beneficiary account (represented
-     *   as unlockAuthorityPrivateKey, if differs from takerPrivateKey)
-     * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
-     *   the unlock_beneficiary account as soon as the commands to unlock fulfilled (but not yet unlocked) orders
-     *   are sent from other chains
-     * - PLUS the total value of intermediary assets locked by the DLN smart contract that yet to be transferred to
-     *   the unlock_beneficiary account as soon as all active unlock commands (that were sent from other chains
-     *   but were not yet claimed/executed on the given chain) are executed.
-     */
-    TVLBudget?: number;
-  };
+  constraints?: SrcConstraints &
+    SrcOrderConstraints & {
+      /**
+       * Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
+       * For example, you may want to fulfill orders coming from Ethereum:
+       * - worth <$100 - immediately (after 1 block confirmation)
+       * - worth <$1,000 — after 6 block confirmations
+       * - everything else (worth $1,000+) - after default 12 block confirmations,
+       * then you can configure it:
+       *
+       * ```
+       * requiredConfirmationsThresholds: [
+       *  {thresholdAmountInUSD: 100, minBlockConfirmations: 1},     // worth <$100: 1+ block confirmation
+       *  {thresholdAmountInUSD: 1_000, minBlockConfirmations: 6},   // worth <$1,000: 6+ block confirmations
+       * ]
+       * ```
+       */
+      requiredConfirmationsThresholds?: Array<
+        SrcOrderConstraints & {
+          thresholdAmountInUSD: number;
+          minBlockConfirmations?: number;
+        }
+      >;
+    };
 
   /**
    * Defines constraints imposed on all orders coming to this chain. These properties have precedence over `constraints` property
@@ -229,7 +246,7 @@ export interface ChainDefinition {
      */
     perOrderValueUpperThreshold?: Array<
       DstOrderConstraints & {
-        upperThreshold: number;
+        minBlockConfirmations: number;
       }
     >;
   };
@@ -244,16 +261,33 @@ export interface ChainDefinition {
   beneficiary: StringifiedAddress;
 
   /**
+   * Authority responsible for initializing txns (applicable for Solana only)
+   */
+  initAuthority?: SignerAuthority;
+
+  /**
+   * Authority responsible for creating fulfill txns
+   */
+  fulfillAuthority?: SignerAuthority;
+
+  /**
+   * Authority responsible for creating unlock txns
+   */
+  unlockAuthority?: SignerAuthority;
+
+  /**
    * The private key for the wallet with funds to fulfill orders. Must have enough reserves and native currency
    * to fulfill orders
+   * @deprecated Use fulfillAuthority
    */
-  takerPrivateKey: string;
+  takerPrivateKey?: string;
 
   /**
    * The private key for the wallet who is responsible for sending order unlocks (must differ from takerPrivateKey).
    * Must have enough ether to unlock orders
+   * @deprecated Use unlockAuthority
    */
-  unlockAuthorityPrivateKey: string;
+  unlockAuthorityPrivateKey?: string;
 
   /**
    * Represents a list of filters which filter out orders for fulfillment
@@ -264,11 +298,6 @@ export interface ChainDefinition {
    * Represents a list of filters which filter out orders for fulfillment
    */
   dstFilters?: OrderFilterInitializer[];
-
-  /**
-   * Defines an order processor that implements the fulfillment strategy
-   */
-  orderProcessor?: OrderProcessorInitializer;
 }
 
 export interface ExecutorLaunchConfig {
@@ -276,11 +305,6 @@ export interface ExecutorLaunchConfig {
    * Represents a list of filters which filter out orders for fulfillment
    */
   filters?: OrderFilterInitializer[];
-
-  /**
-   * Defines an order processor that implements the fulfillment strategy
-   */
-  orderProcessor?: OrderProcessorInitializer;
 
   /**
    * Hook handlers
@@ -296,14 +320,11 @@ export interface ExecutorLaunchConfig {
   tokenPriceService?: PriceTokenService;
 
   /**
-   * Swap connector
-   */
-  swapConnector?: SwapConnector;
-
-  /**
    * Source of orders
    */
   orderFeed?: string | GetNextOrder;
+
+  srcConstraints?: SrcConstraints;
 
   chains: ChainDefinition[];
 

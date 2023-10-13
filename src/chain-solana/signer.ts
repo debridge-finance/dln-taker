@@ -1,12 +1,17 @@
 import { ChainId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Connection, Keypair, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { Logger } from 'pino';
+import { Authority } from '../interfaces';
 import { avgBlockSpeed, BLOCK_CONFIRMATIONS_HARD_CAPS } from '../config';
 
-import { ProviderAdapter, SendTransactionContext } from './provider.adapter';
+export type SolanaTxContext = {
+  logger: Logger;
+  options: Parameters<typeof helpers.sendAll>['3'];
+};
 
-export class SolanaProviderAdapter implements ProviderAdapter {
-  private readonly wallet: Parameters<typeof helpers.sendAll>['1'];
+export class SolanaTxSigner implements Authority {
+  private readonly wallet: helpers.Wallet;
 
   constructor(
     private readonly connection: Connection,
@@ -33,23 +38,28 @@ export class SolanaProviderAdapter implements ProviderAdapter {
     return BLOCK_CONFIRMATIONS_HARD_CAPS[ChainId.Solana];
   }
 
-  public get unsafeGetConnection(): Connection {
-    return this.connection;
+  async sendTransaction(
+    data: VersionedTransaction | Transaction,
+    context: SolanaTxContext,
+  ): Promise<string> {
+    const [tx] = await this.sendTransactions(data, context);
+    return tx;
   }
 
-  async sendTransaction(data: unknown, context: SendTransactionContext) {
+  async sendTransactions(
+    data: VersionedTransaction | Transaction | Array<Transaction | VersionedTransaction>,
+    context: SolanaTxContext,
+  ): Promise<Array<string>> {
     const logger = context.logger.child({
-      service: 'SolanaProviderAdapter',
+      service: SolanaTxSigner.name,
       currentChainId: ChainId.Solana,
     });
 
-    const tx = data as Transaction | VersionedTransaction;
-    const [txid] = await helpers.sendAll(this.connection, this.wallet, tx, {
+    return helpers.sendAll(this.connection, this.wallet, data, {
       rpcCalls: 3,
       skipPreflight: false,
       logger: (...args: any) => logger.debug(args), // sendAll will log base64 tx data sent to blockchain
+      ...context.options,
     });
-
-    return txid;
   }
 }

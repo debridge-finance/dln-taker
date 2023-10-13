@@ -2,7 +2,7 @@ import { ChainId, Offer, OrderData } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import WebSocket from 'ws';
 
-import { U256 } from '../helpers';
+import { U256 } from './u256-utils';
 import {
   GetNextOrder,
   IncomingOrder,
@@ -221,7 +221,7 @@ export class WsNextOrder extends GetNextOrder {
 
   private handleEvent(event: Buffer) {
     const rawMessage = event.toString('utf-8');
-    this.logger.info(`📨 ws received new message`);
+    this.logger.debug(`📨 ws received new message`);
     this.logger.debug(rawMessage);
 
     const data = WsNextOrder.parseEvent(rawMessage);

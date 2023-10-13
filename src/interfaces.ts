@@ -1,8 +1,8 @@
-import { ChainId, CommonDlnClient, Evm, OrderData, Solana } from '@debridge-finance/dln-client';
+import { ChainId, OrderData } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 
-import { OrderProcessorContext } from './processors/base';
 import { HooksEngine } from './hooks/HooksEngine';
+import { ExecutorSupportedChain } from './executor';
 
 export enum OrderInfoStatus {
   Created,
@@ -15,6 +15,8 @@ export enum OrderInfoStatus {
   TakeOfferDecreased,
   GiveOfferIncreased,
 }
+
+export type OrderId = string;
 
 type FinalizationInfo =
   | {
@@ -40,7 +42,8 @@ export type IncomingOrder<T extends OrderInfoStatus> = {
 
 export type IncomingOrderContext = {
   orderInfo: IncomingOrder<OrderInfoStatus>;
-  context: OrderProcessorContext;
+  giveChain: ExecutorSupportedChain;
+  takeChain: ExecutorSupportedChain;
 };
 
 export type OrderProcessorFunc = (order: IncomingOrder<any>) => Promise<void>;
@@ -49,6 +52,11 @@ export type UnlockAuthority = {
   chainId: ChainId;
   address: string;
 };
+
+export interface Authority {
+  address: string;
+  bytesAddress: Uint8Array;
+}
 
 export abstract class GetNextOrder {
   // @ts-ignore Initialized deferredly within the setEnabledChains() method. Should be rewritten during the next major refactoring
@@ -75,9 +83,6 @@ export abstract class GetNextOrder {
   }
 
   setLogger(logger: Logger) {
-    this.logger = logger;
+    this.logger = logger.child({ service: GetNextOrder.name });
   }
 }
-
-type ActiveClients = Solana.DlnClient | Evm.DlnClient;
-export type DlnClient = CommonDlnClient<ActiveClients>;

@@ -4,6 +4,6 @@ export function die(message: string) {
   process.exit(1);
 }
 
-export function assert(validation: boolean, message: string) {
+export function assert(validation: boolean, message: string): asserts validation {
   if (!validation) die(message);
 }

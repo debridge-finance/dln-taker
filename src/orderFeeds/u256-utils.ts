@@ -1,13 +1,6 @@
 /* eslint-disable no-bitwise -- This helpers implement U256 arithmetics. Seems like not needed anymore because WS returns standard integers. TODO #862karjre */
 
-import { OrderData } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
-
-import { Order } from './pmm_common';
-
-export function timeDiff(timestamp: number) {
-  return Date.now() / 1000 - timestamp;
-}
 
 function BytesToU64(data: Buffer, encoding: 'le' | 'be'): bigint {
   let result: bigint = 0n;
@@ -96,30 +89,4 @@ export class U256 {
 
     return new U256({ limb1, limb2, limb3, limb4 });
   }
-}
-
-export function eventToOrderData(event: Order): OrderData {
-  const orderData: OrderData = {
-    give: {
-      amount: U256.toBigInt(event.give!.amount!),
-      chainId: Number(U256.toBigInt(event.give!.chainId!)),
-      tokenAddress: Buffer.from(event.give!.tokenAddress!.address),
-    },
-    take: {
-      amount: U256.toBigInt(event.take!.amount!),
-      chainId: Number(U256.toBigInt(event.take!.chainId!)),
-      tokenAddress: Buffer.from(event.take!.tokenAddress!.address),
-    },
-    maker: Buffer.from(event.makerSrc?.address!),
-    givePatchAuthority: Buffer.from(event.givePatchAuthoritySrc!.address),
-    nonce: event.makerOrderNonce,
-    orderAuthorityDstAddress: Buffer.from(event.orderAuthorityAddressDst!.address),
-    receiver: Buffer.from(event.receiverDst!.address),
-    allowedCancelBeneficiary: event.allowedCancelBeneficiarySrc
-      ? Buffer.from(event.allowedCancelBeneficiarySrc.address)
-      : undefined,
-    allowedTaker: event.allowedTakerDst ? Buffer.from(event.allowedTakerDst.address) : undefined,
-    externalCall: event.externalCall,
-  };
-  return orderData;
 }

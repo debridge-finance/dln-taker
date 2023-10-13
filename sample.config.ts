@@ -1,10 +1,10 @@
-/* eslint-disable import/no-default-export -- Allowed to simplify configuration file */
+/* eslint-disable import/no-default-export, @typescript-eslint/no-unused-vars -- Allowed to simplify configuration file */
 
 import {
   ChainId,
   configurator,
   ExecutorLaunchConfig,
-  processors,
+  filters,
   WsNextOrder,
   CURRENT_ENVIRONMENT as environment,
 } from '@debridge-finance/dln-taker';
@@ -54,7 +54,7 @@ const config: ExecutorLaunchConfig = {
     coingeckoApiKey: process?.env?.COINGECKO_API_KEY,
   }),
 
-  orderProcessor: processors.universalProcessor({
+  srcConstraints: {
     // desired profitability. Setting a higher value would prevent dln-taker from fulfilling most orders because
     // the deBridge app and the API suggest users placing orders with as much margin as 4bps
     minProfitabilityBps: 4,
@@ -68,8 +68,8 @@ const config: ExecutorLaunchConfig = {
     // affects order profitability because the deBridge app and the API reserves the cost of unlock in the order's margin,
     // assuming that the order would be unlocked in a batch of size=10. Reducing the batch size to a lower value increases
     // your unlock costs and thus reduces order profitability, making them unprofitable most of the time.
-    batchUnlockSize: 10,
-  }),
+    unlockBatchSize: 10,
+  },
 
   chains: [
     {
