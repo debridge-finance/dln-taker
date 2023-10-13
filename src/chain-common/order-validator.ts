@@ -5,7 +5,7 @@ import { DexlessChains } from "../config"
 import { die } from "../errors"
 import { RejectionReason, PostponingReason } from "../hooks/HookEnums"
 import { OrderInfoStatus } from "../interfaces"
-import { createClientLogger } from "../logger"
+import { createClientLogger } from "../dln-ts-client.utils"
 import { CreatedOrder, OrderEvaluationContextual, OrderEvaluationPayload } from "./order"
 import {  OrderEstimator,  } from "./order-estimator"
 
@@ -87,6 +87,7 @@ export class OrderValidator extends OrderEvaluationContextual {
             await this.checkAccountBalance()
             await this.checkRoughProfitability()
             await this.runChecks()
+
             return this.getSuccessfulValidationResult()
         }
         catch (e) {
@@ -192,11 +193,7 @@ export class OrderValidator extends OrderEvaluationContextual {
     }
 
     private async checkFinalization(): Promise<void> {
-        if (this.order.finalization === 'Revoked') {
-            const message = 'order announced as revoked';
-            return rejectOrder(RejectionReason.REVOKED, message);
-        }
-        else if (this.order.finalization === 'Finalized') {
+        if (this.order.finalization === 'Finalized') {
             // do nothing: order have stable finality according to the WS
             this.#logger.debug('order announced as finalized');
         }

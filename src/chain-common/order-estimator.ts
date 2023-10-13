@@ -3,7 +3,7 @@ import { calculateExpectedTakeAmount } from "@debridge-finance/legacy-dln-profit
 import { SwapConnectorResult } from "node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector";
 import { Logger } from "pino";
 import { assert } from "../errors";
-import { createClientLogger } from "../logger";
+import { createClientLogger } from "../dln-ts-client.utils";
 import { CreatedOrder, OrderEvaluationContextual, OrderEvaluationPayload } from "./order";
 
 type OrderEstimatorContext = {
@@ -24,6 +24,36 @@ function getPreFulfillSlippage(evaluatedTakeAmount: bigint, takeAmount: bigint):
     return Number(calculatedSlippageBps);
   }
 
+  export async function explainEstimation(orderEstimation: OrderEstimation): Promise<string> {
+    const takeAmountDrop = orderEstimation.projectedFulfillAmount * 10_000n / orderEstimation.order.orderData.take.amount;
+    const takeAmountDropShare = Number(10_000n - takeAmountDrop) / 100;
+
+    const reserveTokenDesc = orderEstimation.order.route.reserveDstToken.toAddress(orderEstimation.order.takeChain.chain);
+    const takeTokenDesc = orderEstimation.order.orderData.take.tokenAddress.toAddress(orderEstimation.order.takeChain.chain)
+
+    return [
+      `order is estimated to be profitable when supplying `,
+      `${await orderEstimation.order.executor.formatTokenValue(
+        orderEstimation.order.orderData.take.chainId,
+        orderEstimation.order.route.reserveDstToken,
+        orderEstimation.requiredReserveAmount,
+      )} `,
+      `of reserve token (${reserveTokenDesc}) during fulfillment, `,
+      `which gives only ${await orderEstimation.order.executor.formatTokenValue(
+        orderEstimation.order.orderData.take.chainId,
+        orderEstimation.order.route.reserveDstToken,
+        orderEstimation.projectedFulfillAmount,
+      )} `,
+      `of take token (${takeTokenDesc}), `,
+      `while order requires ${await orderEstimation.order.executor.formatTokenValue(
+        orderEstimation.order.orderData.take.chainId,
+        orderEstimation.order.route.reserveDstToken,
+        orderEstimation.order.orderData.take.amount,
+      )} of take amount `,
+      `(${takeAmountDropShare}% drop)`,
+    ].join('');
+  }
+
 // wrapped version of the result of calculateExpectedTakeAmount()
 export class RawOrderEstimation {
     public isProfitable: boolean
@@ -38,8 +68,9 @@ export class RawOrderEstimation {
         this.projectedFulfillAmount = BigInt(rawEstimation.profitableTakeAmount)
     }
 
-    toOrderEstimation(payload?: OrderEvaluationPayload): OrderEstimation {
+    toOrderEstimation(order: CreatedOrder, payload?: OrderEvaluationPayload): OrderEstimation {
       return {
+        order,
         isProfitable: this.isProfitable,
         requiredReserveAmount: this.requiredReserveAmount,
         projectedFulfillAmount: this.projectedFulfillAmount,
@@ -50,6 +81,7 @@ export class RawOrderEstimation {
 }
 
 export type OrderEstimation = {
+    readonly order: CreatedOrder;
     readonly isProfitable: boolean
     readonly requiredReserveAmount: bigint
     readonly projectedFulfillAmount: bigint
@@ -57,10 +89,41 @@ export type OrderEstimation = {
     readonly payload: OrderEvaluationPayload
 }
 
+
+
+    // protected sendHook() {
+    //     assert(undefined !== this.#estimation, "Unexpected: hook triggered before estimation is performed on OrderEstimator")
+
+    //     const { reserveDstToken, requiredReserveDstAmount, isProfitable, profitableTakeAmount } =
+    //         this.#estimation;
+
+    //     const hookEstimation = {
+    //         isProfitable,
+    //         reserveToken: reserveDstToken,
+    //         requiredReserveAmount: requiredReserveDstAmount,
+    //         fulfillToken: this.order.orderData.take.tokenAddress,
+    //         projectedFulfillAmount: profitableTakeAmount,
+    //     };
+    //     this.order.executor.hookEngine.handleOrderEstimated({
+    //         order: {
+    //             orderId: this.order.orderId,
+    //             status: this.order.status,
+    //             order: this.order.orderData
+    //         },
+    //         estimation: hookEstimation,
+    //         context: {
+    //             logger: this.#logger,
+    //             giveChain: this.order.giveChain,
+    //             takeChain: this.order.takeChain,
+    //             config: this.order.executor
+    //         },
+    //     });
+    // }
+
 export class OrderEstimator extends OrderEvaluationContextual {
     protected readonly logger: Logger;
 
-  constructor(protected readonly order: CreatedOrder, protected readonly context: OrderEstimatorContext) {
+  constructor(public readonly order: CreatedOrder, protected readonly context: OrderEstimatorContext) {
       super(context.validationPayload)
        this.logger = context.logger.child({ service: OrderEstimator.name })
     }
@@ -123,7 +186,7 @@ export class OrderEstimator extends OrderEvaluationContextual {
         }
 
         return {
-          ...rawOrderEstimation.toOrderEstimation(this.payload),
+          ...rawOrderEstimation.toOrderEstimation(this.order, this.payload),
           preFulfillSwapResult: swapResult,
         }
 
@@ -142,35 +205,6 @@ export class OrderEstimator extends OrderEvaluationContextual {
         // use default for any order
         return unlockBatchSize;
     }
-
-    // protected sendHook() {
-    //     assert(undefined !== this.#estimation, "Unexpected: hook triggered before estimation is performed on OrderEstimator")
-
-    //     const { reserveDstToken, requiredReserveDstAmount, isProfitable, profitableTakeAmount } =
-    //         this.#estimation;
-
-    //     const hookEstimation = {
-    //         isProfitable,
-    //         reserveToken: reserveDstToken,
-    //         requiredReserveAmount: requiredReserveDstAmount,
-    //         fulfillToken: this.order.orderData.take.tokenAddress,
-    //         projectedFulfillAmount: profitableTakeAmount,
-    //     };
-    //     this.order.executor.hookEngine.handleOrderEstimated({
-    //         order: {
-    //             orderId: this.order.orderId,
-    //             status: this.order.status,
-    //             order: this.order.orderData
-    //         },
-    //         estimation: hookEstimation,
-    //         context: {
-    //             logger: this.#logger,
-    //             giveChain: this.order.giveChain,
-    //             takeChain: this.order.takeChain,
-    //             config: this.order.executor
-    //         },
-    //     });
-    // }
 }
 
 
