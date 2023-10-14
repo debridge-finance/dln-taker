@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Specify the environment to use its secrets
+    environment: 
+      name: main  # Replace with the actual environment name
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
