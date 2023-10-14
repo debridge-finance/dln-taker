@@ -1,4 +1,4 @@
-name: CI
+name: publish_npm_release
 
 on:
   release:
