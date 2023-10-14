@@ -54,7 +54,7 @@ export class SwapConnectorImplementationService implements SwapConnector {
     this.#connectors[ChainId.Solana] = new Jupiter.JupiterConnectorV6(
       config.solanaConnection,
       config.jupiterApiToken,
-      24,
+      22,
     );
   }
 
