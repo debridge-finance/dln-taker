@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+      - name: Check release tag
+        run: |
+          VERSION=$(node -p "const ver=require('./package.json').version; ver.startsWith('v') ? ver : 'v' + ver")
+          TAG=${{ github.ref }}
+          TAG=${TAG#refs/tags/}
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "Error: The release tag ($TAG) does not match the version ($VERSION) in package.json"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build --if-present
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
