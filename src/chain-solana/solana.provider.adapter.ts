@@ -5,9 +5,9 @@ import { Logger } from 'pino';
 import { Authority } from 'src/interfaces';
 import { avgBlockSpeed, BLOCK_CONFIRMATIONS_HARD_CAPS } from '../config';
 
-
 export type SendTransactionContext = {
   logger: Logger;
+  options: Parameters<typeof helpers.sendAll>['3'];
 };
 
 export class SolanaProviderAdapter implements Authority {
@@ -38,19 +38,28 @@ export class SolanaProviderAdapter implements Authority {
     return BLOCK_CONFIRMATIONS_HARD_CAPS[ChainId.Solana];
   }
 
-  async sendTransaction(data: VersionedTransaction | Transaction, context: SendTransactionContext) {
+  async sendTransaction(
+    data: VersionedTransaction | Transaction,
+    context: SendTransactionContext,
+  ): Promise<string> {
+    const [tx] = await this.sendTransactions(data, context);
+    return tx;
+  }
+
+  async sendTransactions(
+    data: VersionedTransaction | Transaction | Array<Transaction | VersionedTransaction>,
+    context: SendTransactionContext,
+  ): Promise<Array<string>> {
     const logger = context.logger.child({
-      service: 'SolanaProviderAdapter',
+      service: SolanaProviderAdapter.name,
       currentChainId: ChainId.Solana,
     });
 
-    const tx = data as Transaction | VersionedTransaction;
-    const [txid] = await helpers.sendAll(this.connection, this.wallet, tx, {
+    return helpers.sendAll(this.connection, this.wallet, data, {
       rpcCalls: 3,
       skipPreflight: false,
       logger: (...args: any) => logger.debug(args), // sendAll will log base64 tx data sent to blockchain
+      ...context.options,
     });
-
-    return txid;
   }
 }

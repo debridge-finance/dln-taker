@@ -1,4 +1,4 @@
-import { ChainEngine, ChainId, tokenStringToBuffer } from '@debridge-finance/dln-client';
+import { ChainId, tokenStringToBuffer } from '@debridge-finance/dln-client';
 import BigNumber from 'bignumber.js';
 import { Logger } from 'pino';
 import { Authority } from 'src/interfaces';
@@ -11,8 +11,6 @@ import {
   EvmRebroadcastAdapterOpts,
   SupportedChain,
 } from '../config';
-
-import { getApproveTx, getAllowance } from './utils/approve.tx';
 
 type TransactionConfig = Parameters<Web3['eth']['sendTransaction']>[0];
 type BroadcastedTx = {
@@ -459,7 +457,6 @@ export class EvmProviderAdapter implements Authority {
       pollingInterval: rebroadcast?.pollingInterval || this.avgBlockSpeed * 1000,
     };
   }
-
 
   estimateGas(tx: InputTransaction): Promise<number> {
     return this.connection.eth.estimateGas({

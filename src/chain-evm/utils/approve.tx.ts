@@ -1,15 +1,11 @@
 import Web3 from 'web3';
-import { Contract } from 'web3-eth-contract';
 import IERC20 from './ierc20.json';
 import { InputTransaction } from '../evm.provider.adapter';
 
 const APPROVE_VALUE = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
 
-export const getApproveTx = (
-  tokenAddress: string,
-  spenderAddress: string,
-): InputTransaction => {
-  const contract = new Contract(IERC20.abi as any, tokenAddress);
+export const getApproveTx = (tokenAddress: string, spenderAddress: string): InputTransaction => {
+  const contract = new new Web3().eth.Contract(IERC20.abi as any, tokenAddress);
 
   return {
     to: tokenAddress,
@@ -25,9 +21,9 @@ export const getAllowance = async (
 ): Promise<bigint> => {
   const contract = new connection.eth.Contract(IERC20.abi as any, tokenAddress);
 
-  const approvedAmount = await contract.methods
+  const approvedAmount = (await contract.methods
     .allowance(ownerAddress, spenderAddress)
-    .call() as string;
+    .call()) as string;
 
   return BigInt(approvedAmount);
 };
