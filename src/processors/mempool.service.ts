@@ -15,10 +15,11 @@ const defaultOpts: MempoolOpts = {
   baseArchivalDelay: 60 * 2,
   delayStep: 10,
   archivalDelayStep: 60 * 5,
-}
+};
 
 export class MempoolService {
   readonly #logger: Logger;
+
   readonly #opts: MempoolOpts;
 
   readonly #trackedOrders = new Map<OrderId, ReturnType<typeof setTimeout>>();

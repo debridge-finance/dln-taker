@@ -51,20 +51,20 @@ export enum DexlessChains {
 }
 
 type PrivateKeyAuthority = {
-  type: "PK";
+  type: 'PK';
   privateKey: string;
-}
+};
 type ForDefiAuthority = {
-  type: "ForDefi";
+  type: 'ForDefi';
   forDefiVaultId: string;
   forDefiAccessToken: string;
-}
+};
 type SafeAuthority = {
-  type: "Safe";
+  type: 'Safe';
   safeAddress: string;
   signerPrivateKey: string;
-}
-export type SignerAuthority = PrivateKeyAuthority | ForDefiAuthority | SafeAuthority
+};
+export type SignerAuthority = PrivateKeyAuthority | ForDefiAuthority | SafeAuthority;
 
 export class EvmRebroadcastAdapterOpts {
   /**
@@ -165,7 +165,7 @@ export type SrcConstraints = {
   unlockBatchSize?: number;
 
   immediateUnlockAtUsdValue?: number;
-}
+};
 
 export type SrcOrderConstraints = {
   /**
@@ -219,29 +219,30 @@ export interface ChainDefinition {
   /**
    * Defines constraints imposed on all orders coming from this chain
    */
-  constraints?: SrcConstraints & SrcOrderConstraints & {
-    /**
-     * Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
-     * For example, you may want to fulfill orders coming from Ethereum:
-     * - worth <$100 - immediately (after 1 block confirmation)
-     * - worth <$1,000 — after 6 block confirmations
-     * - everything else (worth $1,000+) - after default 12 block confirmations,
-     * then you can configure it:
-     *
-     * ```
-     * requiredConfirmationsThresholds: [
-     *  {thresholdAmountInUSD: 100, minBlockConfirmations: 1},     // worth <$100: 1+ block confirmation
-     *  {thresholdAmountInUSD: 1_000, minBlockConfirmations: 6},   // worth <$1,000: 6+ block confirmations
-     * ]
-     * ```
-     */
-    requiredConfirmationsThresholds?: Array<
-      SrcOrderConstraints & {
-        thresholdAmountInUSD: number;
-        minBlockConfirmations?: number;
-      }
-    >;
-  };
+  constraints?: SrcConstraints &
+    SrcOrderConstraints & {
+      /**
+       * Defines necessary and sufficient block confirmation thresholds per worth of order expressed in dollars.
+       * For example, you may want to fulfill orders coming from Ethereum:
+       * - worth <$100 - immediately (after 1 block confirmation)
+       * - worth <$1,000 — after 6 block confirmations
+       * - everything else (worth $1,000+) - after default 12 block confirmations,
+       * then you can configure it:
+       *
+       * ```
+       * requiredConfirmationsThresholds: [
+       *  {thresholdAmountInUSD: 100, minBlockConfirmations: 1},     // worth <$100: 1+ block confirmation
+       *  {thresholdAmountInUSD: 1_000, minBlockConfirmations: 6},   // worth <$1,000: 6+ block confirmations
+       * ]
+       * ```
+       */
+      requiredConfirmationsThresholds?: Array<
+        SrcOrderConstraints & {
+          thresholdAmountInUSD: number;
+          minBlockConfirmations?: number;
+        }
+      >;
+    };
 
   /**
    * Defines constraints imposed on all orders coming to this chain. These properties have precedence over `constraints` property
@@ -327,7 +328,7 @@ export interface ExecutorLaunchConfig {
    */
   orderFeed?: string | GetNextOrder;
 
-  srcConstraints?: SrcConstraints,
+  srcConstraints?: SrcConstraints;
 
   chains: ChainDefinition[];
 

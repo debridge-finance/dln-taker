@@ -3,7 +3,6 @@ import assert from 'assert';
 import 'mocha';
 import { U256 } from 'src/orderFeeds/u256-utils';
 
-
 function testConversion() {
   it('can convert hex to bigint', () => {
     const buf = helpers.hexToBuffer(

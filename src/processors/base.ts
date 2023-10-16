@@ -1,8 +1,5 @@
 import { Logger } from 'pino';
-import {
-  ExecutorSupportedChain,
-  IExecutor,
-} from '../executor';
+import { ExecutorSupportedChain, IExecutor } from '../executor';
 
 export type OrderProcessorContext = {
   logger: Logger;

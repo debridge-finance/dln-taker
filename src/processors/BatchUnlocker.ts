@@ -8,13 +8,10 @@ import {
 import { Logger } from 'pino';
 
 import { helpers } from '@debridge-finance/solana-utils';
-import {
-  ExecutorSupportedChain,
-  IExecutor,
-} from '../executor';
+import { TransactionBuilder } from 'src/chain-common/tx-builder';
+import { ExecutorSupportedChain, IExecutor } from '../executor';
 
 import { OrderProcessorContext } from './base';
-import { TransactionBuilder } from 'src/chain-common/tx-builder';
 
 export class BatchUnlocker {
   private ordersDataMap = new Map<string, OrderData>(); // orderId => orderData
@@ -29,7 +26,7 @@ export class BatchUnlocker {
     logger: Logger,
     private readonly executor: IExecutor,
     private readonly takeChain: ExecutorSupportedChain,
-    private readonly transactionBuilder: TransactionBuilder
+    private readonly transactionBuilder: TransactionBuilder,
   ) {
     this.logger = logger.child({
       service: 'batchUnlock',
@@ -147,7 +144,7 @@ export class BatchUnlocker {
   }
 
   private getBatchUnlockSize(giveChainId: ChainId): number {
-    return this.executor.getSupportedChain(giveChainId).srcConstraints.unlockBatchSize
+    return this.executor.getSupportedChain(giveChainId).srcConstraints.unlockBatchSize;
   }
 
   /**
@@ -207,10 +204,7 @@ export class BatchUnlocker {
     if (!giveChain) throw new Error(`Give chain not set: ${ChainId[giveChainId]}`);
 
     try {
-      const sendBatchUnlockTransactionHash = await this.sendBatchUnlock(
-        orderIds,
-        logger,
-      );
+      const sendBatchUnlockTransactionHash = await this.sendBatchUnlock(orderIds, logger);
       unlockedOrders.push(...orderIds);
 
       logger.info(
@@ -243,15 +237,13 @@ export class BatchUnlocker {
     return unlockedOrders;
   }
 
-  private async sendBatchUnlock(
-    orderIds: string[],
-    logger: Logger,
-  ): Promise<string> {
+  private async sendBatchUnlock(orderIds: string[], logger: Logger): Promise<string> {
     return this.transactionBuilder.getBatchOrderUnlockTxSender(
       orderIds.map((orderId) => ({
         ...this.ordersDataMap.get(orderId)!,
         orderId: helpers.hexToBuffer(orderId),
-      })), logger
+      })),
+      logger,
     )();
   }
 }

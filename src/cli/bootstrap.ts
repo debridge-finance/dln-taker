@@ -1,4 +1,4 @@
 #!/usr/bin/env node
 
-require('../init')
+require('../init');
 require('./cli');
