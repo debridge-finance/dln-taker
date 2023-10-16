@@ -1,52 +1,65 @@
-import { JupiterWrapper, OrderDataWithId, Solana } from "@debridge-finance/dln-client";
-import { Logger } from "pino";
-import { OrderEstimation } from "src/chain-common/order-estimator";
-import { TransactionBuilder } from "src/chain-common/tx-builder";
-import { IExecutor } from "src/executor";
-import { SolanaProviderAdapter } from "src/chain-solana/solana.provider.adapter";
-import { SolanaOrderFulfillIntent } from "./order.fulfill";
-import { unlockTx } from "./unlock.tx";
-import { PublicKey } from "@solana/web3.js";
+import { OrderDataWithId, Solana } from '@debridge-finance/dln-client';
+import { Logger } from 'pino';
+import { OrderEstimation } from 'src/chain-common/order-estimator';
+import { TransactionBuilder } from 'src/chain-common/tx-builder';
+import { IExecutor } from 'src/executor';
+import { SolanaProviderAdapter } from 'src/chain-solana/solana.provider.adapter';
+import { SolanaOrderFulfillIntent } from './order.fulfill';
+import { unlockTx } from './utils/unlock.tx';
+import { tryInitTakerALT } from './utils/tryInitAltSolana';
 
 export class SolanaTransactionBuilder implements TransactionBuilder {
-    constructor(private solanaClient: Solana.DlnClient,private readonly adapter: SolanaProviderAdapter, private readonly executor: IExecutor, private jupiterConnector: JupiterWrapper) {}
+  constructor(
+    private solanaClient: Solana.DlnClient,
+    private readonly adapter: SolanaProviderAdapter,
+    private readonly executor: IExecutor,
+  ) {}
 
-    getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
-      return async () => this.adapter.sendTransaction(
-        await new SolanaOrderFulfillIntent(orderEstimation.order, orderEstimation, logger)
-          .createOrderFullfillTx(),
-        {logger}
-      )
-    }
-
-    getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {
-        return async () => this.adapter.sendTransaction(
-          await unlockTx(this.executor, orders, logger),
-          {logger}
-        )
-    }
-
-    async getInitTxSenders(logger: Logger) {
-      const txSenders = [];
-
-      logger.debug("initialize solanaClient.destination.debridge...")
-      await this.solanaClient.destination.debridge.init()
-
-      // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
-      logger.debug("Check if Solana Address Lookup Table (ALT) must be pre-initalized")
-      const altInitTx = await this.solanaClient.initForFulfillPreswap(
-        new PublicKey(this.adapter.bytesAddress),
-        Object.values(this.executor.chains).map((chainConfig) => chainConfig.chain),
-        this.jupiterConnector,
+  getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
+    return async () =>
+      this.adapter.sendTransaction(
+        await new SolanaOrderFulfillIntent(
+          orderEstimation.order,
+          orderEstimation,
+          logger,
+        ).createOrderFullfillTx(),
+        {
+          logger,
+          options: {},
+        },
       );
-      if (altInitTx) {
-        const func = () => {
-          logger.info(`Initializing Solana Address Lookup Table (ALT)`);
-          return this.adapter.sendTransaction(altInitTx, { logger });
-        }
-        txSenders.push(func)
-      }
-
-      return txSenders
-    }
   }
+
+  getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {
+    return async () =>
+      this.adapter.sendTransaction(await unlockTx(this.executor, orders, logger), {
+        logger,
+        options: {},
+      });
+  }
+
+  async getInitTxSenders(logger: Logger) {
+    logger.debug('initialize solanaClient.destination.debridge...');
+    await this.solanaClient.destination.debridge.init();
+
+    const maxAttempts = 3;
+    for (let i = 0; i < maxAttempts; i += 1) {
+      try {
+        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+        await tryInitTakerALT(
+          this.adapter.bytesAddress,
+          Object.values(this.executor.chains).map((chainConfig) => chainConfig.chain),
+          this.adapter,
+          this.solanaClient,
+          logger,
+        );
+      } catch (e) {
+        logger.info(`Unable to initialize alts (attempt ${i}/${maxAttempts}): ${e}`);
+        logger.error(e);
+      }
+    }
+    throw new Error('Unable to initialize alts');
+
+    return [];
+  }
+}
