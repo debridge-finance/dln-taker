@@ -17,7 +17,7 @@
     "build": "npm-run-all clean compile && chmod +x ./dist/cli/bootstrap.js",
     "clean": "rimraf ./dist",
     "compile": "tsc -P tsconfig.build.json",
-    "executor": "ts-node -P tsconfig.dev.json ./src/cli/bootstrap.ts",
+    "executor": "ts-node -r tsconfig-paths/register -P tsconfig.dev.json ./src/cli/bootstrap.ts",
     "format": "npm-run-all lint pretty",
     "lint": "npm-run-all lint:ts lint:tsc",
     "lint:ts": "eslint --fix \"{src,tests}/**/*.ts\" sample.config.ts",
@@ -79,6 +79,7 @@
     "prettier-package-json": "^2.8.0",
     "rimraf": "3.0.2",
     "ts-node": "10.9.1",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "~5.1.6"
   },
   "keywords": [
