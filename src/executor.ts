@@ -1,6 +1,5 @@
 import {
   Address,
-  buffersAreEqual,
   ChainEngine,
   ChainId,
   ClientImplementation,
@@ -8,14 +7,10 @@ import {
   CommonDlnClient,
   Evm,
   getEngineByChainId,
-  JupiterWrapper,
-  OneInchV4Connector,
-  OneInchV5Connector,
   OrderData,
   PriceTokenService,
   Solana,
   SwapConnector,
-  SwapConnectorImpl,
   tokenStringToBuffer,
 } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
@@ -26,6 +21,7 @@ import { Logger } from 'pino';
 import { TokensBucket, setSlippageOverloader } from '@debridge-finance/legacy-dln-profitability';
 import { DlnConfig } from 'node_modules/@debridge-finance/dln-client/dist/types/evm/core/models/config.model';
 import BigNumber from 'bignumber.js';
+import Web3 from 'web3';
 import {
   ChainDefinition,
   ExecutorLaunchConfig,
@@ -48,11 +44,11 @@ import { TVLBudgetController } from './processors/TVLBudgetController';
 import { DataStore } from './processors/DataStore';
 import { createClientLogger } from './dln-ts-client.utils';
 import { getCurrentEnvironment } from './environments';
-import Web3 from 'web3';
 import { OrderProcessor } from './processor';
 import { TransactionBuilder } from './chain-common/tx-builder';
 import { SolanaTransactionBuilder } from './chain-solana/tx-builder';
 import { EvmTransactionBuilder } from './chain-evm/tx-builder';
+import { SwapConnectorImplementationService } from './processors/swap-connector-implementation.service';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
@@ -73,7 +69,7 @@ export type SrcConstraints = Readonly<{
   profitability: number;
   unlockBatchSize: number;
   immediateUnlockAtUsdValue: number;
-}>
+}>;
 
 export type SrcOrderConstraints = Readonly<{
   fulfillmentDelay: number;
@@ -81,12 +77,11 @@ export type SrcOrderConstraints = Readonly<{
   throughputTimeWindowSec: number;
 }>;
 
-export type SrcConstraintsPerOrderValue =
-  SrcOrderConstraints &
-    Readonly<{
-      upperThreshold: number;
-      minBlockConfirmations: number;
-    }>
+export type SrcConstraintsPerOrderValue = SrcOrderConstraints &
+  Readonly<{
+    upperThreshold: number;
+    minBlockConfirmations: number;
+  }>;
 
 export type ExecutorSupportedChain = Readonly<{
   chain: ChainId;
@@ -95,9 +90,10 @@ export type ExecutorSupportedChain = Readonly<{
   TVLBudgetController: TVLBudgetController;
   throughput: ThroughputController;
   srcConstraints: Readonly<
-    SrcConstraints & SrcOrderConstraints & {
-      perOrderValue: Array<SrcConstraintsPerOrderValue>;
-    }
+    SrcConstraints &
+      SrcOrderConstraints & {
+        perOrderValue: Array<SrcConstraintsPerOrderValue>;
+      }
   >;
   dstConstraints: Readonly<
     DstOrderConstraints & {
@@ -151,15 +147,16 @@ export class Executor implements IExecutor {
   hookEngine: HooksEngine;
 
   chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
+
   processors: { [key in ChainId]?: OrderProcessor } = {};
 
   buckets: TokensBucket[] = [];
 
   dlnApi: DataStore = new DataStore(this);
 
-  private isInitialized = false;
+  #isInitialized = false;
 
-  private readonly url1Inch = 'https://nodes.debridge.finance';
+  readonly #url1Inch = 'https://nodes.debridge.finance';
 
   constructor(private readonly logger: Logger) {}
 
@@ -228,21 +225,13 @@ export class Executor implements IExecutor {
   }
 
   async init(config: ExecutorLaunchConfig) {
-    if (this.isInitialized) return;
+    if (this.#isInitialized) return;
 
     this.tokenPriceService = config.tokenPriceService || new CoingeckoPriceFeed();
 
-    const jupiterConnector = new JupiterWrapper(
-      (route) =>
-        // allow all routes except partial swaps
-        // e.g. Lifinity swap is Ok, Lifinity (20%) + Orca (80%) is bad
-        route.marketInfos.find((marketInfo) => marketInfo.label.includes(' + ')) === undefined,
-    );
-    this.swapConnector = new SwapConnectorImpl(
-      new OneInchV4Connector(this.url1Inch),
-      new OneInchV5Connector(this.url1Inch),
-      jupiterConnector,
-    );
+    this.swapConnector = new SwapConnectorImplementationService({
+      oneInchApi: this.#url1Inch,
+    });
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
     this.hookEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
@@ -282,31 +271,42 @@ export class Executor implements IExecutor {
       }
 
       if (chain.takerPrivateKey) {
-        if (chain.fulfillAuthority) throw new Error(`Both takerPrivateKey and fulfillAuthority are set for ${ChainId[chain.chain]}; prefer using fulfillAuthority`)
+        if (chain.fulfillAuthority)
+          throw new Error(
+            `Both takerPrivateKey and fulfillAuthority are set for ${
+              ChainId[chain.chain]
+            }; prefer using fulfillAuthority`,
+          );
         chain.fulfillAuthority = {
-          type: "PK",
-          privateKey: chain.takerPrivateKey
-        }
+          type: 'PK',
+          privateKey: chain.takerPrivateKey,
+        };
       }
-      if (!chain.fulfillAuthority) throw new Error(`fulfillAuthority is not set for ${ChainId[chain.chain]}`)
+      if (!chain.fulfillAuthority)
+        throw new Error(`fulfillAuthority is not set for ${ChainId[chain.chain]}`);
 
       if (chain.unlockAuthorityPrivateKey) {
-        if (chain.unlockAuthority) throw new Error(`Both unlockAuthorityPrivateKey and unlockAuthority are set for ${ChainId[chain.chain]}; prefer using unlockAuthority`)
+        if (chain.unlockAuthority)
+          throw new Error(
+            `Both unlockAuthorityPrivateKey and unlockAuthority are set for ${
+              ChainId[chain.chain]
+            }; prefer using unlockAuthority`,
+          );
         chain.unlockAuthority = {
-          type: "PK",
-          privateKey: chain.unlockAuthorityPrivateKey
-        }
+          type: 'PK',
+          privateKey: chain.unlockAuthorityPrivateKey,
+        };
       }
       if (chain.unlockAuthority) {
         // if both authorities share the same PK, let's reuse a single object for both
-        if (chain.unlockAuthority.type == "PK" && chain.fulfillAuthority.type == "PK") {
+        if (chain.unlockAuthority.type === 'PK' && chain.fulfillAuthority.type === 'PK') {
           if (chain.unlockAuthority.privateKey === chain.fulfillAuthority.privateKey) {
             chain.unlockAuthority = undefined;
           }
         }
       }
 
-      let transactionBuilder: TransactionBuilder | undefined = undefined;
+      let transactionBuilder: TransactionBuilder | undefined;
       let client;
       let unlockProvider;
       let fulfillProvider;
@@ -316,7 +316,14 @@ export class Executor implements IExecutor {
         const solanaConnection = new Connection(chain.chainRpc, {
           // force using native fetch because node-fetch throws errors on some RPC providers sometimes
           fetch,
+          commitment: 'confirmed',
         });
+
+        (this.swapConnector as SwapConnectorImplementationService).initSolana({
+          solanaConnection,
+          jupiterApiToken: undefined,
+        });
+
         const solanaPmmSrc = new PublicKey(
           chain.environment?.pmmSrc || getCurrentEnvironment().chains[ChainId.Solana]!.pmmSrc!,
         );
@@ -332,7 +339,11 @@ export class Executor implements IExecutor {
             getCurrentEnvironment().chains![ChainId.Solana]!.solana!.debridgeSetting!,
         );
 
-        fulfillProvider = Executor.getSolanaProvider(chain, solanaConnection, chain.fulfillAuthority)
+        fulfillProvider = Executor.getSolanaProvider(
+          chain,
+          solanaConnection,
+          chain.fulfillAuthority,
+        );
         unlockProvider = chain.unlockAuthority
           ? Executor.getSolanaProvider(chain, solanaConnection, chain.unlockAuthority)
           : fulfillProvider;
@@ -345,27 +356,17 @@ export class Executor implements IExecutor {
           solanaDebridgeSetting,
           undefined,
           undefined,
-          undefined,
           getCurrentEnvironment().environment,
         );
-        transactionBuilder = new SolanaTransactionBuilder(client, fulfillProvider, this, jupiterConnector);
+        transactionBuilder = new SolanaTransactionBuilder(client, fulfillProvider, this);
         clients.push(client);
       } else {
         const connection = new Web3(chain.chainRpc);
-        fulfillProvider = Executor.getEVMProvider(
-          chain,
-          connection,
-          chain.fulfillAuthority
-        )
+        fulfillProvider = Executor.getEVMProvider(chain, connection, chain.fulfillAuthority);
 
         unlockProvider = chain.unlockAuthority
-          ? Executor.getEVMProvider(
-            chain,
-            connection,
-            chain.fulfillAuthority
-          )
-          : fulfillProvider
-
+          ? Executor.getEVMProvider(chain, connection, chain.fulfillAuthority)
+          : fulfillProvider;
 
         evmChainConfig[chain.chain] = {
           connection,
@@ -394,7 +395,13 @@ export class Executor implements IExecutor {
           ];
         }
 
-        transactionBuilder = new EvmTransactionBuilder(chain.chain, contractsForApprove, connection, fulfillProvider, this)
+        transactionBuilder = new EvmTransactionBuilder(
+          chain.chain,
+          contractsForApprove,
+          connection,
+          fulfillProvider,
+          this,
+        );
       }
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -422,7 +429,11 @@ export class Executor implements IExecutor {
       );
 
       const srcConstraints: ExecutorSupportedChain['srcConstraints'] = {
-        ...Executor.getSrcConstraints(chain.chain, chain.constraints || {}, config.srcConstraints || {}),
+        ...Executor.getSrcConstraints(
+          chain.chain,
+          chain.constraints || {},
+          config.srcConstraints || {},
+        ),
         ...Executor.getSrcOrderConstraints(chain.constraints || {}),
         perOrderValue: Executor.getSrcOrderConstraintsPerOrderValue(
           chain.chain as unknown as SupportedChain,
@@ -471,10 +482,15 @@ export class Executor implements IExecutor {
       };
 
       // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-      this.processors[chain.chain] = await OrderProcessor.initialize(transactionBuilder, this.chains[chain.chain]!, this, {
-        logger: this.logger,
-        contractsForApprove,
-      });
+      this.processors[chain.chain] = await OrderProcessor.initialize(
+        transactionBuilder,
+        this.chains[chain.chain]!,
+        this,
+        {
+          logger: this.logger,
+          contractsForApprove,
+        },
+      );
     }
 
     if (Object.keys(evmChainConfig).length !== 0) {
@@ -523,12 +539,16 @@ export class Executor implements IExecutor {
     // Override internal slippage calculation: do not reserve slippage buffer for pre-fulfill swap
     setSlippageOverloader(() => 0);
 
-    this.isInitialized = true;
+    this.#isInitialized = true;
   }
 
-  private static getEVMProvider(chain: ChainDefinition, connection: Web3, authority: SignerAuthority): EvmProviderAdapter {
+  private static getEVMProvider(
+    chain: ChainDefinition,
+    connection: Web3,
+    authority: SignerAuthority,
+  ): EvmProviderAdapter {
     switch (authority.type) {
-      case "PK": {
+      case 'PK': {
         return new EvmProviderAdapter(
           chain.chain,
           connection,
@@ -546,27 +566,27 @@ export class Executor implements IExecutor {
       //   )
       // }
 
-      default: throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`)
+      default:
+        throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`);
     }
   }
 
-  private static getSolanaProvider(chain: ChainDefinition, connection: Connection, authority: SignerAuthority): SolanaProviderAdapter {
+  private static getSolanaProvider(
+    chain: ChainDefinition,
+    connection: Connection,
+    authority: SignerAuthority,
+  ): SolanaProviderAdapter {
     const decodeKey = (key: string) =>
-      Keypair.fromSecretKey(
-        key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key),
-      );
+      Keypair.fromSecretKey(key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key));
 
     switch (authority.type) {
-      case "PK": {
-        return new SolanaProviderAdapter(
-          connection,
-          decodeKey(authority.privateKey),
-        );
+      case 'PK': {
+        return new SolanaProviderAdapter(connection, decodeKey(authority.privateKey));
       }
 
-      default: throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`)
+      default:
+        throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`);
     }
-
   }
 
   private static getDstConstraintsPerOrderValue(
@@ -586,20 +606,29 @@ export class Executor implements IExecutor {
   private static getSrcConstraints(
     chainId: ChainId,
     chainConstraint: RawSrcConstraints,
-    sharedConstraint: RawSrcConstraints
+    sharedConstraint: RawSrcConstraints,
   ): SrcConstraints {
     const maxBatchSize = 10;
     const maxBatchSizeToSolana = 7;
 
     const srcConstraints = {
       TVLBudget: chainConstraint.TVLBudget || sharedConstraint.TVLBudget || 0,
-      profitability: chainConstraint.minProfitabilityBps || sharedConstraint.minProfitabilityBps || DEFAULT_MIN_PROFITABILITY_BPS,
-      unlockBatchSize: chainConstraint.unlockBatchSize || sharedConstraint.unlockBatchSize || maxBatchSize,
-      immediateUnlockAtUsdValue: chainConstraint.immediateUnlockAtUsdValue || sharedConstraint.immediateUnlockAtUsdValue || 0
-    }
+      profitability:
+        chainConstraint.minProfitabilityBps ||
+        sharedConstraint.minProfitabilityBps ||
+        DEFAULT_MIN_PROFITABILITY_BPS,
+      unlockBatchSize:
+        chainConstraint.unlockBatchSize || sharedConstraint.unlockBatchSize || maxBatchSize,
+      immediateUnlockAtUsdValue:
+        chainConstraint.immediateUnlockAtUsdValue ||
+        sharedConstraint.immediateUnlockAtUsdValue ||
+        0,
+    };
 
     if (srcConstraints.unlockBatchSize < 1 || srcConstraints.unlockBatchSize > maxBatchSize) {
-      throw new Error(`Unlock batch size is out of bounds: expected [1,${maxBatchSize}]; actual: ${srcConstraints.unlockBatchSize} for ${ChainId[chainId]}`)
+      throw new Error(
+        `Unlock batch size is out of bounds: expected [1,${maxBatchSize}]; actual: ${srcConstraints.unlockBatchSize} for ${ChainId[chainId]}`,
+      );
     }
 
     if (chainId === ChainId.Solana) {
@@ -610,7 +639,7 @@ export class Executor implements IExecutor {
       }
     }
 
-    return srcConstraints
+    return srcConstraints;
   }
 
   private static getDstConstraints(
@@ -643,7 +672,7 @@ export class Executor implements IExecutor {
           return {
             upperThreshold: constraint.thresholdAmountInUSD,
             minBlockConfirmations: constraint.minBlockConfirmations || 0,
-            ...Executor.getSrcOrderConstraints(constraint, configSrcConstraints),
+            ...Executor.getSrcOrderConstraints(constraint),
           };
         })
         // important to sort by upper bound ASC for easier finding of the corresponding range
@@ -651,21 +680,11 @@ export class Executor implements IExecutor {
     );
   }
 
-  private static getSrcOrderConstraints(
-    primaryConstraints: RawSrcOrderConstraints,
-    defaultConstraints?: RawSrcOrderConstraints,
-  ): SrcOrderConstraints {
+  private static getSrcOrderConstraints(constraints: RawSrcOrderConstraints): SrcOrderConstraints {
     return {
-      fulfillmentDelay:
-        primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0,
-      throughputTimeWindowSec:
-        primaryConstraints?.throughputTimeWindowSec ||
-        defaultConstraints?.throughputTimeWindowSec ||
-        0,
-      maxFulfillThroughputUSD:
-        primaryConstraints?.maxFulfillThroughputUSD ||
-        defaultConstraints?.maxFulfillThroughputUSD ||
-        0,
+      fulfillmentDelay: constraints?.fulfillmentDelay || 0,
+      throughputTimeWindowSec: constraints?.throughputTimeWindowSec || 0,
+      maxFulfillThroughputUSD: constraints?.maxFulfillThroughputUSD || 0,
     };
   }
 

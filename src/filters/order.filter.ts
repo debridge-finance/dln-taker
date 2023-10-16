@@ -1,10 +1,7 @@
 import { ChainId, OrderData } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 
-import {
-  ExecutorSupportedChain,
-  IExecutor,
-} from '../executor';
+import { ExecutorSupportedChain, IExecutor } from '../executor';
 
 export interface FilterContext {
   logger: Logger;
