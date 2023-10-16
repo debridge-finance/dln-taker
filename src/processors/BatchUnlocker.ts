@@ -55,7 +55,7 @@ export class BatchUnlocker {
       return;
     }
 
-    const unlockAuthority = this.takeChain.unlockProvider.bytesAddress;
+    const unlockAuthority = this.takeChain.unlockAuthority.bytesAddress;
     // a FULFILLED order must have ours takerAddress to ensure successful unlock
     if (!buffersAreEqual(orderState.takerAddress, unlockAuthority)) {
       context.logger.debug(

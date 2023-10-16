@@ -40,7 +40,7 @@ export async function unlockTx(
 
   return executor.client.sendBatchUnlock<ChainEngine.Solana>(
     {
-      beneficiary: giveChain.beneficiary,
+      beneficiary: giveChain.unlockBeneficiary,
       executionFee: fees.total,
       loggerInstance: createClientLogger(logger),
       orders,
@@ -48,7 +48,7 @@ export async function unlockTx(
     {
       // solanaInitWalletReward: fees.rewards[0],
       // solanaClaimUnlockReward: fees.rewards[1],
-      unlocker: takeChain.unlockProvider.bytesAddress,
+      unlocker: takeChain.unlockAuthority.bytesAddress,
     },
   );
 }

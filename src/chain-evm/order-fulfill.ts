@@ -36,13 +36,13 @@ export class EVMOrderFulfillIntent {
       return this.order.executor.client.preswapAndFulfillOrder<ChainEngine.EVM>(
         {
           order: this.order.getWithId(),
-          taker: this.order.takeChain.fulfillProvider.bytesAddress,
+          taker: this.order.takeChain.fulfillAuthority.bytesAddress,
           swapResult: this.estimation.preFulfillSwapResult,
           loggerInstance: createClientLogger(this.#logger),
         },
         {
-          unlockAuthority: this.order.takeChain.unlockProvider.bytesAddress,
-          externalCallRewardBeneficiary: this.order.takeChain.beneficiary,
+          unlockAuthority: this.order.takeChain.unlockAuthority.bytesAddress,
+          externalCallRewardBeneficiary: this.order.takeChain.unlockBeneficiary,
         },
       );
     }
@@ -55,8 +55,8 @@ export class EVMOrderFulfillIntent {
       {
         permit: '0x',
         // taker: this.order.takeChain.fulfillProvider.bytesAddress,
-        unlockAuthority: this.order.takeChain.unlockProvider.bytesAddress,
-        externalCallRewardBeneficiary: this.order.takeChain.beneficiary,
+        unlockAuthority: this.order.takeChain.unlockAuthority.bytesAddress,
+        externalCallRewardBeneficiary: this.order.takeChain.unlockBeneficiary,
       },
     );
   }

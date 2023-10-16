@@ -1,4 +1,10 @@
-import { Logger as ClientLogger, LogLevel } from '@debridge-finance/dln-client';
+import {
+  CommonDlnClient,
+  Evm,
+  Solana,
+  Logger as ClientLogger,
+  LogLevel,
+} from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 
 export const createClientLogger = (logger: Logger) =>
@@ -31,3 +37,6 @@ export const createClientLogger = (logger: Logger) =>
       }
     }
   });
+
+type ActiveClients = Solana.DlnClient | Evm.DlnClient;
+export type DlnClient = CommonDlnClient<ActiveClients>;

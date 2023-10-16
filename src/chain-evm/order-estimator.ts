@@ -16,7 +16,7 @@ export class EVMOrderEstimator extends OrderEstimator {
    * exactly this gas price
    */
   private async getEstimatedGasPrice(): Promise<bigint> {
-    const evmAdapter = this.order.takeChain.fulfillProvider as EvmProviderAdapter;
+    const evmAdapter = this.order.takeChain.fulfillAuthority as EvmProviderAdapter;
     const currentGasPriceBN = await evmAdapter.getRequiredGasPrice();
     const currentGasPrice = BigInt(currentGasPriceBN.integerValue().toString());
     const estimatedGasPrice =

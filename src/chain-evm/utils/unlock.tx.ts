@@ -54,7 +54,7 @@ export async function unlockTx(
 
   const tx = await executor.client.sendBatchUnlock<ChainEngine.EVM>(
     {
-      beneficiary: giveChain.beneficiary,
+      beneficiary: giveChain.unlockBeneficiary,
       executionFee: fees.total,
       loggerInstance: createClientLogger(logger),
       orders,

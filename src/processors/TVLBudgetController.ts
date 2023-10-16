@@ -41,8 +41,8 @@ export class TVLBudgetController {
 
   get hasSeparateUnlockBeneficiary(): boolean {
     return !buffersAreEqual(
-      this.giveChain.fulfillProvider.bytesAddress,
-      this.giveChain.beneficiary,
+      this.giveChain.fulfillAuthority.bytesAddress,
+      this.giveChain.unlockBeneficiary,
     );
   }
 
@@ -78,12 +78,12 @@ export class TVLBudgetController {
   }
 
   private async getTakerAccountBalance(): Promise<number> {
-    return this.getAccountValue(this.giveChain.fulfillProvider.bytesAddress);
+    return this.getAccountValue(this.giveChain.fulfillAuthority.bytesAddress);
   }
 
   private async getUnlockBeneficiaryAccountBalance(): Promise<number> {
     if (!this.hasSeparateUnlockBeneficiary) return 0;
-    return this.getAccountValue(this.giveChain.beneficiary);
+    return this.getAccountValue(this.giveChain.unlockBeneficiary);
   }
 
   private async getAccountValue(account: Address): Promise<number> {
