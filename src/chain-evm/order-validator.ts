@@ -26,7 +26,7 @@ export class EVMOrderValidator extends OrderValidator {
       this.logger,
     );
 
-    const adapter = this.order.takeChain.fulfillProvider as EvmProviderAdapter;
+    const adapter = this.order.takeChain.fulfillAuthority as EvmProviderAdapter;
     const tx = await intent.getFulfillTx();
     try {
       const evmFulfillGasLimit = await adapter.estimateGas({

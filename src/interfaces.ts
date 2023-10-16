@@ -1,4 +1,4 @@
-import { ChainId, CommonDlnClient, Evm, OrderData, Solana } from '@debridge-finance/dln-client';
+import { ChainId, OrderData } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 
 import { OrderProcessorContext } from './processors/base';
@@ -87,6 +87,3 @@ export abstract class GetNextOrder {
     this.logger = logger;
   }
 }
-
-type ActiveClients = Solana.DlnClient | Evm.DlnClient;
-export type DlnClient = CommonDlnClient<ActiveClients>;
