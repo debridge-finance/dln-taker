@@ -11,7 +11,6 @@ import {
 import { findExpectedBucket } from '@debridge-finance/legacy-dln-profitability';
 import { helpers } from '@debridge-finance/solana-utils';
 import assert from 'assert';
-import { SwapConnectorResult } from 'node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector';
 import { Logger } from 'pino';
 import { EVMOrderValidator } from 'src/chain-evm/order-validator';
 import { BLOCK_CONFIRMATIONS_HARD_CAPS, SupportedChain } from '../config';
@@ -31,35 +30,6 @@ type CreatedOrderContext = {
   takeChain: ExecutorSupportedChain;
   logger: Logger;
 };
-export type OrderEvaluationPayload = { estimation?: SwapConnectorResult } & {
-  [key in string]: any;
-};
-
-export abstract class OrderEvaluationContextual {
-  readonly #payload: OrderEvaluationPayload = {};
-
-  constructor(base?: OrderEvaluationPayload) {
-    if (base) this.#payload = base;
-  }
-
-  protected setPayloadEntry<T>(key: string, value: T) {
-    assert(
-      this.#payload[key] === undefined,
-      `OrderValidator: accidentally overwriting the ${key} payload entry`,
-    );
-    this.#payload[key] = value;
-  }
-
-  protected getPayloadEntry<T>(key: string): T {
-    assert(typeof this.#payload[key] !== undefined, `payload does not contain ${key}`);
-
-    return this.#payload[key];
-  }
-
-  protected get payload() {
-    return this.#payload;
-  }
-}
 
 export class CreatedOrder {
   public readonly executor: IExecutor;

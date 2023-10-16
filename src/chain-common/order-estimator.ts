@@ -8,8 +8,9 @@ import {
 import { Logger } from 'pino';
 import { assert } from '../errors';
 import { createClientLogger } from '../dln-ts-client.utils';
-import { CreatedOrder, OrderEvaluationContextual, OrderEvaluationPayload } from './order';
+import { CreatedOrder } from './order';
 import './mixins';
+import { OrderEvaluationContextual, OrderEvaluationPayload } from './shared';
 
 type OrderEstimatorContext = {
   logger: Logger;
