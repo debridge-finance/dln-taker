@@ -53,13 +53,13 @@ export class SolanaTransactionBuilder implements TransactionBuilder {
           this.solanaClient,
           logger,
         );
+
+        return [];
       } catch (e) {
-        logger.info(`Unable to initialize alts (attempt ${i}/${maxAttempts}): ${e}`);
+        logger.info(`Unable to initialize alts (attempt ${i}/${maxAttempts})`);
         logger.error(e);
       }
     }
     throw new Error('Unable to initialize alts');
-
-    return [];
   }
 }

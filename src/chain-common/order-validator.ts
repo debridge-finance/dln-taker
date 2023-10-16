@@ -6,8 +6,9 @@ import { die } from '../errors';
 import { RejectionReason, PostponingReason } from '../hooks/HookEnums';
 import { OrderInfoStatus } from '../interfaces';
 import { createClientLogger } from '../dln-ts-client.utils';
-import { CreatedOrder, OrderEvaluationContextual, OrderEvaluationPayload } from './order';
+import { CreatedOrder } from './order';
 import { OrderEstimator } from './order-estimator';
+import { OrderEvaluationContextual, OrderEvaluationPayload } from './shared';
 
 export enum OrderValidationResult {
   Successful,
