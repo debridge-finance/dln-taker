@@ -1,5 +1,6 @@
 import { explainEstimation, OrderEstimator } from 'src/chain-common/order-estimator';
 import { Logger } from 'pino';
+import { ChainId } from '@debridge-finance/dln-client';
 import { IncomingOrder, IncomingOrderContext, OrderId, OrderInfoStatus } from './interfaces';
 import { BatchUnlocker } from './processors/BatchUnlocker';
 import { MempoolService } from './processors/mempool.service';
@@ -16,11 +17,6 @@ type CreatedOrderMetadata = {
   readonly arrivedAt: Date;
   attempts: number;
   context: IncomingOrderContext;
-};
-
-export type OrderProcessorInitContext = {
-  logger: Logger;
-  contractsForApprove: string[];
 };
 
 export class OrderProcessor {
@@ -44,10 +40,12 @@ export class OrderProcessor {
     private readonly transactionBuilder: TransactionBuilder,
     private readonly takeChain: ExecutorSupportedChain,
     private readonly executor: IExecutor,
-    context: OrderProcessorInitContext,
+    logger: Logger,
   ) {
-    this.#logger = context.logger.child({
+    this.#logger = logger.child({
+      service: OrderProcessor.name,
       takeChainId: takeChain.chain,
+      takeChainName: ChainId[takeChain.chain],
     });
 
     this.#batchUnlocker = new BatchUnlocker(
@@ -66,15 +64,15 @@ export class OrderProcessor {
     transactionBuilder: TransactionBuilder,
     takeChain: ExecutorSupportedChain,
     executor: IExecutor,
-    context: OrderProcessorInitContext,
+    logger: Logger,
   ): Promise<OrderProcessor> {
-    const me = new OrderProcessor(transactionBuilder, takeChain, executor, context);
+    const me = new OrderProcessor(transactionBuilder, takeChain, executor, logger);
     return me.init();
   }
 
   private async init(): Promise<OrderProcessor> {
+    this.#logger.info('Initializing...');
     for (const txSender of await this.transactionBuilder.getInitTxSenders(this.#logger)) {
-      this.#logger.debug('Initializing...');
       // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
       const txHash = await txSender();
       this.#logger.info(`Initialization txn sent: ${txHash}`);
@@ -122,7 +120,7 @@ export class OrderProcessor {
 
     // already processing an order
     if (this.isLocked) {
-      orderContext.logger.debug(`Processor is currently processing an order, postponing`);
+      orderContext.logger.debug(`processor is busy, postponing order`);
 
       switch (status) {
         case OrderInfoStatus.ArchivalCreated: {
@@ -329,8 +327,8 @@ export class OrderProcessor {
 
     // putting the order to the mempool, in case fulfill_txn gets lost
     const fulfillCheckDelay: number =
-      this.takeChain.fulfillProvider.avgBlockSpeed *
-      this.takeChain.fulfillProvider.finalizedBlockCount;
+      this.takeChain.fulfillAuthority.avgBlockSpeed *
+      this.takeChain.fulfillAuthority.finalizedBlockCount;
     this.#mempoolService.addOrder(metadata.orderId, fulfillCheckDelay);
 
     return Promise.resolve();

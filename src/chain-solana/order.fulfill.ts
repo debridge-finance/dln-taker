@@ -21,12 +21,12 @@ export class SolanaOrderFulfillIntent {
       return this.order.executor.client.preswapAndFulfillOrder<ChainEngine.Solana>(
         {
           order: this.order.getWithId(),
-          taker: this.order.takeChain.fulfillProvider.bytesAddress,
+          taker: this.order.takeChain.fulfillAuthority.bytesAddress,
           swapResult: this.estimation.preFulfillSwapResult,
           loggerInstance: createClientLogger(this.#logger),
         },
         {
-          unlockAuthority: this.order.takeChain.unlockProvider.bytesAddress,
+          unlockAuthority: this.order.takeChain.unlockAuthority.bytesAddress,
           computeUnitsLimit: 600_000,
           // externalCallRewardBeneficiary: this.order.takeChain.beneficiary,
         },
@@ -40,8 +40,8 @@ export class SolanaOrderFulfillIntent {
       },
       {
         // permit: '0x',
-        taker: this.order.takeChain.fulfillProvider.bytesAddress,
-        unlockAuthority: this.order.takeChain.unlockProvider.bytesAddress,
+        taker: this.order.takeChain.fulfillAuthority.bytesAddress,
+        unlockAuthority: this.order.takeChain.unlockAuthority.bytesAddress,
         // externalCallRewardBeneficiary: this.order.takeChain.beneficiary,
       },
     );

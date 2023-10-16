@@ -23,7 +23,7 @@ export class DataStore {
   private async getPendingForUnlockOrderIds(from: ChainId): Promise<string[]> {
     const unlockAuthorities = this.executor
       .getSupportedChainIds()
-      .map((chainId) => this.executor.getSupportedChain(chainId).unlockProvider.address);
+      .map((chainId) => this.executor.getSupportedChain(chainId).unlockAuthority.address);
 
     let skip = 0;
     let hasMoreOrders = true;

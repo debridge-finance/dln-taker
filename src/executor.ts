@@ -34,7 +34,7 @@ import {
 } from './config';
 import * as filters from './filters/index';
 import { OrderFilter } from './filters/index';
-import { Authority, DlnClient, GetNextOrder, IncomingOrder, OrderInfoStatus } from './interfaces';
+import { Authority, GetNextOrder, IncomingOrder, OrderInfoStatus } from './interfaces';
 import { WsNextOrder } from './orderFeeds/ws.order.feed';
 import { EvmProviderAdapter } from './chain-evm/evm.provider.adapter';
 import { SolanaProviderAdapter } from './chain-solana/solana.provider.adapter';
@@ -42,7 +42,7 @@ import { HooksEngine } from './hooks/HooksEngine';
 import { ThroughputController } from './processors/throughput';
 import { TVLBudgetController } from './processors/TVLBudgetController';
 import { DataStore } from './processors/DataStore';
-import { createClientLogger } from './dln-ts-client.utils';
+import { createClientLogger, DlnClient } from './dln-ts-client.utils';
 import { getCurrentEnvironment } from './environments';
 import { OrderProcessor } from './processor';
 import { TransactionBuilder } from './chain-common/tx-builder';
@@ -100,9 +100,9 @@ export type ExecutorSupportedChain = Readonly<{
       perOrderValue: DstConstraintsPerOrderValue;
     }
   >;
-  unlockProvider: Authority;
-  fulfillProvider: Authority;
-  beneficiary: Address;
+  unlockAuthority: Authority;
+  fulfillAuthority: Authority;
+  unlockBeneficiary: Address;
 }>;
 
 export interface IExecutor {
@@ -445,8 +445,8 @@ export class Executor implements IExecutor {
         chain: chain.chain,
         srcFilters,
         dstFilters,
-        unlockProvider,
-        fulfillProvider,
+        unlockAuthority: unlockProvider,
+        fulfillAuthority: fulfillProvider,
         throughput: new ThroughputController(
           chain.chain,
           [
@@ -473,7 +473,7 @@ export class Executor implements IExecutor {
           chain.constraints?.TVLBudget || 0,
           this.logger,
         ),
-        beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
+        unlockBeneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
         srcConstraints,
         dstConstraints: {
           ...Executor.getDstConstraints(chain.dstConstraints || {}),
@@ -486,10 +486,7 @@ export class Executor implements IExecutor {
         transactionBuilder,
         this.chains[chain.chain]!,
         this,
-        {
-          logger: this.logger,
-          contractsForApprove,
-        },
+        this.logger,
       );
     }
 
@@ -518,7 +515,7 @@ export class Executor implements IExecutor {
 
     const unlockAuthorities = Object.values(this.chains).map((chain) => ({
       chainId: chain.chain,
-      address: chain.unlockProvider.address as string,
+      address: chain.unlockAuthority.address as string,
     }));
 
     const minConfirmationThresholds = Object.values(this.chains)

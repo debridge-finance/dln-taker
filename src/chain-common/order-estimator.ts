@@ -194,7 +194,7 @@ export class OrderEstimator extends OrderEvaluationContextual {
             this.order.orderData.take.amount,
           ),
           routeHint: this.context.preferEstimation,
-          fromAddress: this.order.takeChain.fulfillProvider.bytesAddress,
+          fromAddress: this.order.takeChain.fulfillAuthority.bytesAddress,
           destReceiver: this.order.executor.client.getForwarderAddress(
             this.order.orderData.take.chainId,
           ),

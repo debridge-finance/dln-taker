@@ -129,7 +129,7 @@ export class OrderValidator extends OrderEvaluationContextual {
     if (this.order.orderData.allowedTaker) {
       if (
         !buffersAreEqual(
-          this.order.takeChain.unlockProvider.bytesAddress,
+          this.order.takeChain.unlockAuthority.bytesAddress,
           this.order.orderData.allowedTaker,
         )
       ) {
@@ -346,7 +346,7 @@ export class OrderValidator extends OrderEvaluationContextual {
       .getBalance(
         this.order.takeChain.chain,
         route.reserveDstToken,
-        this.order.takeChain.fulfillProvider.bytesAddress,
+        this.order.takeChain.fulfillAuthority.bytesAddress,
       );
     if (accountReserveBalance < maxProfitableReserveAmount) {
       const message = `not enough funds of the reserve token (${route.reserveDstToken.toAddress(
@@ -379,7 +379,7 @@ export class OrderValidator extends OrderEvaluationContextual {
           fromTokenAddress: this.order.route.reserveDstToken,
           toTokenAddress: this.order.orderData.take.tokenAddress,
           slippageBps: 100, // dummy slippage 1%: we don't care about it here bc we need estimated outcome of the swap
-          fromAddress: this.order.takeChain.fulfillProvider.bytesAddress,
+          fromAddress: this.order.takeChain.fulfillAuthority.bytesAddress,
           destReceiver: this.order.executor.client.getForwarderAddress(
             this.order.orderData.take.chainId,
           ),
