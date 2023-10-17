@@ -17,13 +17,10 @@ export class SolanaTransactionBuilder implements TransactionBuilder {
 
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
     return async () =>
-      this.signer.sendTransaction(
-        await createOrderFullfillTx(orderEstimation, logger),
-        {
-          logger,
-          options: {},
-        },
-      );
+      this.signer.sendTransaction(await createOrderFullfillTx(orderEstimation, logger), {
+        logger,
+        options: {},
+      });
   }
 
   getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {

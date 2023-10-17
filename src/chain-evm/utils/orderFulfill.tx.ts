@@ -2,14 +2,17 @@ import { ChainEngine, EvmInstruction } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 import { InputTransaction } from 'src/chain-evm/signer';
 import BigNumber from 'bignumber.js';
+import { assert } from 'src/errors';
 import { createClientLogger } from '../../dln-ts-client.utils';
 import { OrderEstimation } from '../../chain-common/order-estimator';
 import { EVMOrderEstimator } from '../order-estimator';
-import { assert } from 'src/errors';
 import { EVMOrderValidator } from '../order-validator';
 
-async function getLowLevelEvmInstruction(estimation: OrderEstimation, logger: Logger): Promise<EvmInstruction> {
-  const { order } = estimation
+async function getLowLevelEvmInstruction(
+  estimation: OrderEstimation,
+  logger: Logger,
+): Promise<EvmInstruction> {
+  const { order } = estimation;
   if (estimation.preFulfillSwapResult) {
     return order.executor.client.preswapAndFulfillOrder<ChainEngine.EVM>(
       {
@@ -39,23 +42,26 @@ async function getLowLevelEvmInstruction(estimation: OrderEstimation, logger: Lo
   );
 }
 
-export async function getFulfillTx(estimation: OrderEstimation, logger: Logger): Promise<InputTransaction> {
+export async function getFulfillTx(
+  estimation: OrderEstimation,
+  logger: Logger,
+): Promise<InputTransaction> {
   const ix = await getLowLevelEvmInstruction(estimation, logger);
-  const cappedFee = <bigint | undefined>estimation.payload[EVMOrderEstimator.EVM_ESTIMATED_FEE_NAME];
+  const cappedFee = <bigint | undefined>(
+    estimation.payload[EVMOrderEstimator.EVM_ESTIMATED_FEE_NAME]
+  );
   assert(
-    (
-      (typeof cappedFee === "bigint" && cappedFee > 0)
-      || (true === estimation.payload[EVMOrderValidator.EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME])
-    ),
-    'evm order fulfill expects either a capped fee or explicitly disabled fee capping'
-  )
+    (typeof cappedFee === 'bigint' && cappedFee > 0) ||
+      estimation.payload[EVMOrderValidator.EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME] === true,
+    'evm order fulfill expects either a capped fee or explicitly disabled fee capping',
+  );
   const tx = {
     to: ix.to,
     data: ix.data,
     value: ix.value.toString(),
-    cappedFee: cappedFee ? new BigNumber(cappedFee.toString()) : undefined
+    cappedFee: cappedFee ? new BigNumber(cappedFee.toString()) : undefined,
   };
 
-  logger.debug(`Crafted txn: ${JSON.stringify(tx)}`)
-  return tx
+  logger.debug(`Crafted txn: ${JSON.stringify(tx)}`);
+  return tx;
 }

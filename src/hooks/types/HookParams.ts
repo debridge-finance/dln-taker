@@ -27,7 +27,7 @@ export type HookParams<T extends Hooks> = {} & (T extends Hooks.OrderFeedConnect
         reason: PostponingReason;
         message: string;
         attempts: number;
-        executor: IExecutor
+        executor: IExecutor;
       }
     : {}) &
   (T extends Hooks.OrderUnlockFailed

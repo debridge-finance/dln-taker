@@ -8,6 +8,8 @@ export type TransactionSender = {
   (): Promise<TxHash>;
 };
 
-export interface TransactionBuilder extends FulfillTransactionBuilder, BatchUnlockTransactionBuilder {
+export interface TransactionBuilder
+  extends FulfillTransactionBuilder,
+    BatchUnlockTransactionBuilder {
   getInitTxSenders(logger: Logger): Promise<Array<TransactionSender>>;
 }

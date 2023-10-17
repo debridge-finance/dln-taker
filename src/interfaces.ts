@@ -2,7 +2,7 @@ import { ChainId, OrderData } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 
 import { HooksEngine } from './hooks/HooksEngine';
-import { ExecutorSupportedChain, IExecutor } from './executor';
+import { ExecutorSupportedChain } from './executor';
 
 export enum OrderInfoStatus {
   Created,
