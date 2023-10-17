@@ -1,8 +1,8 @@
 import { ChainId, OrderData } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 
-import { OrderProcessorContext } from './processors/base';
 import { HooksEngine } from './hooks/HooksEngine';
+import { ExecutorSupportedChain, IExecutor } from './executor';
 
 export enum OrderInfoStatus {
   Created,
@@ -42,7 +42,8 @@ export type IncomingOrder<T extends OrderInfoStatus> = {
 
 export type IncomingOrderContext = {
   orderInfo: IncomingOrder<OrderInfoStatus>;
-  context: OrderProcessorContext;
+  giveChain: ExecutorSupportedChain;
+  takeChain: ExecutorSupportedChain;
 };
 
 export type OrderProcessorFunc = (order: IncomingOrder<any>) => Promise<void>;
@@ -84,6 +85,6 @@ export abstract class GetNextOrder {
   }
 
   setLogger(logger: Logger) {
-    this.logger = logger;
+    this.logger = logger.child({ service: GetNextOrder.name });
   }
 }

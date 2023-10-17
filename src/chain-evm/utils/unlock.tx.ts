@@ -8,7 +8,7 @@ import { Logger } from 'pino';
 import { assert } from 'src/errors';
 import { IExecutor } from 'src/executor';
 import { createClientLogger } from 'src/dln-ts-client.utils';
-import { InputTransaction } from 'src/chain-evm/evm.provider.adapter';
+import { InputTransaction } from 'src/chain-evm/signer';
 
 export async function unlockTx(
   executor: IExecutor,

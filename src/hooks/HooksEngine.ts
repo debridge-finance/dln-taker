@@ -5,12 +5,17 @@ import { HookHandler } from './HookHandler';
 import { HookParams } from './types/HookParams';
 
 export class HooksEngine {
+  readonly #logger: Logger;
   constructor(
     private readonly hookHandlers: {
       [key in Hooks]?: HookHandler<key>[];
     },
-    private readonly logger: Logger,
-  ) {}
+    logger: Logger,
+  ) {
+    this.#logger = logger.child({
+      service: HooksEngine.name
+    })
+  }
 
   handleOrderFeedConnected(params: HookParams<Hooks.OrderFeedConnected>) {
     this.process(Hooks.OrderFeedConnected, params);
@@ -22,10 +27,6 @@ export class HooksEngine {
 
   handleOrderRejected(params: HookParams<Hooks.OrderRejected>) {
     this.process(Hooks.OrderRejected, params);
-  }
-
-  handleOrderEstimated(params: HookParams<Hooks.OrderEstimated>) {
-    this.process(Hooks.OrderEstimated, params);
   }
 
   handleOrderPostponed(params: HookParams<Hooks.OrderPostponed>) {
@@ -45,14 +46,15 @@ export class HooksEngine {
   }
 
   private async process<T extends Hooks>(hookEnum: Hooks, params: HookParams<T>): Promise<void> {
+    this.#logger.debug(`triggering hook ${Hooks[hookEnum]}`)
     const handlers = this.hookHandlers[hookEnum] || [];
     for (const handler of handlers) {
       try {
         // eslint-disable-next-line no-await-in-loop -- Used to track hook errors. TODO make hooks asynchronous DEV-3490
-        await handler(params as any, { logger: this.logger });
+        await handler(params as any, { logger: this.#logger.child({ hook: Hooks[hookEnum]}) });
       } catch (e) {
-        this.logger.error(`Error in execution hook handler in ${hookEnum}`);
-        this.logger.error(e);
+        this.#logger.error(`Error in execution hook handler in ${hookEnum}`);
+        this.#logger.error(e);
       }
     }
   }

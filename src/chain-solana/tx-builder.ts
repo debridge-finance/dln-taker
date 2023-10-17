@@ -3,26 +3,22 @@ import { Logger } from 'pino';
 import { OrderEstimation } from 'src/chain-common/order-estimator';
 import { TransactionBuilder } from 'src/chain-common/tx-builder';
 import { IExecutor } from 'src/executor';
-import { SolanaProviderAdapter } from 'src/chain-solana/solana.provider.adapter';
-import { SolanaOrderFulfillIntent } from './order.fulfill';
+import { SolanaTxSigner } from 'src/chain-solana/signer';
 import { unlockTx } from './utils/unlock.tx';
-import { tryInitTakerALT } from './utils/tryInitAltSolana';
+import { tryInitTakerALT } from './utils/init-alts.tx';
+import { createOrderFullfillTx } from './utils/orderFulfill.tx';
 
 export class SolanaTransactionBuilder implements TransactionBuilder {
   constructor(
     private solanaClient: Solana.DlnClient,
-    private readonly adapter: SolanaProviderAdapter,
+    private readonly signer: SolanaTxSigner,
     private readonly executor: IExecutor,
   ) {}
 
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
     return async () =>
-      this.adapter.sendTransaction(
-        await new SolanaOrderFulfillIntent(
-          orderEstimation.order,
-          orderEstimation,
-          logger,
-        ).createOrderFullfillTx(),
+      this.signer.sendTransaction(
+        await createOrderFullfillTx(orderEstimation, logger),
         {
           logger,
           options: {},
@@ -32,7 +28,7 @@ export class SolanaTransactionBuilder implements TransactionBuilder {
 
   getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {
     return async () =>
-      this.adapter.sendTransaction(await unlockTx(this.executor, orders, logger), {
+      this.signer.sendTransaction(await unlockTx(this.executor, orders, logger), {
         logger,
         options: {},
       });
@@ -47,9 +43,9 @@ export class SolanaTransactionBuilder implements TransactionBuilder {
       try {
         // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
         await tryInitTakerALT(
-          this.adapter.bytesAddress,
+          this.signer.bytesAddress,
           Object.values(this.executor.chains).map((chainConfig) => chainConfig.chain),
-          this.adapter,
+          this.signer,
           this.solanaClient,
           logger,
         );

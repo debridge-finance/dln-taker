@@ -4,28 +4,13 @@ import { Logger } from 'pino';
 import { DexlessChains } from '../config';
 import { die } from '../errors';
 import { RejectionReason, PostponingReason } from '../hooks/HookEnums';
-import { OrderInfoStatus } from '../interfaces';
 import { createClientLogger } from '../dln-ts-client.utils';
 import { CreatedOrder } from './order';
 import { OrderEstimator } from './order-estimator';
-import { OrderEvaluationContextual, OrderEvaluationPayload } from './shared';
+import { OrderEvaluationContextual,  } from './shared';
+import { helpers } from '@debridge-finance/solana-utils';
+import { TakerShortCircuit } from './order-taker';
 
-export enum OrderValidationResult {
-  Successful,
-  ShouldPostpone,
-  ShouldReject,
-}
-export type OrderValidation<T extends OrderValidationResult> = {
-  result: T;
-} & (T extends OrderValidationResult.Successful
-  ? { estimator: OrderEstimator; payload: OrderEvaluationPayload }
-  : {}) &
-  (T extends OrderValidationResult.ShouldReject
-    ? { rejection: RejectionReason; message: string }
-    : {}) &
-  (T extends OrderValidationResult.ShouldPostpone
-    ? { postpone: PostponingReason; message: string; delay?: number }
-    : {});
 
 // gets the amount of sec to additionally wait until this order can be processed
 function getOrderRemainingDelay(firstSeen: Date, delay: number): number {
@@ -42,25 +27,6 @@ function getOrderRemainingDelay(firstSeen: Date, delay: number): number {
   return 0;
 }
 
-export function rejectOrder(rejection: RejectionReason, message: string) {
-  const error: OrderValidation<OrderValidationResult.ShouldReject> = {
-    result: OrderValidationResult.ShouldReject,
-    rejection,
-    message,
-  };
-  return Promise.reject(error);
-}
-
-export function postponeOrder(postpone: PostponingReason, message: string, delay?: number) {
-  const error: OrderValidation<OrderValidationResult.ShouldPostpone> = {
-    result: OrderValidationResult.ShouldPostpone,
-    postpone,
-    message,
-    delay,
-  };
-  return Promise.reject(error);
-}
-
 export class OrderValidator extends OrderEvaluationContextual {
   readonly #logger: Logger;
 
@@ -68,6 +34,7 @@ export class OrderValidator extends OrderEvaluationContextual {
 
   constructor(
     protected readonly order: CreatedOrder,
+    protected readonly sc: TakerShortCircuit,
     context: { logger: Logger },
   ) {
     super();
@@ -85,44 +52,56 @@ export class OrderValidator extends OrderEvaluationContextual {
   // eslint-disable-next-line @typescript-eslint/no-empty-function, class-methods-use-this -- Intended for overriding in the upper classes
   protected async runChecks() {}
 
-  async verify(): Promise<OrderValidation<any>> {
-    try {
-      await this.checkOrderId();
-      await this.checkExternalCallHash();
-      await this.checkAllowedTaker();
-      await this.checkRouting();
-      await this.checkTVLBudget();
-      await this.checkFinalization();
-      await this.checkFulfillmentDelay();
-      await this.checkThroughput();
-      await this.checkTakeStatus();
-      await this.checkGiveStatus();
-      await this.checkPrefulfillSwapAbility();
-      await this.checkAccountBalance();
-      await this.checkRoughProfitability();
-      await this.runChecks();
+  async validate(): Promise<OrderEstimator> {
+    await this.checkFilters();
+    await this.checkOrderId();
+    await this.checkExternalCallHash();
+    await this.checkAllowedTaker();
+    await this.checkRouting();
+    await this.checkTVLBudget();
+    await this.checkFinalization();
+    await this.checkFulfillmentDelay();
+    await this.checkThroughput();
+    await this.checkTakeStatus();
+    await this.checkGiveStatus();
+    await this.checkPrefulfillSwapAbility();
+    await this.checkAccountBalance();
+    await this.checkRoughProfitability();
+    await this.runChecks();
 
-      return this.getSuccessfulValidationResult();
-    } catch (e) {
-      if ((<OrderValidation<any>>e).result !== undefined) return <OrderValidation<any>>e;
-      throw e;
-    }
+    return this.getOrderEstimator()
   }
 
-  protected getSuccessfulValidationResult(): OrderValidation<OrderValidationResult.Successful> {
-    return {
-      result: OrderValidationResult.Successful,
-      estimator: this.getOrderEstimator(),
-      payload: this.payload,
-    };
-  }
-
-  protected getOrderEstimator(): OrderEstimator {
+  protected getOrderEstimator() {
     return new OrderEstimator(this.order, {
       logger: this.#logger,
       preferEstimation: this.#preliminarySwapResult,
       validationPayload: this.payload,
     });
+  }
+
+  private async checkFilters(): Promise<void> {
+    const listOrderFilters = [
+      ...this.order.takeChain.dstFilters,
+      ...this.order.giveChain.srcFilters
+    ];
+
+      this.#logger.debug('running filters against the order');
+      const orderFilters = await Promise.all(
+        listOrderFilters.map((filter) =>
+          filter(this.order.orderData, {
+            logger: this.#logger,
+            config: this.order.executor,
+            giveChain: this.order.giveChain,
+            takeChain: this.order.takeChain,
+          }),
+        ),
+      );
+
+      if (!orderFilters.every((it) => it)) {
+        const message = 'order has been filtered off, dropping'
+        return this.sc.reject(RejectionReason.FILTERED_OFF, message)
+      }
   }
 
   private async checkAllowedTaker(): Promise<void> {
@@ -133,8 +112,8 @@ export class OrderValidator extends OrderEvaluationContextual {
           this.order.orderData.allowedTaker,
         )
       ) {
-        const message = `The order includes the provided allowedTakerDst, which differs from the taker's address`;
-        return rejectOrder(RejectionReason.WRONG_TAKER, message);
+        const message = `allowedTakerDst restriction; order requires expected allowed taker: ${this.order.orderData.allowedTaker.toAddress(this.order.orderData.take.chainId)}; actual: ${this.order.takeChain.unlockAuthority.bytesAddress.toAddress(this.order.orderData.take.chainId)}`;
+        return this.sc.reject(RejectionReason.WRONG_TAKER, message);
       }
     }
     return Promise.resolve();
@@ -143,8 +122,8 @@ export class OrderValidator extends OrderEvaluationContextual {
   private async checkOrderId(): Promise<void> {
     const calculatedId = Order.calculateId(this.order.orderData);
     if (calculatedId !== this.order.orderId) {
-      const message = 'orderId mismatch';
-      return rejectOrder(RejectionReason.MALFORMED_ORDER, message);
+      const message = `orderId mismatch; expected: ${calculatedId}, actual: ${this.order.orderId}`;
+      return this.sc.reject(RejectionReason.MALFORMED_ORDER, message);
     }
 
     return Promise.resolve();
@@ -161,8 +140,8 @@ export class OrderValidator extends OrderEvaluationContextual {
           this.order.orderData.externalCall.externalCallHash || Buffer.alloc(0),
         )
       ) {
-        const message = 'externalCallHash mismatch';
-        return rejectOrder(RejectionReason.MALFORMED_ORDER, message);
+        const message = `externalCallHash mismatch; expected: ${helpers.bufferToHex(calculatedExternalCallHash)}; actual: ${helpers.bufferToHex(this.order.orderData.externalCall.externalCallHash || Buffer.alloc(0))}`;
+        return this.sc.reject(RejectionReason.MALFORMED_ORDER, message);
       }
     }
     return Promise.resolve();
@@ -177,15 +156,13 @@ export class OrderValidator extends OrderEvaluationContextual {
     );
 
     if (bucket === undefined) {
-      const message = `no bucket found to cover order's give token: ${this.order.giveTokenAsString}`;
-      return rejectOrder(RejectionReason.UNEXPECTED_GIVE_TOKEN, message);
+      const message = `no bucket found to route order's give token: ${this.order.giveTokenAsString}`;
+      return this.sc.reject(RejectionReason.UNEXPECTED_GIVE_TOKEN, message);
     }
     return Promise.resolve();
   }
 
   private async checkFulfillmentDelay(): Promise<void> {
-    if (this.order.status !== OrderInfoStatus.Created) return Promise.resolve();
-
     const [srcConstraints, dstConstraints] = await Promise.all([
       this.order.srcConstraints(),
       this.order.dstConstraints(),
@@ -198,8 +175,9 @@ export class OrderValidator extends OrderEvaluationContextual {
 
     if (remainingDelay > 0) {
       const message = `order should be delayed by ${remainingDelay}s (why: fulfillment delay is set to ${fulfillmentDelay}s)`;
-      return postponeOrder(PostponingReason.FORCED_DELAY, message, remainingDelay);
+      return this.sc.postpone(PostponingReason.FORCED_DELAY, message, remainingDelay);
     }
+
     return Promise.resolve();
   }
 
@@ -215,7 +193,7 @@ export class OrderValidator extends OrderEvaluationContextual {
         } over a budget of $${
           TVLBudgetController.budget
         } (current TVL: $${currentGiveTVL}), thus postponing`;
-        return postponeOrder(PostponingReason.TVL_BUDGET_EXCEEDED, message);
+        return this.sc.postpone(PostponingReason.TVL_BUDGET_EXCEEDED, message);
       }
     }
     return Promise.resolve();
@@ -241,7 +219,7 @@ export class OrderValidator extends OrderEvaluationContextual {
 
         if (confirmationBlocksCount < srcConstraints.minBlockConfirmations) {
           const message = `announced block confirmations is less than the block confirmation constraint (${srcConstraints.minBlockConfirmations} for order worth of $${usdValue}`;
-          return rejectOrder(
+          return this.sc.reject(
             RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
             message,
           );
@@ -249,7 +227,7 @@ export class OrderValidator extends OrderEvaluationContextual {
       } else {
         // range not found: we do not accept this order, let it come finalized
         const message = `non-finalized order worth of $${usdValue} is not covered by any custom block confirmation range`;
-        return rejectOrder(RejectionReason.NOT_YET_FINALIZED, message);
+        return this.sc.reject(RejectionReason.NOT_YET_FINALIZED, message);
       }
     } else {
       die(`Unexpected finalization: ${this.order.finalization}`);
@@ -266,8 +244,8 @@ export class OrderValidator extends OrderEvaluationContextual {
     );
 
     if (isThrottled) {
-      const message = 'order does not fit the budget, rejecting';
-      return postponeOrder(PostponingReason.CAPPED_THROUGHPUT, message);
+      const message = 'order does not fit the throughput, postponing';
+      return this.sc.postpone(PostponingReason.CAPPED_THROUGHPUT, message);
     }
     return Promise.resolve();
   }
@@ -286,7 +264,7 @@ export class OrderValidator extends OrderEvaluationContextual {
     );
     if (takeOrderStatus?.status !== OrderState.NotSet && takeOrderStatus?.status !== undefined) {
       const message = `order is already handled on the take chain (${ChainId[takeChainId]}), actual status: ${takeOrderStatus?.status}`;
-      return rejectOrder(RejectionReason.ALREADY_FULFILLED_OR_CANCELLED, message);
+      return this.sc.reject(RejectionReason.ALREADY_FULFILLED_OR_CANCELLED, message);
     }
     return Promise.resolve();
   }
@@ -305,12 +283,12 @@ export class OrderValidator extends OrderEvaluationContextual {
 
     if (giveOrderStatus?.status === undefined) {
       const message = `order does not exist on the give chain (${ChainId[giveChainId]})`;
-      return rejectOrder(RejectionReason.MISSING, message);
+      return this.sc.reject(RejectionReason.MISSING, message);
     }
 
     if (giveOrderStatus?.status !== OrderState.Created) {
       const message = `order has unexpected give status (${giveOrderStatus?.status}) on the give chain (${ChainId[giveChainId]})`;
-      return rejectOrder(RejectionReason.UNEXPECTED_GIVE_STATUS, message);
+      return this.sc.reject(RejectionReason.UNEXPECTED_GIVE_STATUS, message);
     }
     return Promise.resolve();
   }
@@ -319,24 +297,24 @@ export class OrderValidator extends OrderEvaluationContextual {
     const { take } = this.order.orderData;
 
     // reject orders that require pre-fulfill swaps on the dexless chains (e.g. Linea)
-    const pickedBucket = this.order.route;
+    const {reserveDstToken} = this.order.route;
     if (
       DexlessChains[take.chainId] &&
-      !buffersAreEqual(pickedBucket.reserveDstToken, take.tokenAddress)
+      !buffersAreEqual(reserveDstToken, take.tokenAddress)
     ) {
       const message = `swaps are unavailable on ${
         ChainId[take.chainId]
-      }, can't perform pre-fulfill swap from ${pickedBucket.reserveDstToken.toAddress(
+      }, can't perform pre-fulfill swap from ${reserveDstToken.toAddress(
         take.chainId,
       )} to ${take.tokenAddress.toAddress(take.chainId)}`;
-      return rejectOrder(RejectionReason.UNAVAILABLE_PRE_FULFILL_SWAP, message);
+      return this.sc.reject(RejectionReason.UNAVAILABLE_PRE_FULFILL_SWAP, message);
     }
     return Promise.resolve();
   }
 
   private async checkAccountBalance(): Promise<void> {
-    const { take } = this.order.orderData;
-    const { route } = this.order;
+    const { chainId: takeChainId } = this.order.orderData.take;
+    const {reserveDstToken} = this.order.route;
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
     const maxProfitableReserveAmount = await this.order.getMaxProfitableReserveAmount();
@@ -345,34 +323,35 @@ export class OrderValidator extends OrderEvaluationContextual {
       .getClient(this.order.takeChain.chain)
       .getBalance(
         this.order.takeChain.chain,
-        route.reserveDstToken,
+        reserveDstToken,
         this.order.takeChain.fulfillAuthority.bytesAddress,
       );
     if (accountReserveBalance < maxProfitableReserveAmount) {
-      const message = `not enough funds of the reserve token (${route.reserveDstToken.toAddress(
-        take.chainId,
+      const message = `not enough funds of the reserve token (${reserveDstToken.toAddress(
+        takeChainId,
       )}); actual balance: ${await this.order.executor.formatTokenValue(
-        take.chainId,
-        route.reserveDstToken,
+        takeChainId,
+        reserveDstToken,
         accountReserveBalance,
       )}, but expected ${await this.order.executor.formatTokenValue(
-        take.chainId,
-        route.reserveDstToken,
+        takeChainId,
+        reserveDstToken,
         maxProfitableReserveAmount,
       )}`;
 
-      return postponeOrder(PostponingReason.NOT_ENOUGH_BALANCE, message);
+      return this.sc.postpone(PostponingReason.NOT_ENOUGH_BALANCE, message);
     }
     return Promise.resolve();
   }
 
   private async checkRoughProfitability(): Promise<void> {
     const maxProfitableReserveAmount = await this.order.getMaxProfitableReserveAmount();
+    this.#logger.debug(`obtained max profitable reserve amount: ${maxProfitableReserveAmount}`)
 
     // now compare if aforementioned rough amount is still profitable
     if (this.order.route.requiresSwap) {
       // in dln client 6.0+ swaps are prepared outside of preswapAndFulfill method
-      this.#preliminarySwapResult = await this.order.executor.swapConnector.getSwap(
+      const preliminarySwapResult = await this.order.executor.swapConnector.getSwap(
         {
           amountIn: maxProfitableReserveAmount,
           chainId: this.order.orderData.take.chainId,
@@ -389,18 +368,24 @@ export class OrderValidator extends OrderEvaluationContextual {
         },
       );
 
-      if (this.#preliminarySwapResult.amountOut < this.order.orderData.take.amount) {
-        return postponeOrder(
+      if (preliminarySwapResult.amountOut < this.order.orderData.take.amount) {
+        const message = `rough profitability estimation failed, swap outcome is estimated to be less than order's take amount; expected: ${this.order.orderData.take.amount} but actual: ${preliminarySwapResult.amountOut}`
+        return this.sc.postpone(
           PostponingReason.NOT_PROFITABLE,
-          'rough profitability estimation: order is not profitable',
+          message,
         );
       }
+      else {
+        this.#preliminarySwapResult = preliminarySwapResult
+      }
     } else if (maxProfitableReserveAmount < this.order.orderData.take.amount) {
-      return postponeOrder(
+      const message = `rough profitability estimation failed, max profitable reserve amount is less than order's take amount; expected: ${this.order.orderData.take.amount} but actual: ${maxProfitableReserveAmount}`
+      return this.sc.postpone(
         PostponingReason.NOT_PROFITABLE,
-        'rough profitability estimation: order is not profitable',
+        message,
       );
     }
+
     return Promise.resolve();
   }
 }
