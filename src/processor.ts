@@ -1,6 +1,5 @@
-import { explainEstimation, OrderEstimator } from 'src/chain-common/order-estimator';
 import { Logger } from 'pino';
-import { ChainId } from '@debridge-finance/dln-client';
+import { ChainId, OrderData } from '@debridge-finance/dln-client';
 import { IncomingOrder, IncomingOrderContext, OrderId, OrderInfoStatus } from './interfaces';
 import { BatchUnlocker } from './processors/BatchUnlocker';
 import { MempoolService } from './processors/mempool.service';
@@ -8,8 +7,8 @@ import { PostponingReason, RejectionReason } from './hooks/HookEnums';
 import { IExecutor, ExecutorSupportedChain } from './executor';
 import { assert, die } from './errors';
 import { CreatedOrder } from './chain-common/order';
-import { OrderValidation, OrderValidationResult } from './chain-common/order-validator';
 import { TransactionBuilder } from './chain-common/tx-builder';
+import { TakerShortCircuit } from './chain-common/order-taker';
 
 // Represents all necessary information about Created order during its internal lifecycle
 type CreatedOrderMetadata = {
@@ -18,6 +17,49 @@ type CreatedOrderMetadata = {
   attempts: number;
   context: IncomingOrderContext;
 };
+
+
+enum BreakReason {
+   ShouldPostpone,
+   ShouldReject,
+ }
+  type ProcessorCircuitBreaker<T extends BreakReason> = {
+   circuitBreaker: true;
+   breakReason: T;
+ } &
+   (T extends BreakReason.ShouldReject
+     ? { rejection: RejectionReason; message: string }
+     : {}) &
+   (T extends BreakReason.ShouldPostpone
+     ? { postpone: PostponingReason; message: string; delay?: number }
+     : {});
+
+function getShortCircuit(): TakerShortCircuit {
+ return {
+
+   reject: (rejection: RejectionReason, message: string) => {
+     const error: ProcessorCircuitBreaker<BreakReason.ShouldReject> = {
+       circuitBreaker: true,
+       breakReason: BreakReason.ShouldReject,
+       rejection,
+       message,
+     };
+     return Promise.reject(error);
+   },
+
+   postpone: (postpone: PostponingReason, message: string, delay?: number) => {
+     const error: ProcessorCircuitBreaker<BreakReason.ShouldPostpone> = {
+       circuitBreaker: true,
+       breakReason: BreakReason.ShouldPostpone,
+       postpone,
+       message,
+       delay,
+     };
+     return Promise.reject(error);
+   }
+ }
+}
+
 
 export class OrderProcessor {
   readonly #mempoolService: MempoolService;
@@ -71,7 +113,6 @@ export class OrderProcessor {
   }
 
   private async init(): Promise<OrderProcessor> {
-    this.#logger.info('Initializing...');
     for (const txSender of await this.transactionBuilder.getInitTxSenders(this.#logger)) {
       // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
       const txHash = await txSender();
@@ -116,25 +157,24 @@ export class OrderProcessor {
 
   private async process(context: IncomingOrderContext): Promise<void> {
     const { status, orderId } = context.orderInfo;
-    const { context: orderContext } = context;
 
     // already processing an order
     if (this.isLocked) {
-      orderContext.logger.debug(`processor is busy, postponing order`);
+      this.#logger.debug(`processor is busy, postponing order ${orderId}`);
 
       switch (status) {
         case OrderInfoStatus.ArchivalCreated: {
           this.queue.add(orderId);
-          orderContext.logger.debug(`postponed to secondary queue`);
+          this.#logger.debug(`order ${orderId} postponed to secondary queue`);
           break;
         }
         case OrderInfoStatus.Created: {
           this.priorityQueue.add(orderId);
-          orderContext.logger.debug(`postponed to primary queue`);
+          this.#logger.debug(`order ${orderId} postponed to primary queue`);
           break;
         }
         default: {
-          orderContext.logger.debug(`postponed to event queue`);
+          this.#logger.debug(`order ${orderId} postponed to event queue`);
           this.eventsQueue.push(context);
         }
       }
@@ -143,55 +183,53 @@ export class OrderProcessor {
     }
 
     this.isLocked = true;
+    this.#logger.info(`processing order ${orderId}, status: ${OrderInfoStatus[status]}`);
+
     switch (status) {
       case OrderInfoStatus.Created:
       case OrderInfoStatus.ArchivalCreated: {
         const metadata = this.getCreatedOrderMetadata(context.orderInfo.orderId);
-        try {
-          metadata.attempts++;
-          await this.evaluateAndFulfill(metadata);
-        } catch (e) {
-          const message = `processing order failed with an unhandled error: ${e}`;
-          orderContext.logger.error(message);
-          orderContext.logger.error(e);
-          this.postponeOrder(metadata, message, PostponingReason.UNHANDLED_ERROR);
-        }
+        metadata.attempts++;
+        await this.takeOrder(metadata);
 
         break;
       }
       case OrderInfoStatus.ArchivalFulfilled: {
-        this.#batchUnlocker.unlockOrder(orderId, context.orderInfo.order, orderContext);
+        this.#batchUnlocker.unlockOrder(orderId, context.orderInfo.order);
+
         break;
       }
       case OrderInfoStatus.Cancelled: {
         this.clearInternalQueues(orderId);
         this.clearOrderStore(orderId);
-        orderContext.logger.debug(`deleted from queues`);
+
         break;
       }
       case OrderInfoStatus.Fulfilled: {
         this.clearInternalQueues(orderId);
         this.clearOrderStore(orderId);
-        orderContext.giveChain.TVLBudgetController.flushCache();
-        orderContext.takeChain.TVLBudgetController.flushCache();
-        orderContext.logger.debug(`deleted from queues`);
+        context.giveChain.TVLBudgetController.flushCache();
+        context.takeChain.TVLBudgetController.flushCache();
+        this.#batchUnlocker.unlockOrder(orderId, context.orderInfo.order);
 
-        this.#batchUnlocker.unlockOrder(orderId, context.orderInfo.order, orderContext);
         break;
       }
       default: {
-        orderContext.logger.debug(`status=${OrderInfoStatus[status]} not implemented, skipping`);
+        this.#logger.debug(`status=${OrderInfoStatus[status]} not implemented, skipping`);
       }
     }
+    this.#logger.debug(`finished processing order ${orderId}, status: ${OrderInfoStatus[status]}`);
     this.isLocked = false;
 
     if (this.eventsQueue.length > 0) {
+      this.#logger.debug(`has events (${this.eventsQueue.length} in the events queue, picking`)
       this.handleEvent(this.eventsQueue.shift()!);
       return;
     }
 
     const nextOrderId = this.pickNextOrderId();
     if (nextOrderId) {
+      this.#logger.debug(`has orders in the orders queue, picking ${nextOrderId}`)
       this.handleOrder(nextOrderId);
     }
   }
@@ -218,51 +256,53 @@ export class OrderProcessor {
   }
 
   private postponeOrder(
-    metadata: CreatedOrderMetadata,
+    orderId: OrderId,
+    order: OrderData,
+    isLive: boolean,
+    attempt: number,
     message: string,
     reason: PostponingReason,
     remainingDelay?: number,
   ) {
-    const {
-      attempts,
-      context: { context, orderInfo },
-    } = metadata;
+    this.#logger.info(`⏸️ postponed order ${orderId} because of ${PostponingReason[reason]}: ${message}`);
 
-    context.logger.info(message);
     this.executor.hookEngine.handleOrderPostponed({
-      order: orderInfo,
-      context,
+      orderId,
+      order,
       message,
       reason,
-      attempts,
+      isLive,
+      executor: this.executor,
+      attempts: attempt,
     });
 
     if (remainingDelay) {
-      this.#mempoolService.addOrder(metadata.orderId, remainingDelay);
-    } else if (metadata.context.orderInfo.status === OrderInfoStatus.ArchivalCreated) {
-      this.#mempoolService.delayArchivalOrder(metadata.orderId, attempts);
+      this.#mempoolService.addOrder(orderId, remainingDelay);
+    } else if (!isLive) {
+      this.#mempoolService.delayArchivalOrder(orderId, attempt);
     } else {
-      this.#mempoolService.delayOrder(metadata.orderId, attempts);
+      this.#mempoolService.delayOrder(orderId, attempt);
     }
   }
 
   private rejectOrder(
-    metadata: CreatedOrderMetadata,
+    orderId: OrderId,
+    order: OrderData,
+    isLive: boolean,
+    attempt: number,
     message: string,
     reason: RejectionReason,
   ): Promise<void> {
-    const {
-      attempts,
-      context: { context, orderInfo },
-    } = metadata;
+    this.#logger.info(`𐄂 rejected order ${orderId} because of ${RejectionReason[reason]}: ${message}`);
 
-    context.logger.info(message);
     this.executor.hookEngine.handleOrderRejected({
-      order: orderInfo,
-      context,
+      orderId,
+      order,
+      isLive,
+      executor: this.executor,
       message,
       reason,
-      attempts,
+      attempts: attempt,
     });
 
     return Promise.resolve();
@@ -276,66 +316,12 @@ export class OrderProcessor {
     if (finalizationInfo === 'Revoked') return 'Revoked';
     if ('Finalized' in finalizationInfo) return 'Finalized';
     if ('Confirmed' in finalizationInfo)
-      return finalizationInfo.Confirmed.confirmation_blocks_count;
+      return Number(finalizationInfo.Confirmed.confirmation_blocks_count);
     return 0;
   }
 
-  private async estimateOrder(estimator: OrderEstimator, metadata: CreatedOrderMetadata) {
-    const estimation = await estimator.getEstimation();
-    if (!estimation.isProfitable) {
-      // print nice msg and return
-      return this.postponeOrder(
-        metadata,
-        await explainEstimation(estimation),
-        PostponingReason.NOT_PROFITABLE,
-      );
-    }
-
-    const { logger } = metadata.context.context;
-
-    try {
-      const fulfillTxHash = await this.transactionBuilder.getOrderFulfillTxSender(
-        estimation,
-        logger,
-      )();
-      logger.info(`fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
-
-      // we add this order to the budget controller right before the txn is broadcasted
-      // Mind that in case of an error (see the catch{} block below) we don't remove it from the
-      // controller because the error may occur because the txn was stuck in the mempool and reside there
-      // for a long period of time
-      estimation.order.giveChain.throughput.addOrder(
-        estimation.order.orderId,
-        estimation.order.blockConfirmations,
-        await estimation.order.getUsdValue(),
-      );
-
-      this.executor.hookEngine.handleOrderFulfilled({
-        order: metadata.context.orderInfo,
-        txHash: fulfillTxHash,
-      });
-    } catch (e) {
-      const message = `fulfill transaction failed: ${e}`;
-      logger.error(message);
-      logger.error(e);
-      return this.postponeOrder(metadata, message, PostponingReason.FULFILLMENT_TX_FAILED);
-    }
-
-    // order is fulfilled, remove it from queues (the order may have come again thru WS)
-    this.clearInternalQueues(estimation.order.orderId);
-    estimation.order.giveChain.TVLBudgetController.flushCache();
-
-    // putting the order to the mempool, in case fulfill_txn gets lost
-    const fulfillCheckDelay: number =
-      this.takeChain.fulfillAuthority.avgBlockSpeed *
-      this.takeChain.fulfillAuthority.finalizedBlockCount;
-    this.#mempoolService.addOrder(metadata.orderId, fulfillCheckDelay);
-
-    return Promise.resolve();
-  }
-
-  private async evaluateAndFulfill(metadata: CreatedOrderMetadata): Promise<void> {
-    const { context: orderContext, orderInfo } = metadata.context;
+  private async takeOrder(metadata: CreatedOrderMetadata): Promise<void> {
+    const { orderInfo } = metadata.context;
 
     // special case for revokes: WS sends revokes as a part of Created event, and we want to handle it ASAP
     // probably, we need to move this special case to a higher level event handler (handleEvent) and convert it into ordinary event
@@ -343,45 +329,66 @@ export class OrderProcessor {
       orderInfo.status,
       (orderInfo as IncomingOrder<OrderInfoStatus.Created>).finalization_info,
     );
+    const isLive = metadata.context.orderInfo.status === OrderInfoStatus.Created;
     if (finalizationInfo === 'Revoked') {
       this.clearInternalQueues(orderInfo.orderId);
 
       const message = 'order has been revoked by the order feed due to chain reorganization';
-      return this.rejectOrder(metadata, message, RejectionReason.REVOKED);
+      return this.rejectOrder(orderInfo.orderId, orderInfo.order, isLive, metadata.attempts, message, RejectionReason.REVOKED);
     }
 
-    // here we start order evaluation
     const order = new CreatedOrder(
       orderInfo.orderId,
       orderInfo.order,
-      orderInfo.status,
       finalizationInfo,
+      metadata.arrivedAt,
+      metadata.attempts,
       {
         executor: this.executor,
-        giveChain: orderContext.giveChain,
-        takeChain: orderContext.takeChain,
-        logger: orderContext.logger,
+        giveChain: metadata.context.giveChain,
+        takeChain: metadata.context.takeChain,
+        logger: this.#logger,
       },
     );
 
-    const verification = await order.verify();
-    switch (verification.result) {
-      case OrderValidationResult.Successful: {
-        const v = <OrderValidation<OrderValidationResult.Successful>>verification;
-        return this.estimateOrder(v.estimator, metadata);
+    try {
+      await order.getTaker().take(getShortCircuit(), this.transactionBuilder);
+      this.markOrderAsFulfilled(order)
+    } catch (e) {
+      if ((<ProcessorCircuitBreaker<any>>e).circuitBreaker === true) {
+        const circuitBreaker = <ProcessorCircuitBreaker<any>>e;
+
+        switch ((<ProcessorCircuitBreaker<any>>e).breakReason) {
+          case BreakReason.ShouldReject: {
+            const v = <ProcessorCircuitBreaker<BreakReason.ShouldReject>>circuitBreaker;
+            return this.rejectOrder(orderInfo.orderId, orderInfo.order, isLive, metadata.attempts, v.message, v.rejection);
+          }
+          case BreakReason.ShouldPostpone: {
+            const v = <ProcessorCircuitBreaker<BreakReason.ShouldPostpone>>circuitBreaker;
+            return this.postponeOrder(orderInfo.orderId, orderInfo.order, isLive, metadata.attempts, v.message, v.postpone, v.delay);
+          }
+          default: {
+            die(`Unexpected verification result: ${circuitBreaker.breakReason}`);
+          }
+        }
       }
-      case OrderValidationResult.ShouldReject: {
-        const v = <OrderValidation<OrderValidationResult.ShouldReject>>verification;
-        return this.rejectOrder(metadata, v.message, v.rejection);
-      }
-      case OrderValidationResult.ShouldPostpone: {
-        const v = <OrderValidation<OrderValidationResult.ShouldPostpone>>verification;
-        return this.postponeOrder(metadata, v.message, v.postpone, v.delay);
-      }
-      default: {
-        die(`Unexpected verification result: ${verification.result}`);
-      }
+
+      const message = `processing order ${order.orderId} failed with an unhandled error: ${e}`;
+      this.#logger.error(message);
+      this.#logger.error(e);
+      return this.postponeOrder(orderInfo.orderId, orderInfo.order, isLive, metadata.attempts, message, PostponingReason.UNHANDLED_ERROR);
     }
-    return Promise.resolve();
   }
+
+  private markOrderAsFulfilled(order: CreatedOrder) {
+    // order is fulfilled, remove it from queues (the order may have come again thru WS)
+    this.clearInternalQueues(order.orderId);
+
+    // putting the order to the mempool, in case fulfill_txn gets lost
+    const fulfillCheckDelay: number =
+      this.takeChain.fulfillAuthority.avgBlockSpeed *
+      this.takeChain.fulfillAuthority.finalizedBlockCount;
+    this.#mempoolService.addOrder(order.orderId, fulfillCheckDelay);
+  }
+
 }

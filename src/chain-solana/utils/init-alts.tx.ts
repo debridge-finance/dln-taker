@@ -2,7 +2,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import { helpers } from '@debridge-finance/solana-utils';
 import { ChainId, Solana } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { SolanaProviderAdapter } from '../solana.provider.adapter';
+import { SolanaTxSigner } from '../signer';
 
 async function waitSolanaTxFinalized(connection: Connection, txId: string) {
   let finalized = false;
@@ -24,7 +24,7 @@ async function waitSolanaTxFinalized(connection: Connection, txId: string) {
 export async function tryInitTakerALT(
   takerAddress: Uint8Array,
   chains: ChainId[],
-  solanaAdapter: SolanaProviderAdapter,
+  solanaAdapter: SolanaTxSigner,
   solanaClient: Solana.DlnClient,
   logger: Logger,
 ) {

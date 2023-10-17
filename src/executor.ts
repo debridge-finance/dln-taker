@@ -36,8 +36,8 @@ import * as filters from './filters/index';
 import { OrderFilter } from './filters/index';
 import { Authority, GetNextOrder, IncomingOrder, OrderInfoStatus } from './interfaces';
 import { WsNextOrder } from './orderFeeds/ws.order.feed';
-import { EvmProviderAdapter } from './chain-evm/evm.provider.adapter';
-import { SolanaProviderAdapter } from './chain-solana/solana.provider.adapter';
+import { EvmTxSigner } from './chain-evm/signer';
+import { SolanaTxSigner } from './chain-solana/signer';
 import { HooksEngine } from './hooks/HooksEngine';
 import { ThroughputController } from './processors/throughput';
 import { TVLBudgetController } from './processors/TVLBudgetController';
@@ -85,6 +85,7 @@ export type SrcConstraintsPerOrderValue = SrcOrderConstraints &
 
 export type ExecutorSupportedChain = Readonly<{
   chain: ChainId;
+  connection: any;
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
   TVLBudgetController: TVLBudgetController;
@@ -158,7 +159,13 @@ export class Executor implements IExecutor {
 
   readonly #url1Inch = 'https://nodes.debridge.finance';
 
-  constructor(private readonly logger: Logger) {}
+  private readonly logger: Logger;
+
+  constructor(logger: Logger) {
+    this.logger = logger.child({
+      service: Executor.name
+    })
+  }
 
   async usdValueOfAsset(chain: ChainId, token: Address, amount: bigint): Promise<number> {
     const tokenPrice = await this.tokenPriceService.getPrice(chain, token, {
@@ -308,19 +315,20 @@ export class Executor implements IExecutor {
 
       let transactionBuilder: TransactionBuilder | undefined;
       let client;
+      let connection: Web3 | Connection;
       let unlockProvider;
       let fulfillProvider;
       let contractsForApprove: string[] = [];
 
       if (chain.chain === ChainId.Solana) {
-        const solanaConnection = new Connection(chain.chainRpc, {
+        connection = new Connection(chain.chainRpc, {
           // force using native fetch because node-fetch throws errors on some RPC providers sometimes
           fetch,
           commitment: 'confirmed',
         });
 
         (this.swapConnector as SwapConnectorImplementationService).initSolana({
-          solanaConnection,
+          solanaConnection: connection,
           jupiterApiToken: undefined,
         });
 
@@ -341,15 +349,15 @@ export class Executor implements IExecutor {
 
         fulfillProvider = Executor.getSolanaProvider(
           chain,
-          solanaConnection,
+          connection,
           chain.fulfillAuthority,
         );
         unlockProvider = chain.unlockAuthority
-          ? Executor.getSolanaProvider(chain, solanaConnection, chain.unlockAuthority)
+          ? Executor.getSolanaProvider(chain, connection, chain.unlockAuthority)
           : fulfillProvider;
 
         client = new Solana.DlnClient(
-          solanaConnection,
+          connection,
           solanaPmmSrc,
           solanaPmmDst,
           solanaDebridge,
@@ -361,7 +369,7 @@ export class Executor implements IExecutor {
         transactionBuilder = new SolanaTransactionBuilder(client, fulfillProvider, this);
         clients.push(client);
       } else {
-        const connection = new Web3(chain.chainRpc);
+        connection = new Web3(chain.chainRpc);
         fulfillProvider = Executor.getEVMProvider(chain, connection, chain.fulfillAuthority);
 
         unlockProvider = chain.unlockAuthority
@@ -443,6 +451,7 @@ export class Executor implements IExecutor {
 
       this.chains[chain.chain] = {
         chain: chain.chain,
+        connection,
         srcFilters,
         dstFilters,
         unlockAuthority: unlockProvider,
@@ -527,7 +536,7 @@ export class Executor implements IExecutor {
       }))
       .filter((range) => range.points.length > 0); // skip chains without necessary confirmation points
     orderFeed.init(
-      this.execute.bind(this),
+      (event) => this.execute(event),
       unlockAuthorities,
       minConfirmationThresholds,
       this.hookEngine,
@@ -543,10 +552,10 @@ export class Executor implements IExecutor {
     chain: ChainDefinition,
     connection: Web3,
     authority: SignerAuthority,
-  ): EvmProviderAdapter {
+  ): EvmTxSigner {
     switch (authority.type) {
       case 'PK': {
-        return new EvmProviderAdapter(
+        return new EvmTxSigner(
           chain.chain,
           connection,
           authority.privateKey,
@@ -572,13 +581,13 @@ export class Executor implements IExecutor {
     chain: ChainDefinition,
     connection: Connection,
     authority: SignerAuthority,
-  ): SolanaProviderAdapter {
+  ): SolanaTxSigner {
     const decodeKey = (key: string) =>
       Keypair.fromSecretKey(key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key));
 
     switch (authority.type) {
       case 'PK': {
-        return new SolanaProviderAdapter(connection, decodeKey(authority.privateKey));
+        return new SolanaTxSigner(connection, decodeKey(authority.privateKey));
       }
 
       default:
@@ -685,92 +694,29 @@ export class Executor implements IExecutor {
     };
   }
 
-  async execute(nextOrderInfo: IncomingOrder<any>) {
-    const { orderId } = nextOrderInfo;
-    const logger = this.logger.child({ orderId });
-    logger.info(`new order received, type: ${OrderInfoStatus[nextOrderInfo.status]}`);
-    logger.debug(nextOrderInfo);
-    try {
-      await this.executeOrder(nextOrderInfo, logger);
-    } catch (e) {
-      logger.error(`received error while order execution: ${e}`);
-      logger.error(e);
-    }
-  }
-
-  private async executeOrder(nextOrderInfo: IncomingOrder<any>, logger: Logger): Promise<boolean> {
-    const { order, orderId } = nextOrderInfo;
-    if (!order || !orderId) throw new Error('Order is undefined');
+  private async execute(nextOrderInfo: IncomingOrder<any>) {
+    const { orderId, order } = nextOrderInfo;
+    this.logger.info(`received order ${orderId} of status ${OrderInfoStatus[nextOrderInfo.status]}`);
 
     const takeChain = this.chains[order.take.chainId];
     if (!takeChain) {
-      logger.info(`${ChainId[order.take.chainId]} not configured, dropping`);
-      return false;
+      this.logger.info(`dropping order ${nextOrderInfo.orderId} because take chain ${ChainId[order.take.chainId]} is not configured`);
+      return;
     }
 
     const giveChain = this.chains[order.give.chainId];
     if (!giveChain) {
-      logger.info(`${ChainId[order.give.chainId]} not configured, dropping`);
-      return false;
-    }
-
-    // to accept an order, all filters must approve the order.
-    // executor invokes three groups of filters:
-    // 1) defined globally (config.filters)
-    // 2) defined as dstFilters under the takeChain config
-    // 3) defined as srcFilters under the giveChain config
-
-    // global filters
-    const listOrderFilters = [];
-
-    // dstFilters@takeChain
-    if (takeChain.dstFilters && takeChain.dstFilters.length > 0) {
-      listOrderFilters.push(...takeChain.dstFilters);
-    }
-
-    // srcFilters@giveChain
-    if (giveChain.srcFilters && giveChain.srcFilters.length > 0) {
-      listOrderFilters.push(...giveChain.srcFilters);
-    }
-
-    //
-    // run filters for create or archival orders
-    //
-    if ([OrderInfoStatus.Created, OrderInfoStatus.ArchivalCreated].includes(nextOrderInfo.status)) {
-      logger.debug('running filters against the order');
-      const orderFilters = await Promise.all(
-        listOrderFilters.map((filter) =>
-          filter(order, {
-            logger,
-            config: this,
-            giveChain,
-            takeChain,
-          }),
-        ),
-      );
-
-      if (!orderFilters.every((it) => it)) {
-        logger.info('order has been filtered off, dropping');
-        return false;
-      }
-    } else {
-      logger.debug('accepting order as is');
+      this.logger.info(`dropping order ${nextOrderInfo.orderId} because give chain ${ChainId[order.give.chainId]} is not configured`);
+      return;
     }
 
     //
     // run processor
     //
-    logger.debug(`passing the order to the processor`);
     this.processors[takeChain.chain]!.handleEvent({
       orderInfo: nextOrderInfo,
-      context: {
-        logger,
-        config: this,
-        giveChain,
-        takeChain,
-      },
+      giveChain,
+      takeChain,
     });
-
-    return true;
   }
 }

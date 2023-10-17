@@ -1,6 +1,6 @@
 import { calculateExpectedTakeAmount } from '@debridge-finance/legacy-dln-profitability';
 import { OrderEstimator } from 'src/chain-common/order-estimator';
-import { EvmProviderAdapter } from 'src/chain-evm/evm.provider.adapter';
+import { EvmTxSigner } from 'src/chain-evm/signer';
 import { EVMOrderValidator } from './order-validator';
 
 export class EVMOrderEstimator extends OrderEstimator {
@@ -16,7 +16,8 @@ export class EVMOrderEstimator extends OrderEstimator {
    * exactly this gas price
    */
   private async getEstimatedGasPrice(): Promise<bigint> {
-    const evmAdapter = this.order.takeChain.fulfillAuthority as EvmProviderAdapter;
+    // TODO move gas prediction out of EvmTxSigner
+    const evmAdapter = this.order.takeChain.fulfillAuthority as EvmTxSigner;
     const currentGasPriceBN = await evmAdapter.getRequiredGasPrice();
     const currentGasPrice = BigInt(currentGasPriceBN.integerValue().toString());
     const estimatedGasPrice =
@@ -37,6 +38,10 @@ export class EVMOrderEstimator extends OrderEstimator {
     const gasPrice = await this.getEstimatedGasPrice();
     const gasLimit = this.getPayloadEntry<number>(EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_NAME);
     this.setPayloadEntry(EVMOrderEstimator.EVM_ESTIMATED_FEE_NAME, gasPrice * BigInt(gasLimit));
+
+    console.log('🔴', {
+      gasLimit, gasPrice
+    })
 
     const parentContext = await super.getExpectedTakeAmountContext();
     return {

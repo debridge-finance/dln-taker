@@ -221,7 +221,7 @@ export class WsNextOrder extends GetNextOrder {
 
   private handleEvent(event: Buffer) {
     const rawMessage = event.toString('utf-8');
-    this.logger.info(`📨 ws received new message`);
+    this.logger.debug(`📨 ws received new message`);
     this.logger.debug(rawMessage);
 
     const data = WsNextOrder.parseEvent(rawMessage);

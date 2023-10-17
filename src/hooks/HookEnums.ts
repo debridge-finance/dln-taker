@@ -2,7 +2,6 @@ export enum Hooks {
   OrderFeedConnected,
   OrderFeedDisconnected,
   OrderRejected,
-  OrderEstimated,
   OrderPostponed,
   OrderFulfilled,
   OrderUnlockSent,
@@ -119,4 +118,6 @@ export enum RejectionReason {
    * Indicates that order includes the provided allowedTakerDst, which differs from the taker's address
    */
   WRONG_TAKER,
+
+  FILTERED_OFF,
 }

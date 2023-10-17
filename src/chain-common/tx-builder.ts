@@ -1,13 +1,13 @@
-import { OrderDataWithId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { OrderEstimation } from './order-estimator';
+import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
+import { FulfillTransactionBuilder } from './order-taker';
 
-type TransactionSender = {
-  (): Promise<string>;
+export type TxHash = string;
+
+export type TransactionSender = {
+  (): Promise<TxHash>;
 };
 
-export interface TransactionBuilder {
-  getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger): TransactionSender;
-  getBatchOrderUnlockTxSender(orders: Array<OrderDataWithId>, logger: Logger): TransactionSender;
+export interface TransactionBuilder extends FulfillTransactionBuilder, BatchUnlockTransactionBuilder {
   getInitTxSenders(logger: Logger): Promise<Array<TransactionSender>>;
 }

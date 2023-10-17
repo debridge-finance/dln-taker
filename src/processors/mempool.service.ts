@@ -28,7 +28,7 @@ export class MempoolService {
     logger: Logger,
     private readonly orderConsumer: OrderConsumer,
   ) {
-    this.#logger = logger.child({ service: 'MempoolService' });
+    this.#logger = logger.child({ service: MempoolService.name });
     this.#opts = defaultOpts;
   }
 

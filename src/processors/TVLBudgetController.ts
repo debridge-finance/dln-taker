@@ -31,7 +31,7 @@ export class TVLBudgetController {
     this.budget = budget;
     this.logger = logger.child({ service: TVLBudgetController.name, chainId: chain, budget });
     if (budget) {
-      this.logger.debug(`Will preserve a TVL of $${budget} on ${ChainId[chain]}`);
+      this.logger.info(`Will preserve a TVL of $${budget} on ${ChainId[chain]}`);
     }
   }
 
