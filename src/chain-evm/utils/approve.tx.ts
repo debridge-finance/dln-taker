@@ -13,10 +13,12 @@ export function getApproveTx(tokenAddress: string, spenderAddress: string): Inpu
   };
 }
 
-export async function getAllowance(connection: Web3,
+export async function getAllowance(
+  connection: Web3,
   tokenAddress: string,
   ownerAddress: string,
-  spenderAddress: string): Promise<bigint> {
+  spenderAddress: string,
+): Promise<bigint> {
   const contract = new connection.eth.Contract(IERC20.abi as any, tokenAddress);
 
   const approvedAmount = (await contract.methods

@@ -4,7 +4,10 @@ import { VersionedTransaction } from '@solana/web3.js';
 import { createClientLogger } from '../../dln-ts-client.utils';
 import { OrderEstimation } from '../../chain-common/order-estimator';
 
-export async function createOrderFullfillTx(estimation: OrderEstimation, logger: Logger): Promise<VersionedTransaction> {
+export async function createOrderFullfillTx(
+  estimation: OrderEstimation,
+  logger: Logger,
+): Promise<VersionedTransaction> {
   const { order } = estimation;
   if (estimation.preFulfillSwapResult) {
     return order.executor.client.preswapAndFulfillOrder<ChainEngine.Solana>(

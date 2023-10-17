@@ -64,33 +64,29 @@ export async function explainEstimation(orderEstimation: OrderEstimation): Promi
   ].join('');
 }
 
-// wrapped version of the result of calculateExpectedTakeAmount()
-export class RawOrderEstimation {
-  public isProfitable: boolean;
+type RawOrderEstimation = {
+  isProfitable: boolean;
 
-  public reserveToken: Uint8Array;
+  reserveToken: Uint8Array;
 
-  public requiredReserveAmount: bigint;
+  requiredReserveAmount: bigint;
 
-  public projectedFulfillAmount: bigint;
+  projectedFulfillAmount: bigint;
+};
 
-  constructor(rawEstimation: Awaited<ReturnType<typeof calculateExpectedTakeAmount>>) {
-    this.isProfitable = rawEstimation.isProfitable;
-    this.reserveToken = rawEstimation.reserveDstToken;
-    this.requiredReserveAmount = BigInt(rawEstimation.requiredReserveDstAmount);
-    this.projectedFulfillAmount = BigInt(rawEstimation.profitableTakeAmount);
-  }
-
-  toOrderEstimation(order: CreatedOrder, payload?: OrderEvaluationPayload): OrderEstimation {
-    return {
-      order,
-      isProfitable: this.isProfitable,
-      requiredReserveAmount: this.requiredReserveAmount,
-      projectedFulfillAmount: this.projectedFulfillAmount,
-      preFulfillSwapResult: undefined,
-      payload: payload || {},
-    };
-  }
+function toOrderEstimation(
+  rawOrderEstimation: RawOrderEstimation,
+  order: CreatedOrder,
+  payload?: OrderEvaluationPayload,
+): OrderEstimation {
+  return {
+    order,
+    isProfitable: rawOrderEstimation.isProfitable,
+    requiredReserveAmount: rawOrderEstimation.requiredReserveAmount,
+    projectedFulfillAmount: rawOrderEstimation.projectedFulfillAmount,
+    preFulfillSwapResult: undefined,
+    payload: payload || {},
+  };
 }
 
 export type OrderEstimation = {
@@ -128,13 +124,18 @@ export class OrderEstimator extends OrderEvaluationContextual {
   }
 
   protected async getRawOrderEstimation(): Promise<RawOrderEstimation> {
-
-const t = await this.getExpectedTakeAmountContext()
-    return calculateExpectedTakeAmount(
+    const rawEstimation = await calculateExpectedTakeAmount(
       this.order.orderData,
       this.order.giveChain.srcConstraints.profitability,
-      t,
-    ).then((result) => new RawOrderEstimation(result));
+      await this.getExpectedTakeAmountContext(),
+    );
+
+    return {
+      isProfitable: rawEstimation.isProfitable,
+      reserveToken: rawEstimation.reserveDstToken,
+      requiredReserveAmount: BigInt(rawEstimation.requiredReserveDstAmount),
+      projectedFulfillAmount: BigInt(rawEstimation.profitableTakeAmount),
+    };
   }
 
   async getEstimation(): Promise<OrderEstimation> {
@@ -182,7 +183,7 @@ const t = await this.getExpectedTakeAmountContext()
     }
 
     return {
-      ...rawOrderEstimation.toOrderEstimation(this.order, this.payload),
+      ...toOrderEstimation(rawOrderEstimation, this.order, this.payload),
       preFulfillSwapResult: swapResult,
     };
   }

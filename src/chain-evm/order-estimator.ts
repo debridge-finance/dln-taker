@@ -39,10 +39,6 @@ export class EVMOrderEstimator extends OrderEstimator {
     const gasLimit = this.getPayloadEntry<number>(EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_NAME);
     this.setPayloadEntry(EVMOrderEstimator.EVM_ESTIMATED_FEE_NAME, gasPrice * BigInt(gasLimit));
 
-    console.log('🔴', {
-      gasLimit, gasPrice
-    })
-
     const parentContext = await super.getExpectedTakeAmountContext();
     return {
       ...parentContext,
