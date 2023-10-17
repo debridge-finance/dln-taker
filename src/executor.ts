@@ -163,8 +163,8 @@ export class Executor implements IExecutor {
 
   constructor(logger: Logger) {
     this.logger = logger.child({
-      service: Executor.name
-    })
+      service: Executor.name,
+    });
   }
 
   async usdValueOfAsset(chain: ChainId, token: Address, amount: bigint): Promise<number> {
@@ -347,11 +347,7 @@ export class Executor implements IExecutor {
             getCurrentEnvironment().chains![ChainId.Solana]!.solana!.debridgeSetting!,
         );
 
-        fulfillProvider = Executor.getSolanaProvider(
-          chain,
-          connection,
-          chain.fulfillAuthority,
-        );
+        fulfillProvider = Executor.getSolanaProvider(chain, connection, chain.fulfillAuthority);
         unlockProvider = chain.unlockAuthority
           ? Executor.getSolanaProvider(chain, connection, chain.unlockAuthority)
           : fulfillProvider;
@@ -696,17 +692,27 @@ export class Executor implements IExecutor {
 
   private async execute(nextOrderInfo: IncomingOrder<any>) {
     const { orderId, order } = nextOrderInfo;
-    this.logger.info(`received order ${orderId} of status ${OrderInfoStatus[nextOrderInfo.status]}`);
+    this.logger.info(
+      `received order ${orderId} of status ${OrderInfoStatus[nextOrderInfo.status]}`,
+    );
 
     const takeChain = this.chains[order.take.chainId];
     if (!takeChain) {
-      this.logger.info(`dropping order ${nextOrderInfo.orderId} because take chain ${ChainId[order.take.chainId]} is not configured`);
+      this.logger.info(
+        `dropping order ${nextOrderInfo.orderId} because take chain ${
+          ChainId[order.take.chainId]
+        } is not configured`,
+      );
       return;
     }
 
     const giveChain = this.chains[order.give.chainId];
     if (!giveChain) {
-      this.logger.info(`dropping order ${nextOrderInfo.orderId} because give chain ${ChainId[order.give.chainId]} is not configured`);
+      this.logger.info(
+        `dropping order ${nextOrderInfo.orderId} because give chain ${
+          ChainId[order.give.chainId]
+        } is not configured`,
+      );
       return;
     }
 

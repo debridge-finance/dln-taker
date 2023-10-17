@@ -9,10 +9,10 @@ import {
 import { Logger } from 'pino';
 
 import { helpers } from '@debridge-finance/solana-utils';
-import {  TransactionSender } from 'src/chain-common/tx-builder';
+import { TransactionSender } from 'src/chain-common/tx-builder';
 import { ExecutorSupportedChain, IExecutor } from '../executor';
 
-export interface BatchUnlockTransactionBuilder  {
+export interface BatchUnlockTransactionBuilder {
   getBatchOrderUnlockTxSender(orders: Array<OrderDataWithId>, logger: Logger): TransactionSender;
 }
 
@@ -37,10 +37,7 @@ export class BatchUnlocker {
     });
   }
 
-  async unlockOrder(
-    orderId: string,
-    order: OrderData,
-  ): Promise<void> {
+  async unlockOrder(orderId: string, order: OrderData): Promise<void> {
     // validate current order state:
     const orderState = await this.executor.client.getTakeOrderState(
       {

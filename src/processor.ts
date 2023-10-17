@@ -18,48 +18,42 @@ type CreatedOrderMetadata = {
   context: IncomingOrderContext;
 };
 
-
 enum BreakReason {
-   ShouldPostpone,
-   ShouldReject,
- }
-  type ProcessorCircuitBreaker<T extends BreakReason> = {
-   circuitBreaker: true;
-   breakReason: T;
- } &
-   (T extends BreakReason.ShouldReject
-     ? { rejection: RejectionReason; message: string }
-     : {}) &
-   (T extends BreakReason.ShouldPostpone
-     ? { postpone: PostponingReason; message: string; delay?: number }
-     : {});
+  ShouldPostpone,
+  ShouldReject,
+}
+type ProcessorCircuitBreaker<T extends BreakReason> = {
+  circuitBreaker: true;
+  breakReason: T;
+} & (T extends BreakReason.ShouldReject ? { rejection: RejectionReason; message: string } : {}) &
+  (T extends BreakReason.ShouldPostpone
+    ? { postpone: PostponingReason; message: string; delay?: number }
+    : {});
 
 function getShortCircuit(): TakerShortCircuit {
- return {
+  return {
+    reject: (rejection: RejectionReason, message: string) => {
+      const error: ProcessorCircuitBreaker<BreakReason.ShouldReject> = {
+        circuitBreaker: true,
+        breakReason: BreakReason.ShouldReject,
+        rejection,
+        message,
+      };
+      return Promise.reject(error);
+    },
 
-   reject: (rejection: RejectionReason, message: string) => {
-     const error: ProcessorCircuitBreaker<BreakReason.ShouldReject> = {
-       circuitBreaker: true,
-       breakReason: BreakReason.ShouldReject,
-       rejection,
-       message,
-     };
-     return Promise.reject(error);
-   },
-
-   postpone: (postpone: PostponingReason, message: string, delay?: number) => {
-     const error: ProcessorCircuitBreaker<BreakReason.ShouldPostpone> = {
-       circuitBreaker: true,
-       breakReason: BreakReason.ShouldPostpone,
-       postpone,
-       message,
-       delay,
-     };
-     return Promise.reject(error);
-   }
- }
+    postpone: (postpone: PostponingReason, message: string, delay?: number) => {
+      const error: ProcessorCircuitBreaker<BreakReason.ShouldPostpone> = {
+        circuitBreaker: true,
+        breakReason: BreakReason.ShouldPostpone,
+        postpone,
+        message,
+        delay,
+      };
+      return Promise.reject(error);
+    },
+  };
 }
-
 
 export class OrderProcessor {
   readonly #mempoolService: MempoolService;
@@ -222,14 +216,14 @@ export class OrderProcessor {
     this.isLocked = false;
 
     if (this.eventsQueue.length > 0) {
-      this.#logger.debug(`has events (${this.eventsQueue.length} in the events queue, picking`)
+      this.#logger.debug(`has events (${this.eventsQueue.length} in the events queue, picking`);
       this.handleEvent(this.eventsQueue.shift()!);
       return;
     }
 
     const nextOrderId = this.pickNextOrderId();
     if (nextOrderId) {
-      this.#logger.debug(`has orders in the orders queue, picking ${nextOrderId}`)
+      this.#logger.debug(`has orders in the orders queue, picking ${nextOrderId}`);
       this.handleOrder(nextOrderId);
     }
   }
@@ -264,7 +258,9 @@ export class OrderProcessor {
     reason: PostponingReason,
     remainingDelay?: number,
   ) {
-    this.#logger.info(`⏸️ postponed order ${orderId} because of ${PostponingReason[reason]}: ${message}`);
+    this.#logger.info(
+      `⏸️ postponed order ${orderId} because of ${PostponingReason[reason]}: ${message}`,
+    );
 
     this.executor.hookEngine.handleOrderPostponed({
       orderId,
@@ -293,7 +289,9 @@ export class OrderProcessor {
     message: string,
     reason: RejectionReason,
   ): Promise<void> {
-    this.#logger.info(`𐄂 rejected order ${orderId} because of ${RejectionReason[reason]}: ${message}`);
+    this.#logger.info(
+      `𐄂 rejected order ${orderId} because of ${RejectionReason[reason]}: ${message}`,
+    );
 
     this.executor.hookEngine.handleOrderRejected({
       orderId,
@@ -334,7 +332,14 @@ export class OrderProcessor {
       this.clearInternalQueues(orderInfo.orderId);
 
       const message = 'order has been revoked by the order feed due to chain reorganization';
-      return this.rejectOrder(orderInfo.orderId, orderInfo.order, isLive, metadata.attempts, message, RejectionReason.REVOKED);
+      return this.rejectOrder(
+        orderInfo.orderId,
+        orderInfo.order,
+        isLive,
+        metadata.attempts,
+        message,
+        RejectionReason.REVOKED,
+      );
     }
 
     const order = new CreatedOrder(
@@ -353,7 +358,7 @@ export class OrderProcessor {
 
     try {
       await order.getTaker().take(getShortCircuit(), this.transactionBuilder);
-      this.markOrderAsFulfilled(order)
+      this.markOrderAsFulfilled(order);
     } catch (e) {
       if ((<ProcessorCircuitBreaker<any>>e).circuitBreaker === true) {
         const circuitBreaker = <ProcessorCircuitBreaker<any>>e;
@@ -361,11 +366,26 @@ export class OrderProcessor {
         switch ((<ProcessorCircuitBreaker<any>>e).breakReason) {
           case BreakReason.ShouldReject: {
             const v = <ProcessorCircuitBreaker<BreakReason.ShouldReject>>circuitBreaker;
-            return this.rejectOrder(orderInfo.orderId, orderInfo.order, isLive, metadata.attempts, v.message, v.rejection);
+            return this.rejectOrder(
+              orderInfo.orderId,
+              orderInfo.order,
+              isLive,
+              metadata.attempts,
+              v.message,
+              v.rejection,
+            );
           }
           case BreakReason.ShouldPostpone: {
             const v = <ProcessorCircuitBreaker<BreakReason.ShouldPostpone>>circuitBreaker;
-            return this.postponeOrder(orderInfo.orderId, orderInfo.order, isLive, metadata.attempts, v.message, v.postpone, v.delay);
+            return this.postponeOrder(
+              orderInfo.orderId,
+              orderInfo.order,
+              isLive,
+              metadata.attempts,
+              v.message,
+              v.postpone,
+              v.delay,
+            );
           }
           default: {
             die(`Unexpected verification result: ${circuitBreaker.breakReason}`);
@@ -376,8 +396,17 @@ export class OrderProcessor {
       const message = `processing order ${order.orderId} failed with an unhandled error: ${e}`;
       this.#logger.error(message);
       this.#logger.error(e);
-      return this.postponeOrder(orderInfo.orderId, orderInfo.order, isLive, metadata.attempts, message, PostponingReason.UNHANDLED_ERROR);
+      return this.postponeOrder(
+        orderInfo.orderId,
+        orderInfo.order,
+        isLive,
+        metadata.attempts,
+        message,
+        PostponingReason.UNHANDLED_ERROR,
+      );
     }
+
+    return Promise.resolve();
   }
 
   private markOrderAsFulfilled(order: CreatedOrder) {
@@ -390,5 +419,4 @@ export class OrderProcessor {
       this.takeChain.fulfillAuthority.finalizedBlockCount;
     this.#mempoolService.addOrder(order.orderId, fulfillCheckDelay);
   }
-
 }

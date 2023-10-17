@@ -56,7 +56,8 @@ export class CreatedOrder {
     const route = findExpectedBucket(this.orderData, this.executor.buckets);
     return {
       ...route,
-      requiresSwap: false === buffersAreEqual(route.reserveDstToken, this.orderData.take.tokenAddress),
+      requiresSwap:
+        buffersAreEqual(route.reserveDstToken, this.orderData.take.tokenAddress) === false,
     };
   }
 
@@ -145,6 +146,6 @@ export class CreatedOrder {
   }
 
   getTaker() {
-    return new CreatedOrderTaker(this, this.#logger)
+    return new CreatedOrderTaker(this, this.#logger);
   }
 }

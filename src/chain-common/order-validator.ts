@@ -1,16 +1,15 @@
 import { buffersAreEqual, OrderState, ChainId, Order } from '@debridge-finance/dln-client';
 import { SwapConnectorResult } from 'node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector';
 import { Logger } from 'pino';
+import { helpers } from '@debridge-finance/solana-utils';
 import { DexlessChains } from '../config';
 import { die } from '../errors';
 import { RejectionReason, PostponingReason } from '../hooks/HookEnums';
 import { createClientLogger } from '../dln-ts-client.utils';
 import { CreatedOrder } from './order';
 import { OrderEstimator } from './order-estimator';
-import { OrderEvaluationContextual,  } from './shared';
-import { helpers } from '@debridge-finance/solana-utils';
+import { OrderEvaluationContextual } from './shared';
 import { TakerShortCircuit } from './order-taker';
-
 
 // gets the amount of sec to additionally wait until this order can be processed
 function getOrderRemainingDelay(firstSeen: Date, delay: number): number {
@@ -69,7 +68,7 @@ export class OrderValidator extends OrderEvaluationContextual {
     await this.checkRoughProfitability();
     await this.runChecks();
 
-    return this.getOrderEstimator()
+    return this.getOrderEstimator();
   }
 
   protected getOrderEstimator() {
@@ -83,25 +82,26 @@ export class OrderValidator extends OrderEvaluationContextual {
   private async checkFilters(): Promise<void> {
     const listOrderFilters = [
       ...this.order.takeChain.dstFilters,
-      ...this.order.giveChain.srcFilters
+      ...this.order.giveChain.srcFilters,
     ];
 
-      this.#logger.debug('running filters against the order');
-      const orderFilters = await Promise.all(
-        listOrderFilters.map((filter) =>
-          filter(this.order.orderData, {
-            logger: this.#logger,
-            config: this.order.executor,
-            giveChain: this.order.giveChain,
-            takeChain: this.order.takeChain,
-          }),
-        ),
-      );
+    this.#logger.debug('running filters against the order');
+    const orderFilters = await Promise.all(
+      listOrderFilters.map((filter) =>
+        filter(this.order.orderData, {
+          logger: this.#logger,
+          config: this.order.executor,
+          giveChain: this.order.giveChain,
+          takeChain: this.order.takeChain,
+        }),
+      ),
+    );
 
-      if (!orderFilters.every((it) => it)) {
-        const message = 'order has been filtered off, dropping'
-        return this.sc.reject(RejectionReason.FILTERED_OFF, message)
-      }
+    if (!orderFilters.every((it) => it)) {
+      const message = 'order has been filtered off, dropping';
+      return this.sc.reject(RejectionReason.FILTERED_OFF, message);
+    }
+    return Promise.resolve();
   }
 
   private async checkAllowedTaker(): Promise<void> {
@@ -112,7 +112,11 @@ export class OrderValidator extends OrderEvaluationContextual {
           this.order.orderData.allowedTaker,
         )
       ) {
-        const message = `allowedTakerDst restriction; order requires expected allowed taker: ${this.order.orderData.allowedTaker.toAddress(this.order.orderData.take.chainId)}; actual: ${this.order.takeChain.unlockAuthority.bytesAddress.toAddress(this.order.orderData.take.chainId)}`;
+        const message = `allowedTakerDst restriction; order requires expected allowed taker: ${this.order.orderData.allowedTaker.toAddress(
+          this.order.orderData.take.chainId,
+        )}; actual: ${this.order.takeChain.unlockAuthority.bytesAddress.toAddress(
+          this.order.orderData.take.chainId,
+        )}`;
         return this.sc.reject(RejectionReason.WRONG_TAKER, message);
       }
     }
@@ -140,7 +144,11 @@ export class OrderValidator extends OrderEvaluationContextual {
           this.order.orderData.externalCall.externalCallHash || Buffer.alloc(0),
         )
       ) {
-        const message = `externalCallHash mismatch; expected: ${helpers.bufferToHex(calculatedExternalCallHash)}; actual: ${helpers.bufferToHex(this.order.orderData.externalCall.externalCallHash || Buffer.alloc(0))}`;
+        const message = `externalCallHash mismatch; expected: ${helpers.bufferToHex(
+          calculatedExternalCallHash,
+        )}; actual: ${helpers.bufferToHex(
+          this.order.orderData.externalCall.externalCallHash || Buffer.alloc(0),
+        )}`;
         return this.sc.reject(RejectionReason.MALFORMED_ORDER, message);
       }
     }
@@ -297,11 +305,8 @@ export class OrderValidator extends OrderEvaluationContextual {
     const { take } = this.order.orderData;
 
     // reject orders that require pre-fulfill swaps on the dexless chains (e.g. Linea)
-    const {reserveDstToken} = this.order.route;
-    if (
-      DexlessChains[take.chainId] &&
-      !buffersAreEqual(reserveDstToken, take.tokenAddress)
-    ) {
+    const { reserveDstToken } = this.order.route;
+    if (DexlessChains[take.chainId] && !buffersAreEqual(reserveDstToken, take.tokenAddress)) {
       const message = `swaps are unavailable on ${
         ChainId[take.chainId]
       }, can't perform pre-fulfill swap from ${reserveDstToken.toAddress(
@@ -314,7 +319,7 @@ export class OrderValidator extends OrderEvaluationContextual {
 
   private async checkAccountBalance(): Promise<void> {
     const { chainId: takeChainId } = this.order.orderData.take;
-    const {reserveDstToken} = this.order.route;
+    const { reserveDstToken } = this.order.route;
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
     const maxProfitableReserveAmount = await this.order.getMaxProfitableReserveAmount();
@@ -346,7 +351,7 @@ export class OrderValidator extends OrderEvaluationContextual {
 
   private async checkRoughProfitability(): Promise<void> {
     const maxProfitableReserveAmount = await this.order.getMaxProfitableReserveAmount();
-    this.#logger.debug(`obtained max profitable reserve amount: ${maxProfitableReserveAmount}`)
+    this.#logger.debug(`obtained max profitable reserve amount: ${maxProfitableReserveAmount}`);
 
     // now compare if aforementioned rough amount is still profitable
     if (this.order.route.requiresSwap) {
@@ -369,21 +374,14 @@ export class OrderValidator extends OrderEvaluationContextual {
       );
 
       if (preliminarySwapResult.amountOut < this.order.orderData.take.amount) {
-        const message = `rough profitability estimation failed, swap outcome is estimated to be less than order's take amount; expected: ${this.order.orderData.take.amount} but actual: ${preliminarySwapResult.amountOut}`
-        return this.sc.postpone(
-          PostponingReason.NOT_PROFITABLE,
-          message,
-        );
+        const message = `rough profitability estimation failed, swap outcome is estimated to be less than order's take amount; expected: ${this.order.orderData.take.amount} but actual: ${preliminarySwapResult.amountOut}`;
+        return this.sc.postpone(PostponingReason.NOT_PROFITABLE, message);
       }
-      else {
-        this.#preliminarySwapResult = preliminarySwapResult
-      }
+
+      this.#preliminarySwapResult = preliminarySwapResult;
     } else if (maxProfitableReserveAmount < this.order.orderData.take.amount) {
-      const message = `rough profitability estimation failed, max profitable reserve amount is less than order's take amount; expected: ${this.order.orderData.take.amount} but actual: ${maxProfitableReserveAmount}`
-      return this.sc.postpone(
-        PostponingReason.NOT_PROFITABLE,
-        message,
-      );
+      const message = `rough profitability estimation failed, max profitable reserve amount is less than order's take amount; expected: ${this.order.orderData.take.amount} but actual: ${maxProfitableReserveAmount}`;
+      return this.sc.postpone(PostponingReason.NOT_PROFITABLE, message);
     }
 
     return Promise.resolve();

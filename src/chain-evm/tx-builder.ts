@@ -20,13 +20,7 @@ export class EvmTransactionBuilder implements TransactionBuilder {
 
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
     return async () =>
-      this.signer.sendTransaction(
-        await getFulfillTx(
-          orderEstimation,
-          logger,
-        ),
-        { logger },
-      );
+      this.signer.sendTransaction(await getFulfillTx(orderEstimation, logger), { logger });
   }
 
   getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {
@@ -64,9 +58,10 @@ export class EvmTransactionBuilder implements TransactionBuilder {
             return this.signer.sendTransaction(getApproveTx(token, contract), { logger });
           };
           transactionSenders.push(func);
-        }
-        else {
-          logger.info(`Allowance (${currentAllowance}) is set on ${token} to be spend by ${contract} on behalf of a ${this.signer.address}`)
+        } else {
+          logger.info(
+            `Allowance (${currentAllowance}) is set on ${token} to be spend by ${contract} on behalf of a ${this.signer.address}`,
+          );
         }
       }
     }
