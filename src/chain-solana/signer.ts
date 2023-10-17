@@ -5,13 +5,13 @@ import { Logger } from 'pino';
 import { Authority } from 'src/interfaces';
 import { avgBlockSpeed, BLOCK_CONFIRMATIONS_HARD_CAPS } from '../config';
 
-export type SendTransactionContext = {
+export type SolanaTxContext = {
   logger: Logger;
   options: Parameters<typeof helpers.sendAll>['3'];
 };
 
-export class SolanaProviderAdapter implements Authority {
-  private readonly wallet: Parameters<typeof helpers.sendAll>['1'];
+export class SolanaTxSigner implements Authority {
+  private readonly wallet: helpers.Wallet;
 
   constructor(
     private readonly connection: Connection,
@@ -40,7 +40,7 @@ export class SolanaProviderAdapter implements Authority {
 
   async sendTransaction(
     data: VersionedTransaction | Transaction,
-    context: SendTransactionContext,
+    context: SolanaTxContext,
   ): Promise<string> {
     const [tx] = await this.sendTransactions(data, context);
     return tx;
@@ -48,10 +48,10 @@ export class SolanaProviderAdapter implements Authority {
 
   async sendTransactions(
     data: VersionedTransaction | Transaction | Array<Transaction | VersionedTransaction>,
-    context: SendTransactionContext,
+    context: SolanaTxContext,
   ): Promise<Array<string>> {
     const logger = context.logger.child({
-      service: SolanaProviderAdapter.name,
+      service: SolanaTxSigner.name,
       currentChainId: ChainId.Solana,
     });
 

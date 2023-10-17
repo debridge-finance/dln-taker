@@ -1,5 +1,3 @@
-/* eslint max-classes-per-file: ["error", 2] -- Defines additional OrderEvaluationContextual helper class */
-
 import {
   OrderData,
   OrderDataWithId,
@@ -10,7 +8,6 @@ import {
 } from '@debridge-finance/dln-client';
 import { findExpectedBucket } from '@debridge-finance/legacy-dln-profitability';
 import { helpers } from '@debridge-finance/solana-utils';
-import assert from 'assert';
 import { Logger } from 'pino';
 import { EVMOrderValidator } from 'src/chain-evm/order-validator';
 import { BLOCK_CONFIRMATIONS_HARD_CAPS, SupportedChain } from '../config';
@@ -21,7 +18,8 @@ import {
   SrcOrderConstraints,
   DstOrderConstraints,
 } from '../executor';
-import { OrderId, OrderInfoStatus } from '../interfaces';
+import { OrderId } from '../interfaces';
+import { CreatedOrderTaker, TakerShortCircuit } from './order-taker';
 import { OrderValidator } from './order-validator';
 
 type CreatedOrderContext = {
@@ -39,18 +37,6 @@ export class CreatedOrder {
   public readonly takeChain: ExecutorSupportedChain;
 
   readonly #logger: Logger;
-
-  #arrivedAt: Date = new Date();
-
-  #attempts: number = 0;
-
-  get attempts(): number {
-    return this.#attempts;
-  }
-
-  get arrivedAt(): Date {
-    return this.#arrivedAt;
-  }
 
   async getUsdValue(): Promise<number> {
     const value = await this.executor.usdValueOfOrder(this.orderData);
@@ -70,8 +56,22 @@ export class CreatedOrder {
     const route = findExpectedBucket(this.orderData, this.executor.buckets);
     return {
       ...route,
-      requiresSwap: buffersAreEqual(route.reserveDstToken, this.orderData.take.tokenAddress),
+      requiresSwap: false === buffersAreEqual(route.reserveDstToken, this.orderData.take.tokenAddress),
     };
+  }
+
+  constructor(
+    public readonly orderId: OrderId,
+    public readonly orderData: OrderData,
+    public readonly finalization: 'Finalized' | number,
+    public readonly arrivedAt: Date,
+    public readonly attempt: number,
+    context: CreatedOrderContext,
+  ) {
+    this.executor = context.executor;
+    this.giveChain = context.giveChain;
+    this.takeChain = context.takeChain;
+    this.#logger = context.logger.child({ orderId });
   }
 
   async getGiveAmountInReserveToken(): Promise<bigint> {
@@ -80,7 +80,7 @@ export class CreatedOrder {
       this.orderData.give.tokenAddress,
       this.orderData.give.amount,
       this.orderData.take.chainId,
-      this.orderData.take.tokenAddress,
+      this.route.reserveDstToken,
     );
   }
 
@@ -128,45 +128,12 @@ export class CreatedOrder {
     return dstConstraintsByValue || this.takeChain.dstConstraints;
   }
 
-  constructor(
-    public readonly orderId: OrderId,
-    public readonly orderData: OrderData,
-    public readonly status: OrderInfoStatus,
-    public readonly finalization: 'Finalized' | number,
-    context: CreatedOrderContext,
-  ) {
-    assert(
-      [OrderInfoStatus.ArchivalCreated, OrderInfoStatus.Created].includes(status),
-      `unexpected order status: ${OrderInfoStatus[status]}`,
-    );
-    this.executor = context.executor;
-    this.giveChain = context.giveChain;
-    this.takeChain = context.takeChain;
-    this.#logger = context.logger.child({ orderId });
-  }
-
-  update(finalization: 'Finalized' | number): CreatedOrder {
-    const order = new CreatedOrder(this.orderId, this.orderData, this.status, finalization, {
-      executor: this.executor,
-      giveChain: this.giveChain,
-      takeChain: this.takeChain,
-      logger: this.#logger,
-    });
-    order.#arrivedAt = this.#arrivedAt;
-    order.#attempts = this.#attempts;
-    return order;
-  }
-
-  async verify(): ReturnType<OrderValidator['verify']> {
-    return this.getVerifier().verify();
-  }
-
-  getVerifier(): OrderValidator {
+  getValidator(sc: TakerShortCircuit): OrderValidator {
     switch (getEngineByChainId(this.takeChain.chain)) {
       case ChainEngine.EVM:
-        return new EVMOrderValidator(this, { logger: this.#logger });
+        return new EVMOrderValidator(this, sc, { logger: this.#logger });
       default:
-        return new OrderValidator(this, { logger: this.#logger });
+        return new OrderValidator(this, sc, { logger: this.#logger });
     }
   }
 
@@ -175,5 +142,9 @@ export class CreatedOrder {
       orderId: helpers.hexToBuffer(this.orderId),
       ...this.orderData,
     });
+  }
+
+  getTaker() {
+    return new CreatedOrderTaker(this, this.#logger)
   }
 }

@@ -19,7 +19,7 @@ type BroadcastedTx = {
   time: Date;
 };
 
-export type SendTransactionContext = {
+export type EvmTxContext = {
   logger: Logger;
 };
 
@@ -47,7 +47,7 @@ export type InputTransaction = {
   cappedFee?: BigNumber;
 };
 
-export class EvmProviderAdapter implements Authority {
+export class EvmTxSigner implements Authority {
   private staleTx?: BroadcastedTx;
 
   private readonly rebroadcast: Required<EvmRebroadcastAdapterOpts>;
@@ -261,14 +261,11 @@ export class EvmProviderAdapter implements Authority {
     };
   }
 
-  async sendTransaction(data: InputTransaction, context: SendTransactionContext): Promise<string> {
+  async sendTransaction(tx: InputTransaction, context: EvmTxContext): Promise<string> {
     const logger = context.logger.child({
-      service: 'EvmProviderAdapter',
+      service: EvmTxSigner.name,
       currentChainId: await this.connection.eth.getChainId(),
     });
-
-    const tx = data as InputTransaction;
-    if (!tx.to || !tx.data) throw new Error('Unexpected tx');
 
     let broadcastedTx: BroadcastedTx;
 
@@ -456,12 +453,5 @@ export class EvmProviderAdapter implements Authority {
       pollingTimeframe: rebroadcast?.pollingTimeframe || this.avgBlockSpeed * 24 * 1000,
       pollingInterval: rebroadcast?.pollingInterval || this.avgBlockSpeed * 1000,
     };
-  }
-
-  estimateGas(tx: InputTransaction): Promise<number> {
-    return this.connection.eth.estimateGas({
-      ...tx,
-      from: this.address,
-    });
   }
 }

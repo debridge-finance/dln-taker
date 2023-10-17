@@ -1,38 +1,40 @@
 import { PostponingReason } from 'src/hooks/HookEnums';
-import { OrderValidator, postponeOrder } from 'src/chain-common/order-validator';
-import { EvmProviderAdapter } from 'src/chain-evm/evm.provider.adapter';
-import { EVMOrderFulfillIntent } from './order-fulfill';
+import { OrderValidator } from 'src/chain-common/order-validator';
 import { EVMOrderEstimator } from './order-estimator';
+import { getFulfillTx } from './utils/orderFulfill.tx';
+import Web3 from 'web3';
 
 export class EVMOrderValidator extends OrderValidator {
   public static readonly EVM_FULFILL_GAS_LIMIT_NAME = 'evmFulfillGasLimit';
+  public static readonly EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME = 'EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME';
 
   protected async runChecks() {
-    super.runChecks();
+    await super.runChecks();
     await this.checkEvmEstimation();
   }
 
   private async checkEvmEstimation(): Promise<void> {
-    const intent = new EVMOrderFulfillIntent(
-      this.order,
+    const tx = await getFulfillTx(
       {
         order: this.order,
         isProfitable: true,
         requiredReserveAmount: await this.order.getMaxProfitableReserveAmount(),
         projectedFulfillAmount: this.order.orderData.take.amount,
         preFulfillSwapResult: this.preliminarySwapResult,
-        payload: {},
+        payload: {
+          [EVMOrderValidator.EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME]: true
+        },
       },
       this.logger,
     );
 
-    const adapter = this.order.takeChain.fulfillAuthority as EvmProviderAdapter;
-    const tx = await intent.getFulfillTx();
+    const takeChainRpc = this.order.takeChain.connection as Web3;
     try {
-      const evmFulfillGasLimit = await adapter.estimateGas({
+      const evmFulfillGasLimit = await takeChainRpc.eth.estimateGas({
         to: tx.to,
         data: tx.data,
         value: tx.value?.toString(),
+        from: this.order.takeChain.fulfillAuthority.address
       });
       this.logger.debug(
         `estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${evmFulfillGasLimit} gas units`,
@@ -42,7 +44,7 @@ export class EVMOrderValidator extends OrderValidator {
         evmFulfillGasLimit,
       );
     } catch (e) {
-      return postponeOrder(PostponingReason.NOT_PROFITABLE, 'unable to estimate preliminary txn');
+      return this.sc.postpone(PostponingReason.NOT_PROFITABLE, `unable to estimate preliminary txn: ${e}`);
     }
 
     return Promise.resolve();

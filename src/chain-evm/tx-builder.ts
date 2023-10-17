@@ -3,36 +3,35 @@ import { Logger } from 'pino';
 import { OrderEstimation } from 'src/chain-common/order-estimator';
 import { TransactionBuilder } from 'src/chain-common/tx-builder';
 import { IExecutor } from 'src/executor';
-import { EvmProviderAdapter } from 'src/chain-evm/evm.provider.adapter';
+import { EvmTxSigner } from 'src/chain-evm/signer';
 import Web3 from 'web3';
-import { EVMOrderFulfillIntent } from './order-fulfill';
 import { getApproveTx, getAllowance } from './utils/approve.tx';
 import { unlockTx } from './utils/unlock.tx';
+import { getFulfillTx } from './utils/orderFulfill.tx';
 
 export class EvmTransactionBuilder implements TransactionBuilder {
   constructor(
     private readonly chain: ChainId,
     private contractsForApprove: string[],
     private connection: Web3,
-    private readonly adapter: EvmProviderAdapter,
+    private readonly signer: EvmTxSigner,
     private readonly executor: IExecutor,
   ) {}
 
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
     return async () =>
-      this.adapter.sendTransaction(
-        await new EVMOrderFulfillIntent(
-          orderEstimation.order,
+      this.signer.sendTransaction(
+        await getFulfillTx(
           orderEstimation,
           logger,
-        ).getFulfillTx(),
+        ),
         { logger },
       );
   }
 
   getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {
     return async () =>
-      this.adapter.sendTransaction(await unlockTx(this.executor, orders, logger), { logger });
+      this.signer.sendTransaction(await unlockTx(this.executor, orders, logger), { logger });
   }
 
   async getInitTxSenders(logger: Logger) {
@@ -53,18 +52,21 @@ export class EvmTransactionBuilder implements TransactionBuilder {
         const currentAllowance = await getAllowance(
           this.connection,
           token,
-          this.adapter.address,
+          this.signer.address,
           contract,
         );
         if (currentAllowance === 0n) {
-          logger.debug(`${token} requires approval`);
+          logger.info(`${token} requires approval`);
           const func = () => {
             logger.debug(
-              `Setting approval on ${token} to be spend by ${contract} on behalf of ${this.adapter.address}`,
+              `Setting approval on ${token} to be spend by ${contract} on behalf of a ${this.signer.address}`,
             );
-            return this.adapter.sendTransaction(getApproveTx(token, contract), { logger });
+            return this.signer.sendTransaction(getApproveTx(token, contract), { logger });
           };
           transactionSenders.push(func);
+        }
+        else {
+          logger.info(`Allowance (${currentAllowance}) is set on ${token} to be spend by ${contract} on behalf of a ${this.signer.address}`)
         }
       }
     }

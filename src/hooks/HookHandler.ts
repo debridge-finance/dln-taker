@@ -9,5 +9,5 @@ export type HookContext = {
 
 export type HookHandler<T extends Hooks> = (
   args: HookParams<T>,
-  logger?: HookContext,
+  context: HookContext,
 ) => Promise<void>;

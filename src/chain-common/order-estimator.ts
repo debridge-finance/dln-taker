@@ -1,4 +1,3 @@
-/* eslint max-classes-per-file: ["error", 2] -- Defines additional OrderEvaluationContextual helper class */
 import { buffersAreEqual } from '@debridge-finance/dln-client';
 import { calculateExpectedTakeAmount } from '@debridge-finance/legacy-dln-profitability';
 import {
@@ -103,35 +102,6 @@ export type OrderEstimation = {
   readonly payload: OrderEvaluationPayload;
 };
 
-// protected sendHook() {
-//     assert(undefined !== this.#estimation, "Unexpected: hook triggered before estimation is performed on OrderEstimator")
-
-//     const { reserveDstToken, requiredReserveDstAmount, isProfitable, profitableTakeAmount } =
-//         this.#estimation;
-
-//     const hookEstimation = {
-//         isProfitable,
-//         reserveToken: reserveDstToken,
-//         requiredReserveAmount: requiredReserveDstAmount,
-//         fulfillToken: this.order.orderData.take.tokenAddress,
-//         projectedFulfillAmount: profitableTakeAmount,
-//     };
-//     this.order.executor.hookEngine.handleOrderEstimated({
-//         order: {
-//             orderId: this.order.orderId,
-//             status: this.order.status,
-//             order: this.order.orderData
-//         },
-//         estimation: hookEstimation,
-//         context: {
-//             logger: this.#logger,
-//             giveChain: this.order.giveChain,
-//             takeChain: this.order.takeChain,
-//             config: this.order.executor
-//         },
-//     });
-// }
-
 export class OrderEstimator extends OrderEvaluationContextual {
   protected readonly logger: Logger;
 
@@ -158,10 +128,12 @@ export class OrderEstimator extends OrderEvaluationContextual {
   }
 
   protected async getRawOrderEstimation(): Promise<RawOrderEstimation> {
+
+const t = await this.getExpectedTakeAmountContext()
     return calculateExpectedTakeAmount(
       this.order.orderData,
       this.order.giveChain.srcConstraints.profitability,
-      await this.getExpectedTakeAmountContext(),
+      t,
     ).then((result) => new RawOrderEstimation(result));
   }
 
@@ -213,8 +185,6 @@ export class OrderEstimator extends OrderEvaluationContextual {
       ...rawOrderEstimation.toOrderEstimation(this.order, this.payload),
       preFulfillSwapResult: swapResult,
     };
-
-    // this.sendHook();
   }
 
   protected async getBatchUnlockSizeForProfitability(): Promise<number> {
