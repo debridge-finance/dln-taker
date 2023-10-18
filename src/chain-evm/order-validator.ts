@@ -15,6 +15,10 @@ export class EVMOrderValidator extends OrderValidator {
     await this.checkEvmEstimation();
   }
 
+  protected get logger() {
+    return super.logger.child({ service: EVMOrderValidator.name });
+  }
+
   private async checkEvmEstimation(): Promise<void> {
     const tx = await getFulfillTx(
       {
@@ -27,7 +31,7 @@ export class EVMOrderValidator extends OrderValidator {
           [EVMOrderValidator.EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME]: true,
         },
       },
-      this.logger,
+      this.logger.child({ routine: 'checkEvmEstimation' }),
     );
 
     const takeChainRpc = this.order.takeChain.connection as Web3;
@@ -47,7 +51,7 @@ export class EVMOrderValidator extends OrderValidator {
       );
     } catch (e) {
       return this.sc.postpone(
-        PostponingReason.NOT_PROFITABLE,
+        PostponingReason.FULFILLMENT_EVM_TX_PREESTIMATION_FAILED,
         `unable to estimate preliminary txn: ${e}`,
       );
     }

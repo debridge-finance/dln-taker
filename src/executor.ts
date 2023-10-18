@@ -57,12 +57,10 @@ export type DstOrderConstraints = Readonly<{
   preFulfillSwapChangeRecipient: 'taker' | 'maker';
 }>;
 
-type DstConstraintsPerOrderValue = Array<
-  DstOrderConstraints &
-    Readonly<{
-      upperThreshold: number;
-    }>
->;
+export type DstConstraintsPerOrderValue = DstOrderConstraints &
+  Readonly<{
+    minBlockConfirmations: number;
+  }>;
 
 export type SrcConstraints = Readonly<{
   TVLBudget: number;
@@ -98,7 +96,7 @@ export type ExecutorSupportedChain = Readonly<{
   >;
   dstConstraints: Readonly<
     DstOrderConstraints & {
-      perOrderValue: DstConstraintsPerOrderValue;
+      perOrderValue: Array<DstConstraintsPerOrderValue>;
     }
   >;
   unlockAuthority: Authority;
@@ -584,16 +582,16 @@ export class Executor implements IExecutor {
 
   private static getDstConstraintsPerOrderValue(
     configDstConstraints: ChainDefinition['dstConstraints'],
-  ): DstConstraintsPerOrderValue {
-    return (
-      (configDstConstraints?.perOrderValueUpperThreshold || [])
-        .map((constraint) => ({
-          upperThreshold: constraint.upperThreshold,
-          ...Executor.getDstConstraints(constraint, configDstConstraints),
-        }))
-        // important to sort by upper bound ASC for easier finding of the corresponding range
-        .sort((constraintA, constraintB) => constraintA.upperThreshold - constraintB.upperThreshold)
-    );
+  ): Array<DstConstraintsPerOrderValue> {
+    return (configDstConstraints?.perOrderValueUpperThreshold || [])
+      .map((constraint) => ({
+        minBlockConfirmations: constraint.minBlockConfirmations,
+        ...Executor.getDstConstraints(constraint, configDstConstraints),
+      }))
+      .sort(
+        (constraintB, constraintA) =>
+          constraintA.minBlockConfirmations - constraintB.minBlockConfirmations,
+      );
   }
 
   private static getSrcConstraints(
@@ -684,7 +682,7 @@ export class Executor implements IExecutor {
   private async execute(nextOrderInfo: IncomingOrder<any>) {
     const { orderId, order } = nextOrderInfo;
     this.logger.info(
-      `received order ${orderId} of status ${OrderInfoStatus[nextOrderInfo.status]}`,
+      `📥 received order ${orderId} of status ${OrderInfoStatus[nextOrderInfo.status]}`,
     );
 
     const takeChain = this.chains[order.take.chainId];
