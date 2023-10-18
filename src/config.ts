@@ -54,17 +54,7 @@ type PrivateKeyAuthority = {
   type: 'PK';
   privateKey: string;
 };
-type ForDefiAuthority = {
-  type: 'ForDefi';
-  forDefiVaultId: string;
-  forDefiAccessToken: string;
-};
-type SafeAuthority = {
-  type: 'Safe';
-  safeAddress: string;
-  signerPrivateKey: string;
-};
-export type SignerAuthority = PrivateKeyAuthority | ForDefiAuthority | SafeAuthority;
+export type SignerAuthority = PrivateKeyAuthority;
 
 export class EvmRebroadcastAdapterOpts {
   /**
