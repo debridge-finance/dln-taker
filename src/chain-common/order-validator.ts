@@ -52,19 +52,19 @@ export class OrderValidator extends OrderEvaluationContextual {
   protected async runChecks() {}
 
   async validate(): Promise<OrderEstimator> {
-    await this.checkFilters();
     await this.checkOrderId();
     await this.checkExternalCallHash();
     await this.checkAllowedTaker();
     await this.checkRouting();
+    await this.checkPrefulfillSwapAbility();
+    await this.checkAccountBalance();
+    await this.checkFilters();
     await this.checkTVLBudget();
     await this.checkFinalization();
     await this.checkFulfillmentDelay();
     await this.checkThroughput();
     await this.checkTakeStatus();
     await this.checkGiveStatus();
-    await this.checkPrefulfillSwapAbility();
-    await this.checkAccountBalance();
     await this.checkRoughProfitability();
     await this.runChecks();
 
@@ -125,7 +125,9 @@ export class OrderValidator extends OrderEvaluationContextual {
 
   private async checkOrderId(): Promise<void> {
     const calculatedId = Order.calculateId(this.order.orderData);
-    if (calculatedId !== this.order.orderId) {
+    if (
+      !buffersAreEqual(helpers.hexToBuffer(calculatedId), helpers.hexToBuffer(this.order.orderId))
+    ) {
       const message = `orderId mismatch; expected: ${calculatedId}, actual: ${this.order.orderId}`;
       return this.sc.reject(RejectionReason.MALFORMED_ORDER, message);
     }
@@ -138,17 +140,12 @@ export class OrderValidator extends OrderEvaluationContextual {
       const calculatedExternalCallHash = Order.getExternalCallHash({
         externalCallData: this.order.orderData.externalCall.externalCallData,
       });
-      if (
-        !buffersAreEqual(
-          calculatedExternalCallHash,
-          this.order.orderData.externalCall.externalCallHash || Buffer.alloc(0),
-        )
-      ) {
+      const expectedExtCallHash =
+        this.order.orderData.externalCall.externalCallHash || Buffer.alloc(0);
+      if (!buffersAreEqual(calculatedExternalCallHash, expectedExtCallHash)) {
         const message = `externalCallHash mismatch; expected: ${helpers.bufferToHex(
           calculatedExternalCallHash,
-        )}; actual: ${helpers.bufferToHex(
-          this.order.orderData.externalCall.externalCallHash || Buffer.alloc(0),
-        )}`;
+        )}; actual: ${helpers.bufferToHex(expectedExtCallHash)}`;
         return this.sc.reject(RejectionReason.MALFORMED_ORDER, message);
       }
     }
@@ -157,13 +154,13 @@ export class OrderValidator extends OrderEvaluationContextual {
 
   private async checkRouting(): Promise<void> {
     const { take, give } = this.order.orderData;
-    const bucket = this.order.executor.buckets.find(
+    const anyBucket = this.order.executor.buckets.find(
       (iteratedBucket) =>
         iteratedBucket.isOneOf(give.chainId, give.tokenAddress) &&
         iteratedBucket.findFirstToken(take.chainId) !== undefined,
     );
 
-    if (bucket === undefined) {
+    if (anyBucket === undefined) {
       const message = `no bucket found to route order's give token: ${this.order.giveTokenAsString}`;
       return this.sc.reject(RejectionReason.UNEXPECTED_GIVE_TOKEN, message);
     }
@@ -171,10 +168,8 @@ export class OrderValidator extends OrderEvaluationContextual {
   }
 
   private async checkFulfillmentDelay(): Promise<void> {
-    const [srcConstraints, dstConstraints] = await Promise.all([
-      this.order.srcConstraints(),
-      this.order.dstConstraints(),
-    ]);
+    const srcConstraints = this.order.srcConstraints();
+    const dstConstraints = this.order.dstConstraints();
 
     // determine if we should postpone the order
     const fulfillmentDelay =
@@ -210,23 +205,21 @@ export class OrderValidator extends OrderEvaluationContextual {
   private async checkFinalization(): Promise<void> {
     if (this.order.finalization === 'Finalized') {
       // do nothing: order have stable finality according to the WS
-      this.#logger.debug('order announced as finalized');
+      this.#logger.debug('announced as finalized');
     } else if (typeof this.order.finalization === 'number') {
-      const usdValue = await this.order.getUsdValue();
-      const srcConstraints = await this.order.srcConstraintsRange();
-      // we don't rely on ACTUAL finality (which can be retrieved from dln-taker's RPC node)
-      // to avoid data discrepancy and rely on WS instead
-      const confirmationBlocksCount = this.order.finalization;
       this.#logger.info(
-        `order announced as non-finalized at ${confirmationBlocksCount} block confirmations`,
+        `announced as non-finalized at ${this.order.finalization} block confirmations`,
       );
+
+      const srcConstraints = this.order.srcConstraintsRange();
 
       // range found, ensure current block confirmation >= expected
       if (srcConstraints) {
-        this.#logger.debug(`usdAmountConfirmationRange found: <=$${srcConstraints.upperThreshold}`);
+        this.#logger.debug(`using range #${srcConstraints.minBlockConfirmations}+`);
 
-        if (confirmationBlocksCount < srcConstraints.minBlockConfirmations) {
-          const message = `announced block confirmations is less than the block confirmation constraint (${srcConstraints.minBlockConfirmations} for order worth of $${usdValue}`;
+        const usdValue = await this.order.getUsdValue();
+        if (usdValue > srcConstraints.upperThreshold) {
+          const message = `range #${srcConstraints.minBlockConfirmations}+ only allows orders under $${srcConstraints.upperThreshold}, order is worth of $${usdValue}`;
           return this.sc.reject(
             RejectionReason.NOT_ENOUGH_BLOCK_CONFIRMATIONS_FOR_ORDER_WORTH,
             message,
@@ -234,7 +227,7 @@ export class OrderValidator extends OrderEvaluationContextual {
         }
       } else {
         // range not found: we do not accept this order, let it come finalized
-        const message = `non-finalized order worth of $${usdValue} is not covered by any custom block confirmation range`;
+        const message = `range for non-finalized order at  ${this.order.finalization} block confirmations not found`;
         return this.sc.reject(RejectionReason.NOT_YET_FINALIZED, message);
       }
     } else {
@@ -260,9 +253,6 @@ export class OrderValidator extends OrderEvaluationContextual {
 
   private async checkTakeStatus(): Promise<void> {
     const takeChainId = this.order.takeChain.chain;
-    // validate that order is not fullfilled
-    // This must be done after 'Finalized' in finalizationInfo is checked because we may want to remove the order
-    // from the nonFinalizedOrdersBudgetController
     const takeOrderStatus = await this.order.executor.client.getTakeOrderState(
       {
         orderId: this.order.orderId,
