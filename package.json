@@ -28,7 +28,7 @@
     "pretty:package": "prettier-package-json --write",
     "pretty:ts": "prettier --write \"{src,tests}/**/*.ts\" sample.config.ts",
     "start:compiled": "./dist/cli/bootstrap.js",
-    "test": "mocha -r ts-node/register -b -t 100000 ./tests/**/*.test.ts"
+    "test": "mocha -r ts-node/register -r tsconfig-paths/register -b -t 100000 ./tests/**/*.test.ts"
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
