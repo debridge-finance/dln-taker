@@ -559,15 +559,6 @@ export class Executor implements IExecutor {
         );
       }
 
-      // case "ForDefi": {
-      //   return new ForDefiAdapter(
-      //     chain.chain,
-      //     connection,
-      //     authority.forDefiVaultId,
-      //     authority.forDefiAccessToken
-      //   )
-      // }
-
       default:
         throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`);
     }
