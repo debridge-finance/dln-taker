@@ -245,7 +245,7 @@ export interface ChainDefinition {
      */
     perOrderValueUpperThreshold?: Array<
       DstOrderConstraints & {
-        upperThreshold: number;
+        minBlockConfirmations: number;
       }
     >;
   };

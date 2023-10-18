@@ -1,4 +1,5 @@
 import { Logger } from 'pino';
+import { assert } from 'src/errors';
 import { PostponingReason, RejectionReason } from 'src/hooks/HookEnums';
 
 import { CreatedOrder } from './order';
@@ -25,44 +26,20 @@ export class CreatedOrderTaker {
   }
 
   async take(sc: TakerShortCircuit, transactionBuilder: FulfillTransactionBuilder) {
-    this.#logger.info('starting order evaluation');
-
-    this.#logger.info('+ attempting to validate');
+    this.#logger.debug('+ attempting to validate');
     const estimator = await this.order.getValidator(sc).validate();
 
-    this.#logger.info('+ attempting to estimate');
+    this.#logger.debug('+ attempting to estimate');
     const estimation = await estimator.getEstimation();
 
-    if (estimation.isProfitable) {
-      this.#logger.info('✔️ order is profitable');
-    } else {
-      this.#logger.info('𐄂 order is not profitable');
-      // print nice msg and return
+    if (estimation.isProfitable === false) {
       return sc.postpone(PostponingReason.NOT_PROFITABLE, await explainEstimation(estimation));
     }
 
-    this.#logger.info('+ attempting to fulfill');
-    try {
-      await this.fulfill(transactionBuilder, estimation);
-    } catch (e) {
-      const message = `𐄂 fulfill tx failed: ${e}`;
-      this.#logger.error(message);
-      this.#logger.error(e);
-      return sc.postpone(PostponingReason.FULFILLMENT_TX_FAILED, message);
-    }
-
-    return Promise.resolve();
-  }
-
-  async fulfill(
-    transactionBuilder: FulfillTransactionBuilder,
-    estimation: OrderEstimation,
-  ): Promise<TxHash> {
-    const fulfillTxHash = await transactionBuilder.getOrderFulfillTxSender(
-      estimation,
-      this.#logger,
-    )();
-    this.#logger.info(`✔️ fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
+    this.#logger.debug('+ attempting to fulfill');
+    const fulfillTxHash = await this.attemptFulfil(transactionBuilder, estimation, sc);
+    assert(typeof fulfillTxHash === 'string', 'should have raised an error');
+    this.#logger.info(`✔ fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
 
     // we add this order to the budget controller right before the txn is broadcasted
     // Mind that in case of an error (see the catch{} block below) we don't remove it from the
@@ -82,6 +59,20 @@ export class CreatedOrderTaker {
       txHash: fulfillTxHash,
     });
 
-    return fulfillTxHash;
+    return Promise.resolve();
+  }
+
+  private async attemptFulfil(
+    transactionBuilder: FulfillTransactionBuilder,
+    estimation: OrderEstimation,
+    sc: TakerShortCircuit,
+  ): Promise<TxHash | void> {
+    try {
+      return await transactionBuilder.getOrderFulfillTxSender(estimation, this.#logger)();
+    } catch (e) {
+      this.#logger.error(`fulfill tx failed: ${e}`);
+      this.#logger.error(e);
+      return sc.postpone(PostponingReason.FULFILLMENT_TX_FAILED, `${e}`);
+    }
   }
 }

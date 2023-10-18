@@ -17,6 +17,7 @@ import {
   SrcConstraintsPerOrderValue,
   SrcOrderConstraints,
   DstOrderConstraints,
+  DstConstraintsPerOrderValue,
 } from '../executor';
 import { OrderId } from '../interfaces';
 import { CreatedOrderTaker, TakerShortCircuit } from './order-taker';
@@ -99,34 +100,24 @@ export class CreatedOrder {
     return this.finalization;
   }
 
-  public async srcConstraints(): Promise<SrcOrderConstraints> {
-    const usdValue = await this.getUsdValue();
-    // compare worthiness of the order against block confirmation thresholds
-    // find corresponding srcConstraints
-    const srcConstraintsByValue = this.giveChain.srcConstraints.perOrderValue.find(
-      (srcConstraints) => usdValue <= srcConstraints.upperThreshold,
-    );
-    return srcConstraintsByValue || this.giveChain.srcConstraints;
+  public srcConstraints(): SrcOrderConstraints {
+    return this.srcConstraintsRange() || this.giveChain.srcConstraints;
   }
 
-  public async srcConstraintsRange(): Promise<SrcConstraintsPerOrderValue | undefined> {
-    const usdValue = await this.getUsdValue();
-    // compare worthiness of the order against block confirmation thresholds
-    // find corresponding srcConstraints
-    return this.giveChain.srcConstraints.perOrderValue.find(
-      (srcConstraints) => usdValue <= srcConstraints.upperThreshold,
-    );
+  public srcConstraintsRange(): SrcConstraintsPerOrderValue | undefined {
+    return this.giveChain.srcConstraints.perOrderValue
+      .sort((rangeB, rangeA) => rangeA.minBlockConfirmations - rangeB.minBlockConfirmations)
+      .find((range) => range.minBlockConfirmations <= this.blockConfirmations);
   }
 
-  public async dstConstraints(): Promise<DstOrderConstraints> {
-    const usdValue = await this.getUsdValue();
+  public dstConstraints(): DstOrderConstraints {
+    return this.dstConstraintsRange() || this.takeChain.dstConstraints;
+  }
 
-    // find corresponding dstConstraints (they may supersede srcConstraints)
-    const dstConstraintsByValue = this.takeChain.dstConstraints.perOrderValue.find(
-      (dstConstraints) => usdValue <= dstConstraints.upperThreshold,
-    );
-
-    return dstConstraintsByValue || this.takeChain.dstConstraints;
+  private dstConstraintsRange(): DstConstraintsPerOrderValue | undefined {
+    return this.takeChain.dstConstraints.perOrderValue
+      .sort((rangeB, rangeA) => rangeA.minBlockConfirmations - rangeB.minBlockConfirmations)
+      .find((range) => range.minBlockConfirmations <= this.blockConfirmations);
   }
 
   getValidator(sc: TakerShortCircuit): OrderValidator {

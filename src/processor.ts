@@ -22,6 +22,7 @@ enum BreakReason {
   ShouldPostpone,
   ShouldReject,
 }
+
 type ProcessorCircuitBreaker<T extends BreakReason> = {
   circuitBreaker: true;
   breakReason: T;
@@ -177,7 +178,7 @@ export class OrderProcessor {
     }
 
     this.isLocked = true;
-    this.#logger.info(`processing order ${orderId}, status: ${OrderInfoStatus[status]}`);
+    this.#logger.info(`⛏️ processing order ${orderId}, status: ${OrderInfoStatus[status]}`);
 
     switch (status) {
       case OrderInfoStatus.Created:
@@ -259,7 +260,7 @@ export class OrderProcessor {
     remainingDelay?: number,
   ) {
     this.#logger.info(
-      `⏸️ postponed order ${orderId} because of ${PostponingReason[reason]}: ${message}`,
+      `⏸ postponed order ${orderId} because of ${PostponingReason[reason]}: ${message}`,
     );
 
     this.executor.hookEngine.handleOrderPostponed({
@@ -393,15 +394,16 @@ export class OrderProcessor {
         }
       }
 
-      const message = `processing order ${order.orderId} failed with an unhandled error: ${e}`;
-      this.#logger.error(message);
+      this.#logger.error(
+        `⚠️ processing order ${order.orderId} failed with an unhandled error: ${e}`,
+      );
       this.#logger.error(e);
       return this.postponeOrder(
         orderInfo.orderId,
         orderInfo.order,
         isLive,
         metadata.attempts,
-        message,
+        `${e}`,
         PostponingReason.UNHANDLED_ERROR,
       );
     }
@@ -410,6 +412,7 @@ export class OrderProcessor {
   }
 
   private markOrderAsFulfilled(order: CreatedOrder) {
+    this.#logger.info(`✔ order ${order.orderId} has been attempted to be fulfilled`);
     // order is fulfilled, remove it from queues (the order may have come again thru WS)
     this.clearInternalQueues(order.orderId);
 
