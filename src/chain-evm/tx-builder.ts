@@ -50,10 +50,10 @@ export class EvmTransactionBuilder implements TransactionBuilder {
           contract,
         );
         if (currentAllowance === 0n) {
-          logger.info(`${token} requires approval`);
+          logger.debug(`${token} requires approval`);
           const func = () => {
-            logger.debug(
-              `Setting approval on ${token} to be spend by ${contract} on behalf of a ${this.signer.address}`,
+            logger.info(
+              `Setting ∞ approval on ${token} to be spend by ${contract} on behalf of a ${this.signer.address}`,
             );
             return this.signer.sendTransaction(getApproveTx(token, contract), { logger });
           };
