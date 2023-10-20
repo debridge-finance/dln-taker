@@ -1,6 +1,6 @@
 import { calculateExpectedTakeAmount } from '@debridge-finance/legacy-dln-profitability';
-import { OrderEstimator } from 'src/chain-common/order-estimator';
-import { EvmTxSigner } from 'src/chain-evm/signer';
+import { OrderEstimator } from '../chain-common/order-estimator';
+import { EvmTxSigner } from './signer';
 import { EVMOrderValidator } from './order-validator';
 
 export class EVMOrderEstimator extends OrderEstimator {

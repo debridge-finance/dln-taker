@@ -1,6 +1,6 @@
 import { ChainId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { OrderId } from 'src/interfaces';
+import { OrderId } from '../interfaces';
 import { assert } from '../errors';
 
 type Threshold = {

@@ -1,6 +1,6 @@
 import { Logger } from 'pino';
-import { assert } from 'src/errors';
-import { PostponingReason, RejectionReason } from 'src/hooks/HookEnums';
+import { assert } from '../errors';
+import { PostponingReason, RejectionReason } from '../hooks/HookEnums';
 
 import { CreatedOrder } from './order';
 import { explainEstimation, OrderEstimation } from './order-estimator';

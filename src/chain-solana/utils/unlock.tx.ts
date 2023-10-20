@@ -1,8 +1,8 @@
 import { ChainEngine, OrderDataWithId, OrderEstimationStage } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { assert } from 'src/errors';
-import { IExecutor } from 'src/executor';
-import { createClientLogger } from 'src/dln-ts-client.utils';
+import { assert } from '../../errors';
+import { IExecutor } from '../../executor';
+import { createClientLogger } from '../../dln-ts-client.utils';
 
 export async function unlockTx(
   executor: IExecutor,

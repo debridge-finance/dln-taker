@@ -2,7 +2,7 @@ import { ChainId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Connection, Keypair, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { Logger } from 'pino';
-import { Authority } from 'src/interfaces';
+import { Authority } from '../interfaces';
 import { avgBlockSpeed, BLOCK_CONFIRMATIONS_HARD_CAPS } from '../config';
 
 export type SolanaTxContext = {

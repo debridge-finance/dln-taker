@@ -1,8 +1,8 @@
 import { ChainEngine, EvmInstruction } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { InputTransaction } from 'src/chain-evm/signer';
 import BigNumber from 'bignumber.js';
-import { assert } from 'src/errors';
+import { InputTransaction } from '../signer';
+import { assert } from '../../errors';
 import { createClientLogger } from '../../dln-ts-client.utils';
 import { OrderEstimation } from '../../chain-common/order-estimator';
 import { EVMOrderEstimator } from '../order-estimator';

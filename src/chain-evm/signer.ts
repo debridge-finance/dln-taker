@@ -1,9 +1,9 @@
 import { ChainId, tokenStringToBuffer } from '@debridge-finance/dln-client';
 import BigNumber from 'bignumber.js';
 import { Logger } from 'pino';
-import { Authority } from 'src/interfaces';
 import { clearInterval } from 'timers';
 import Web3 from 'web3';
+import { Authority } from '../interfaces';
 
 import {
   avgBlockSpeed,

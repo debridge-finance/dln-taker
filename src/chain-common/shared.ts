@@ -1,5 +1,5 @@
 import { SwapConnectorResult } from '@debridge-finance/dln-client';
-import { assert } from 'src/errors';
+import { assert } from '../errors';
 
 export type OrderEvaluationPayload = { estimation?: SwapConnectorResult } & {
   [key in string]: any;

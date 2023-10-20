@@ -9,7 +9,7 @@ import {
 import { findExpectedBucket } from '@debridge-finance/legacy-dln-profitability';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Logger } from 'pino';
-import { EVMOrderValidator } from 'src/chain-evm/order-validator';
+import { EVMOrderValidator } from '../chain-evm/order-validator';
 import { BLOCK_CONFIRMATIONS_HARD_CAPS, SupportedChain } from '../config';
 import {
   IExecutor,

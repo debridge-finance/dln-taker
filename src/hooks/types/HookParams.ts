@@ -1,5 +1,5 @@
 import { ChainId, OrderData } from '@debridge-finance/dln-client';
-import { IExecutor } from 'src/executor';
+import { IExecutor } from '../../executor';
 import { Hooks, PostponingReason, RejectionReason } from '../HookEnums';
 
 export type HookParams<T extends Hooks> = {} & (T extends Hooks.OrderFeedConnected
