@@ -1,5 +1,5 @@
 import { Logger } from 'pino';
-import { OrderId } from 'src/interfaces';
+import { OrderId } from '../interfaces';
 
 export type OrderConsumer = (orderId: OrderId) => void;
 

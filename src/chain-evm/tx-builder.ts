@@ -1,10 +1,10 @@
 import { buffersAreEqual, ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { OrderEstimation } from 'src/chain-common/order-estimator';
-import { TransactionBuilder } from 'src/chain-common/tx-builder';
-import { IExecutor } from 'src/executor';
-import { EvmTxSigner } from 'src/chain-evm/signer';
 import Web3 from 'web3';
+import { OrderEstimation } from '../chain-common/order-estimator';
+import { TransactionBuilder } from '../chain-common/tx-builder';
+import { IExecutor } from '../executor';
+import { EvmTxSigner } from './signer';
 import { getApproveTx, getAllowance } from './utils/approve.tx';
 import { unlockTx } from './utils/unlock.tx';
 import { getFulfillTx } from './utils/orderFulfill.tx';

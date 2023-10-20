@@ -1,6 +1,6 @@
-import { PostponingReason } from 'src/hooks/HookEnums';
-import { OrderValidator } from 'src/chain-common/order-validator';
 import Web3 from 'web3';
+import { PostponingReason } from '../hooks/HookEnums';
+import { OrderValidator } from '../chain-common/order-validator';
 import { EVMOrderEstimator } from './order-estimator';
 import { getFulfillTx } from './utils/orderFulfill.tx';
 
