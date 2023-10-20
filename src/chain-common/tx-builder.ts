@@ -1,5 +1,5 @@
 import { Logger } from 'pino';
-import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
+import { BatchUnlockTransactionBuilder } from '../processors/BatchUnlocker';
 import { FulfillTransactionBuilder } from './order-taker';
 
 export type TxHash = string;

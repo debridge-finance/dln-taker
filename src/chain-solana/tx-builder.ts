@@ -1,12 +1,12 @@
 import { OrderDataWithId, Solana } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { OrderEstimation } from 'src/chain-common/order-estimator';
-import { TransactionBuilder } from 'src/chain-common/tx-builder';
-import { IExecutor } from 'src/executor';
-import { SolanaTxSigner } from 'src/chain-solana/signer';
+import { TransactionBuilder } from '../chain-common/tx-builder';
 import { unlockTx } from './utils/unlock.tx';
 import { tryInitTakerALT } from './utils/init-alts.tx';
 import { createOrderFullfillTx } from './utils/orderFulfill.tx';
+import { SolanaTxSigner } from './signer';
+import { IExecutor } from '../executor';
+import { OrderEstimation } from '../chain-common/order-estimator';
 
 export class SolanaTransactionBuilder implements TransactionBuilder {
   constructor(
