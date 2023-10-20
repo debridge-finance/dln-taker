@@ -700,7 +700,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           data: preliminaryEvmFulfillTx.data,
           value: preliminaryEvmFulfillTx.value.toString(),
         });
-        evmFulfillGasLimit *= EVM_FULFILL_GAS_LIMIT_MULTIPLIER;
+        evmFulfillGasLimit = Math.round(evmFulfillGasLimit * EVM_FULFILL_GAS_LIMIT_MULTIPLIER);
         logger.debug(
           `estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${evmFulfillGasLimit} gas units`,
         );
@@ -845,7 +845,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         const gas = await (this.takeChain.fulfillProvider as EvmProviderAdapter).estimateGas(
           txToSend,
         );
-        txToSend.gasLimit = gas * EVM_FULFILL_GAS_LIMIT_MULTIPLIER;
+        txToSend.gasLimit = Math.round(gas * EVM_FULFILL_GAS_LIMIT_MULTIPLIER);
         logger.debug(`final fulfill tx gas estimation: ${txToSend.gasLimit}`);
       } catch (e) {
         const message = `unable to estimate fullfil tx: ${e}`;
