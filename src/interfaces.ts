@@ -56,8 +56,6 @@ export type UnlockAuthority = {
 export interface Authority {
   address: string;
   bytesAddress: Uint8Array;
-  avgBlockSpeed: number;
-  finalizedBlockCount: number;
 }
 
 export abstract class GetNextOrder {

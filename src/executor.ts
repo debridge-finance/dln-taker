@@ -31,6 +31,7 @@ import {
   SrcConstraints as RawSrcConstraints,
   BLOCK_CONFIRMATIONS_HARD_CAPS,
   SignerAuthority,
+  avgBlockSpeed,
 } from './config';
 import * as filters from './filters/index';
 import { OrderFilter } from './filters/index';
@@ -84,6 +85,10 @@ export type SrcConstraintsPerOrderValue = SrcOrderConstraints &
 export type ExecutorSupportedChain = Readonly<{
   chain: ChainId;
   connection: any;
+  network: {
+    avgBlockSpeed: number;
+    finalizedBlockCount: number;
+  };
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
   TVLBudgetController: TVLBudgetController;
@@ -311,11 +316,9 @@ export class Executor implements IExecutor {
         }
       }
 
-      let transactionBuilder: TransactionBuilder | undefined;
+      let transactionBuilder: TransactionBuilder;
       let client;
       let connection: Web3 | Connection;
-      let unlockProvider;
-      let fulfillProvider;
       let contractsForApprove: string[] = [];
 
       if (chain.chain === ChainId.Solana) {
@@ -345,11 +348,6 @@ export class Executor implements IExecutor {
             getCurrentEnvironment().chains![ChainId.Solana]!.solana!.debridgeSetting!,
         );
 
-        fulfillProvider = Executor.getSolanaProvider(chain, connection, chain.fulfillAuthority);
-        unlockProvider = chain.unlockAuthority
-          ? Executor.getSolanaProvider(chain, connection, chain.unlockAuthority)
-          : fulfillProvider;
-
         client = new Solana.DlnClient(
           connection,
           solanaPmmSrc,
@@ -360,15 +358,25 @@ export class Executor implements IExecutor {
           undefined,
           getCurrentEnvironment().environment,
         );
-        transactionBuilder = new SolanaTransactionBuilder(client, fulfillProvider, this);
+
+        const fulfillBuilder = this.getSolanaProvider(
+          chain,
+          client,
+          connection,
+          chain.fulfillAuthority,
+        );
+        const initBuilder = chain.initAuthority
+          ? this.getSolanaProvider(chain, client, connection, chain.initAuthority)
+          : fulfillBuilder;
+        const unlockBuilder = chain.unlockAuthority
+          ? this.getSolanaProvider(chain, client, connection, chain.unlockAuthority)
+          : fulfillBuilder;
+
+        transactionBuilder = new TransactionBuilder(initBuilder, fulfillBuilder, unlockBuilder);
+
         clients.push(client);
       } else {
         connection = new Web3(chain.chainRpc);
-        fulfillProvider = Executor.getEVMProvider(chain, connection, chain.fulfillAuthority);
-
-        unlockProvider = chain.unlockAuthority
-          ? Executor.getEVMProvider(chain, connection, chain.fulfillAuthority)
-          : fulfillProvider;
 
         evmChainConfig[chain.chain] = {
           connection,
@@ -397,13 +405,19 @@ export class Executor implements IExecutor {
           ];
         }
 
-        transactionBuilder = new EvmTransactionBuilder(
-          chain.chain,
+        if (chain.initAuthority)
+          throw new Error('initAuthority is not supported for EVM-based chains');
+
+        const fulfillBuilder = this.getEVMProvider(
+          chain,
           contractsForApprove,
           connection,
-          fulfillProvider,
-          this,
+          chain.fulfillAuthority,
         );
+        const unlockBuilder = chain.unlockAuthority
+          ? this.getEVMProvider(chain, [], connection, chain.unlockAuthority)
+          : fulfillBuilder;
+        transactionBuilder = new TransactionBuilder(fulfillBuilder, fulfillBuilder, unlockBuilder);
       }
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -446,10 +460,15 @@ export class Executor implements IExecutor {
       this.chains[chain.chain] = {
         chain: chain.chain,
         connection,
+        network: {
+          avgBlockSpeed: avgBlockSpeed[chain.chain as unknown as SupportedChain],
+          finalizedBlockCount:
+            BLOCK_CONFIRMATIONS_HARD_CAPS[chain.chain as unknown as SupportedChain],
+        },
         srcFilters,
         dstFilters,
-        unlockAuthority: unlockProvider,
-        fulfillAuthority: fulfillProvider,
+        unlockAuthority: transactionBuilder.fulfillAuthority,
+        fulfillAuthority: transactionBuilder.unlockAuthority,
         throughput: new ThroughputController(
           chain.chain,
           [
@@ -542,18 +561,25 @@ export class Executor implements IExecutor {
     this.#isInitialized = true;
   }
 
-  private static getEVMProvider(
+  private getEVMProvider(
     chain: ChainDefinition,
+    contracts: string[],
     connection: Web3,
     authority: SignerAuthority,
-  ): EvmTxSigner {
+  ): EvmTransactionBuilder {
     switch (authority.type) {
       case 'PK': {
-        return new EvmTxSigner(
+        return new EvmTransactionBuilder(
           chain.chain,
+          contracts,
           connection,
-          authority.privateKey,
-          chain.environment?.evm?.evmRebroadcastAdapterOpts,
+          new EvmTxSigner(
+            chain.chain,
+            connection,
+            authority.privateKey,
+            chain.environment?.evm?.evmRebroadcastAdapterOpts,
+          ),
+          this,
         );
       }
 
@@ -562,17 +588,22 @@ export class Executor implements IExecutor {
     }
   }
 
-  private static getSolanaProvider(
+  private getSolanaProvider(
     chain: ChainDefinition,
+    client: Solana.DlnClient,
     connection: Connection,
     authority: SignerAuthority,
-  ): SolanaTxSigner {
+  ): SolanaTransactionBuilder {
     const decodeKey = (key: string) =>
       Keypair.fromSecretKey(key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key));
 
     switch (authority.type) {
       case 'PK': {
-        return new SolanaTxSigner(connection, decodeKey(authority.privateKey));
+        return new SolanaTransactionBuilder(
+          client,
+          new SolanaTxSigner(connection, decodeKey(authority.privateKey)),
+          this,
+        );
       }
 
       default:

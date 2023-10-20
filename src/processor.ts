@@ -7,8 +7,12 @@ import { PostponingReason, RejectionReason } from './hooks/HookEnums';
 import { IExecutor, ExecutorSupportedChain } from './executor';
 import { assert, die } from './errors';
 import { CreatedOrder } from './chain-common/order';
-import { TransactionBuilder } from './chain-common/tx-builder';
 import { TakerShortCircuit } from './chain-common/order-taker';
+import { TransactionBuilder, TransactionSender } from './chain-common/tx-builder';
+
+export interface InitTransactionBuilder {
+  getInitTxSenders(logger: Logger): Promise<Array<TransactionSender>>;
+}
 
 // Represents all necessary information about Created order during its internal lifecycle
 type CreatedOrderMetadata = {
@@ -418,8 +422,7 @@ export class OrderProcessor {
 
     // putting the order to the mempool, in case fulfill_txn gets lost
     const fulfillCheckDelay: number =
-      this.takeChain.fulfillAuthority.avgBlockSpeed *
-      this.takeChain.fulfillAuthority.finalizedBlockCount;
+      this.takeChain.network.avgBlockSpeed * this.takeChain.network.finalizedBlockCount;
     this.#mempoolService.addOrder(order.orderId, fulfillCheckDelay);
   }
 }

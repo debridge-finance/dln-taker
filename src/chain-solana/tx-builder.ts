@@ -1,6 +1,8 @@
-import { OrderDataWithId, Solana } from '@debridge-finance/dln-client';
+import { ChainId, OrderDataWithId, Solana } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { TransactionBuilder } from '../chain-common/tx-builder';
+import { InitTransactionBuilder } from 'src/processor';
+import { FulfillTransactionBuilder } from 'src/chain-common/order-taker';
+import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
 import { unlockTx } from './utils/unlock.tx';
 import { tryInitTakerALT } from './utils/init-alts.tx';
 import { createOrderFullfillTx } from './utils/orderFulfill.tx';
@@ -8,12 +10,28 @@ import { SolanaTxSigner } from './signer';
 import { IExecutor } from '../executor';
 import { OrderEstimation } from '../chain-common/order-estimator';
 
-export class SolanaTransactionBuilder implements TransactionBuilder {
+export class SolanaTransactionBuilder
+  implements InitTransactionBuilder, FulfillTransactionBuilder, BatchUnlockTransactionBuilder
+{
   constructor(
     private solanaClient: Solana.DlnClient,
     private readonly signer: SolanaTxSigner,
     private readonly executor: IExecutor,
   ) {}
+
+  get fulfillAuthority() {
+    return {
+      address: this.signer.address,
+      bytesAddress: this.signer.bytesAddress,
+    };
+  }
+
+  get unlockAuthority() {
+    return {
+      address: this.signer.address,
+      bytesAddress: this.signer.bytesAddress,
+    };
+  }
 
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
     return async () =>
@@ -40,7 +58,7 @@ export class SolanaTransactionBuilder implements TransactionBuilder {
       try {
         // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
         await tryInitTakerALT(
-          this.signer.bytesAddress,
+          this.executor.getSupportedChain(ChainId.Solana).fulfillAuthority.bytesAddress,
           Object.values(this.executor.chains).map((chainConfig) => chainConfig.chain),
           this.signer,
           this.solanaClient,

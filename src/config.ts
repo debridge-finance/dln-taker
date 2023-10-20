@@ -260,6 +260,11 @@ export interface ChainDefinition {
   beneficiary: StringifiedAddress;
 
   /**
+   * Authority responsible for initializing txns (applicable for Solana only)
+   */
+  initAuthority?: SignerAuthority;
+
+  /**
    * Authority responsible for creating fulfill txns
    */
   fulfillAuthority?: SignerAuthority;
