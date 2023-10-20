@@ -62,7 +62,7 @@ export class EVMOrderValidator extends OrderValidator {
   protected getOrderEstimator() {
     return new EVMOrderEstimator(this.order, {
       logger: this.logger,
-      preferEstimation: this.preliminarySwapResult,
+      preSwapRouteHint: this.preliminarySwapResult,
       validationPayload: this.payload,
     });
   }
