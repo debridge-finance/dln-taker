@@ -1,4 +1,5 @@
 import { Logger } from 'pino';
+import { Authority } from 'src/interfaces';
 import { assert } from '../errors';
 import { PostponingReason, RejectionReason } from '../hooks/HookEnums';
 
@@ -7,6 +8,7 @@ import { explainEstimation, OrderEstimation } from './order-estimator';
 import { TransactionSender, TxHash } from './tx-builder';
 
 export interface FulfillTransactionBuilder {
+  fulfillAuthority: Authority;
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger): TransactionSender;
 }
 

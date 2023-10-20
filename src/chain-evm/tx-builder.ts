@@ -1,15 +1,19 @@
 import { buffersAreEqual, ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 import Web3 from 'web3';
+import { InitTransactionBuilder } from 'src/processor';
+import { FulfillTransactionBuilder } from 'src/chain-common/order-taker';
+import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
 import { OrderEstimation } from '../chain-common/order-estimator';
-import { TransactionBuilder } from '../chain-common/tx-builder';
 import { IExecutor } from '../executor';
 import { EvmTxSigner } from './signer';
 import { getApproveTx, getAllowance } from './utils/approve.tx';
 import { unlockTx } from './utils/unlock.tx';
 import { getFulfillTx } from './utils/orderFulfill.tx';
 
-export class EvmTransactionBuilder implements TransactionBuilder {
+export class EvmTransactionBuilder
+  implements InitTransactionBuilder, FulfillTransactionBuilder, BatchUnlockTransactionBuilder
+{
   constructor(
     private readonly chain: ChainId,
     private contractsForApprove: string[],
@@ -17,6 +21,20 @@ export class EvmTransactionBuilder implements TransactionBuilder {
     private readonly signer: EvmTxSigner,
     private readonly executor: IExecutor,
   ) {}
+
+  get fulfillAuthority() {
+    return {
+      address: this.signer.address,
+      bytesAddress: this.signer.bytesAddress,
+    };
+  }
+
+  get unlockAuthority() {
+    return {
+      address: this.signer.address,
+      bytesAddress: this.signer.bytesAddress,
+    };
+  }
 
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
     return async () =>
