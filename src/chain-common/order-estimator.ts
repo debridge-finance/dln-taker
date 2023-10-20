@@ -13,7 +13,7 @@ import { OrderEvaluationContextual, OrderEvaluationPayload } from './shared';
 
 type OrderEstimatorContext = {
   logger: Logger;
-  preferEstimation?: SwapConnectorRequest['preferEstimation'];
+  preSwapRouteHint?: SwapConnectorRequest['routeHint'];
   validationPayload: OrderEvaluationPayload;
 };
 
@@ -119,7 +119,7 @@ export class OrderEstimator extends OrderEvaluationContextual {
       swapConnector: this.order.executor.swapConnector,
       logger: createClientLogger(this.logger),
       batchSize: await this.getBatchUnlockSizeForProfitability(),
-      swapEstimationPreference: this.context.preferEstimation,
+      swapEstimationPreference: this.context.preSwapRouteHint,
     };
   }
 
@@ -165,7 +165,7 @@ export class OrderEstimator extends OrderEvaluationContextual {
             rawOrderEstimation.projectedFulfillAmount,
             this.order.orderData.take.amount,
           ),
-          preferEstimation: this.context.preferEstimation,
+          routeHint: this.context.preSwapRouteHint,
           fromAddress: this.order.takeChain.fulfillAuthority.bytesAddress,
           destReceiver: this.order.executor.client.getForwarderAddress(
             this.order.orderData.take.chainId,

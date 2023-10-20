@@ -74,7 +74,7 @@ export class OrderValidator extends OrderEvaluationContextual {
   protected getOrderEstimator() {
     return new OrderEstimator(this.order, {
       logger: this.#logger,
-      preferEstimation: this.#preliminarySwapResult,
+      preSwapRouteHint: this.#preliminarySwapResult,
       validationPayload: this.payload,
     });
   }
