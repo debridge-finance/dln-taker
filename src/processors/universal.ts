@@ -40,7 +40,8 @@ import { assert } from '../errors';
 
 // reasonable multiplier for gas price to define max gas price we are willing to
 // bump until. Must cover up to 12.5% block base fee increase
-const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.125;
+const EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.075;
+const EVM_FULFILL_GAS_LIMIT_MULTIPLIER = 1.05;
 
 // defines max batch_unlock size
 const BATCH_UNLOCK_MAX_SIZE = 10;
@@ -699,6 +700,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           data: preliminaryEvmFulfillTx.data,
           value: preliminaryEvmFulfillTx.value.toString(),
         });
+        evmFulfillGasLimit *= EVM_FULFILL_GAS_LIMIT_MULTIPLIER;
         logger.debug(
           `estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${evmFulfillGasLimit} gas units`,
         );
@@ -840,9 +842,10 @@ class UniversalProcessor extends BaseOrderProcessor {
       };
 
       try {
-        txToSend.gasLimit = await (
-          this.takeChain.fulfillProvider as EvmProviderAdapter
-        ).estimateGas(txToSend);
+        const gas = await (this.takeChain.fulfillProvider as EvmProviderAdapter).estimateGas(
+          txToSend,
+        );
+        txToSend.gasLimit = gas * EVM_FULFILL_GAS_LIMIT_MULTIPLIER;
         logger.debug(`final fulfill tx gas estimation: ${txToSend.gasLimit}`);
       } catch (e) {
         const message = `unable to estimate fullfil tx: ${e}`;
