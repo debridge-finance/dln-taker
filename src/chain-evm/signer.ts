@@ -47,6 +47,14 @@ export type InputTransaction = {
   cappedFee?: BigNumber;
 };
 
+/**
+ * Reasonable multiplier for gas obtained from the estimateGas() RPC call, because sometimes there are cases when
+ * tx fails being out of gas (esp on Avalanche).
+ * Must be in sync with EVMOrderEstimator.EVM_FULFILL_GAS_PRICE_MULTIPLIER because it directly affects order
+ * profitability
+ */
+export const EVM_GAS_LIMIT_MULTIPLIER = 1.05;
+
 export class EvmTxSigner implements Authority {
   private staleTx?: BroadcastedTx;
 
@@ -399,7 +407,13 @@ export class EvmTxSigner implements Authority {
   private async populateTransaction(
     inputTx: TransactionConfig,
   ): Promise<Required<Pick<TransactionConfig, 'gas'>> & Omit<TransactionConfig, 'gas'>> {
-    return { ...inputTx, gas: inputTx.gas || (await this.connection.eth.estimateGas(inputTx)) };
+    return { ...inputTx, gas: inputTx.gas || (await this.estimateTx(inputTx)) };
+  }
+
+  private async estimateTx(tx: TransactionConfig): Promise<number> {
+    const gas = await this.connection.eth.estimateGas(tx);
+    const gasLimit = Math.round(gas * EVM_GAS_LIMIT_MULTIPLIER);
+    return gasLimit;
   }
 
   private async sendTx(tx: TransactionConfig, logger: Logger): Promise<BroadcastedTx> {
