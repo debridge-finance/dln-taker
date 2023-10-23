@@ -4,8 +4,8 @@ import { EvmTxSigner } from './signer';
 import { EVMOrderValidator } from './order-validator';
 
 export class EVMOrderEstimator extends OrderEstimator {
-  // Must cover up to 12.5% block base fee increase
-  public static readonly EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.125;
+  // Must cover up to 12.5% block base fee increase. Must be in sync with EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_MULTIPLIER
+  public static readonly EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.075;
 
   public static readonly EVM_ESTIMATED_GAS_PRICE_NAME = 'evmEstimatedGasPrice';
 
