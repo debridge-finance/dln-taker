@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import {
   Address,
   ChainEngine,
@@ -45,10 +46,15 @@ import { DataStore } from './processors/DataStore';
 import { createClientLogger, DlnClient } from './dln-ts-client.utils';
 import { getCurrentEnvironment } from './environments';
 import { OrderProcessor } from './processor';
-import { TransactionBuilder } from './chain-common/tx-builder';
+import { CommonTransactionBuilder, ITransactionBuilder } from './chain-common/tx-builder';
 import { SolanaTransactionBuilder } from './chain-solana/tx-builder';
 import { EvmTransactionBuilder } from './chain-evm/tx-builder';
 import { SwapConnectorImplementationService } from './processors/swap-connector-implementation.service';
+import { ForDefiTransactionBuilder } from './forDefiClient/tx-builder';
+import { ForDefiSigner } from './forDefiClient/signer';
+import { ForDefiClient } from './forDefiClient/client';
+import { EvmForDefiTransactionAdapter } from './chain-evm/fordefi-adapter';
+import { SolanaForDefiTransactionAdapter } from './chain-solana/fordefi-adapter';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
@@ -317,7 +323,7 @@ export class Executor implements IExecutor {
         }
       }
 
-      let transactionBuilder: TransactionBuilder;
+      let transactionBuilder: CommonTransactionBuilder;
       let client;
       let connection: Web3 | Connection;
       let contractsForApprove: string[] = [];
@@ -373,7 +379,11 @@ export class Executor implements IExecutor {
           ? this.getSolanaProvider(chain, client, connection, chain.unlockAuthority)
           : fulfillBuilder;
 
-        transactionBuilder = new TransactionBuilder(initBuilder, fulfillBuilder, unlockBuilder);
+        transactionBuilder = new CommonTransactionBuilder(
+          initBuilder,
+          fulfillBuilder,
+          unlockBuilder,
+        );
 
         clients.push(client);
       } else {
@@ -418,7 +428,11 @@ export class Executor implements IExecutor {
         const unlockBuilder = chain.unlockAuthority
           ? this.getEVMProvider(chain, [], connection, chain.unlockAuthority)
           : fulfillBuilder;
-        transactionBuilder = new TransactionBuilder(fulfillBuilder, fulfillBuilder, unlockBuilder);
+        transactionBuilder = new CommonTransactionBuilder(
+          fulfillBuilder,
+          fulfillBuilder,
+          unlockBuilder,
+        );
       }
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -567,7 +581,7 @@ export class Executor implements IExecutor {
     contracts: string[],
     connection: Web3,
     authority: SignerAuthority,
-  ): EvmTransactionBuilder {
+  ): ITransactionBuilder {
     switch (authority.type) {
       case 'PK': {
         return new EvmTransactionBuilder(
@@ -584,8 +598,35 @@ export class Executor implements IExecutor {
         );
       }
 
+      case 'ForDefi': {
+        const signer = new ForDefiSigner(
+          helpers.hexToBuffer(authority.address),
+          crypto.createPrivateKey({
+            key: authority.signerPrivateKey,
+            passphrase: authority.privateKeyPassphrase,
+          }),
+          this.logger,
+        );
+
+        return new ForDefiTransactionBuilder(
+          chain.chain,
+          new ForDefiClient(authority.accessToken, this.logger),
+          signer,
+          new EvmForDefiTransactionAdapter(
+            chain.chain,
+            authority.vaultId,
+            connection,
+            signer.address,
+            this,
+            contracts,
+          ),
+        );
+      }
+
       default:
-        throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`);
+        throw new Error(
+          `Unsupported authority "${(authority as any).type}" for ${ChainId[chain.chain]}`,
+        );
     }
   }
 
@@ -594,7 +635,7 @@ export class Executor implements IExecutor {
     client: Solana.DlnClient,
     connection: Connection,
     authority: SignerAuthority,
-  ): SolanaTransactionBuilder {
+  ): ITransactionBuilder {
     const decodeKey = (key: string) =>
       Keypair.fromSecretKey(key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key));
 
@@ -607,8 +648,26 @@ export class Executor implements IExecutor {
         );
       }
 
+      case 'ForDefi': {
+        return new ForDefiTransactionBuilder(
+          chain.chain,
+          new ForDefiClient(authority.accessToken, this.logger),
+          new ForDefiSigner(
+            helpers.hexToBuffer(authority.address),
+            crypto.createPrivateKey({
+              key: authority.signerPrivateKey,
+              passphrase: authority.privateKeyPassphrase,
+            }),
+            this.logger,
+          ),
+          new SolanaForDefiTransactionAdapter(authority.vaultId, this),
+        );
+      }
+
       default:
-        throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`);
+        throw new Error(
+          `Unsupported authority "${(authority as any).type}" for ${ChainId[chain.chain]}`,
+        );
     }
   }
 

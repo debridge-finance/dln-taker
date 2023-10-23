@@ -11,9 +11,12 @@ export type TransactionSender = {
   (): Promise<TxHash>;
 };
 
-export class TransactionBuilder
-  implements FulfillTransactionBuilder, BatchUnlockTransactionBuilder, InitTransactionBuilder
-{
+export interface ITransactionBuilder
+  extends FulfillTransactionBuilder,
+    BatchUnlockTransactionBuilder,
+    InitTransactionBuilder {}
+
+export class CommonTransactionBuilder {
   constructor(
     private readonly initTransactionBuilder: InitTransactionBuilder,
     private readonly fulfillTransactionBuilder: FulfillTransactionBuilder,
