@@ -78,10 +78,12 @@ export class TVLBudgetController {
   }
 
   private async getTakerAccountBalance(): Promise<number> {
+    if (this.giveChain.disabledFulfill) return 0;
     return this.getAccountValue(this.giveChain.fulfillAuthority.bytesAddress);
   }
 
   private async getUnlockBeneficiaryAccountBalance(): Promise<number> {
+    if (this.giveChain.disabledFulfill) return 0;
     if (!this.hasSeparateUnlockBeneficiary) return 0;
     return this.getAccountValue(this.giveChain.unlockBeneficiary);
   }

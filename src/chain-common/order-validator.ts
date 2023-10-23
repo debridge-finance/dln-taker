@@ -45,6 +45,7 @@ export class OrderValidator extends OrderEvaluationContextual {
   protected async runChecks() {}
 
   async validate(): Promise<OrderEstimator> {
+    await this.checkDisabled();
     await this.checkOrderId();
     await this.checkExternalCallHash();
     await this.checkAllowedTaker();
@@ -94,6 +95,13 @@ export class OrderValidator extends OrderEvaluationContextual {
     if (!orderFilters.every((it) => it)) {
       const message = 'order has been filtered off, dropping';
       return this.sc.reject(RejectionReason.FILTERED_OFF, message);
+    }
+    return Promise.resolve();
+  }
+
+  private async checkDisabled(): Promise<void> {
+    if (this.order.takeChain.disabledFulfill) {
+      return this.sc.reject(RejectionReason.FILTERED_OFF, 'take chain is disabled');
     }
     return Promise.resolve();
   }
