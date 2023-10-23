@@ -1,7 +1,7 @@
 import { calculateExpectedTakeAmount } from '@debridge-finance/legacy-dln-profitability';
 import { OrderEstimator } from '../chain-common/order-estimator';
-import { EvmTxSigner } from './signer';
 import { EVMOrderValidator } from './order-validator';
+import { EvmFeeManager } from './feeManager';
 
 export class EVMOrderEstimator extends OrderEstimator {
   // Must cover up to 12.5% block base fee increase. Must be in sync with EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_MULTIPLIER
@@ -16,17 +16,22 @@ export class EVMOrderEstimator extends OrderEstimator {
    * exactly this gas price
    */
   private async getEstimatedGasPrice(): Promise<bigint> {
-    // TODO move gas prediction out of EvmTxSigner
-    const evmAdapter = this.order.takeChain.fulfillAuthority as EvmTxSigner;
-    const currentGasPriceBN = await evmAdapter.getRequiredGasPrice();
-    const currentGasPrice = BigInt(currentGasPriceBN.integerValue().toString());
-    const estimatedGasPrice =
-      (currentGasPrice * BigInt(EVMOrderEstimator.EVM_FULFILL_GAS_PRICE_MULTIPLIER * 10_000)) /
+    const takeChain = this.order.takeChain.chain;
+    const feeManager = new EvmFeeManager(
+      takeChain,
+      this.order.executor.getSupportedChain(takeChain).connection,
+    );
+    const estimatedNextGasPrice = await feeManager.estimateNextGasPrice();
+    const bufferedGasPrice =
+      (estimatedNextGasPrice *
+        BigInt(EVMOrderEstimator.EVM_FULFILL_GAS_PRICE_MULTIPLIER * 10_000)) /
       10_000n;
-    this.logger.debug(`estimated gas price for the next block: ${estimatedGasPrice}`);
-    this.setPayloadEntry<bigint>(EVMOrderEstimator.EVM_ESTIMATED_GAS_PRICE_NAME, estimatedGasPrice);
+    this.logger.debug(
+      `estimated gas price for the next block: ${estimatedNextGasPrice}, buffered: ${bufferedGasPrice}`,
+    );
+    this.setPayloadEntry<bigint>(EVMOrderEstimator.EVM_ESTIMATED_GAS_PRICE_NAME, bufferedGasPrice);
 
-    return estimatedGasPrice;
+    return bufferedGasPrice;
   }
 
   /**
