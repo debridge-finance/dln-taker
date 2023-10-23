@@ -71,7 +71,16 @@ type PrivateKeyAuthority = {
   type: 'PK';
   privateKey: string;
 };
-export type SignerAuthority = PrivateKeyAuthority;
+
+type ForDefiAuthority = {
+  type: 'ForDefi';
+  accessToken: string;
+  vaultId: string;
+  signerPrivateKey: string;
+  privateKeyPassphrase?: string;
+};
+
+export type SignerAuthority = PrivateKeyAuthority | ForDefiAuthority;
 
 export type ChainEnvironment = {
   /**
@@ -191,7 +200,7 @@ export interface ChainDefinition {
   /**
    * Forcibly disable fulfills in this chain?
    */
-  disabled?: boolean;
+  disableFulfill?: boolean;
 
   /**
    * chain context related

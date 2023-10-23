@@ -43,7 +43,6 @@ export class SolanaTxSigner implements Authority {
       service: SolanaTxSigner.name,
       currentChainId: ChainId.Solana,
     });
-
     return helpers.sendAll(this.connection, this.wallet, data, {
       rpcCalls: 3,
       skipPreflight: false,

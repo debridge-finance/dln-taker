@@ -8,7 +8,7 @@ import { IExecutor, ExecutorSupportedChain } from './executor';
 import { assert, die } from './errors';
 import { CreatedOrder } from './chain-common/order';
 import { TakerShortCircuit } from './chain-common/order-taker';
-import { TransactionBuilder, TransactionSender } from './chain-common/tx-builder';
+import { ITransactionBuilder, TransactionSender } from './chain-common/tx-builder';
 
 export interface InitTransactionBuilder {
   getInitTxSenders(logger: Logger): Promise<Array<TransactionSender>>;
@@ -78,7 +78,7 @@ export class OrderProcessor {
   readonly #createdOrdersMetadata = new Map<OrderId, CreatedOrderMetadata>();
 
   private constructor(
-    private readonly transactionBuilder: TransactionBuilder,
+    private readonly transactionBuilder: ITransactionBuilder,
     private readonly takeChain: ExecutorSupportedChain,
     private readonly executor: IExecutor,
     logger: Logger,
@@ -102,7 +102,7 @@ export class OrderProcessor {
   }
 
   public static async initialize(
-    transactionBuilder: TransactionBuilder,
+    transactionBuilder: ITransactionBuilder,
     takeChain: ExecutorSupportedChain,
     executor: IExecutor,
     logger: Logger,

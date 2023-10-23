@@ -9,6 +9,11 @@
 - [How `dln-taker` works?](#how-dln-taker-works)
 - [Installation](#installation)
   - [Preparing the environment](#preparing-the-environment)
+- [Configuring order requirements](#configuring-order-requirements)
+- [Configuring chains](#configuring-chains)
+  - [Setting beneficiary](#setting-beneficiary)
+  - [Setting authority](#setting-authority)
+  - [Disabling order fulfillment](#disabling-order-fulfillment)
   - [Understanding reserve funds](#understanding-reserve-funds)
   - [Deploying reserve funds](#deploying-reserve-funds)
 - [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
@@ -76,29 +81,33 @@ See [TL;DR section](#tldr) for quick install.
 
 ### Preparing the environment
 
+Create a configuration file called `executor.config.ts` based on sample:
+```sh
+wget https://raw.githubusercontent.com/debridge-finance/dln-taker/main/sample.config.ts
+mv sample.config.ts executor.config.ts
+```
+
 The [`sample.config.ts` file](./sample.config.ts) already defines all blockchains where DLN is operational:
 1. Arbitrum
 1. Avalanche
 1. Base
 1. BNB Chain
 1. Ethereum
-1. Fantom
 1. Linea
 1. Optimism
 1. Polygon
 1. Solana
 
-so you don't have to describe them explicitly. However, the sample config uses references to the environment variables (via the `${process.env.*}` notation) where sensitive or private data is involved: for example, an API key to access deBridge-managed websocket, or private keys to wallets with reserve funds for order fulfillment are designed to be accessed by the configuration file as environment variables.
+so you don't have to describe them explicitly. Most configuration options are self-explanatory and excessively explained right within the configuration file, so you only need to scroll through the file checking if the suggested default parameters fit your specific needs.
 
-For the sake of simplicity, all variables requested by the `sample.config.ts` are listed in the [`sample.env` file](./sample.env). You can use it as the foundation to create an `.env` file to store your secrets, or reuse it in a hardened way (involving vaults, e.g. Github Secrets or 1password Secrets Automation).
+In the lines where input is needed, you are advised to fill empty variables; the sample config uses references to the environment variables (via the `${process.env.*}` notation) where sensitive or private data is involved: for example, an API key to access deBridge-managed websocket, or private keys to wallets with reserve funds for order fulfillment are designed to be accessed by the configuration file as environment variables. For the sake of simplicity, all variables requested by the `sample.config.ts` are listed in the [`sample.env` file](./sample.env). You can use it as the foundation to create an `.env` file to store your secrets, or reuse it in a hardened way (involving vaults, e.g. Github Secrets or 1password Secrets Automation).
 
-Create an `.env` file using the contents of the [`sample.env` file](./sample.env) file, and set values for all variables for every chain you wish to support, as follows:
+As a quick start, create an `.env` file using the contents of the [`sample.env` file](./sample.env) file, and set values for all variables for every chain you wish to support, as follows:
 
 > **Caution!** Properties from this section define sensitive data used by `dln-taker` to operate reserve funds.
 
 - `<CHAIN>_RPC` variable defines a URL to the RPC node of the chain.
 - `<CHAIN>_TAKER_PRIVATE_KEY` variable defines the private key of the address where the reserve funds available for orders fulfillment. `dln-taker` will sign transactions on behalf of this address, effectively setting approval, transferring funds, performing swaps and fulfillments.
-- `<CHAIN>_UNLOCK_AUTHORITY_PRIVATE_KEY` variable defines the private key of the address used to unlock successfully fulfilled orders. `dln-taker` will sign transactions on behalf of this address, effectively unlocking the orders.
 - `<CHAIN>_BENEFICIARY` variable defines taker controlled address where the orders-locked funds (fulfilled on the other chains) would be unlocked to. For this you can use the address which corresponds to the private key specified as the `<CHAIN>_TAKER_PRIVATE_KEY`, so funds unlocked by fulfilling the orders would be automatically available as the reserve funds.
 
 > ⚠️ The easiest way to obtain private keys is to export them from your wallets: this would give you a confidence that you are passing the key of the proper account to the dln-taker instance. Consider looking at the [support article](https://support.metamask.io/hc/en-us/articles/360015289632-How-to-export-an-account-s-private-key) explaining how to export a private key from Metamask, or a [video](https://youtu.be/UL4gEsGhtEs?t=243) explaining the same thing for the Phantom wallet.
@@ -106,8 +115,134 @@ Create an `.env` file using the contents of the [`sample.env` file](./sample.env
 
 The next step is to deploy your assets to the addresses used by `dln-taker` for order fulfillment. Refer the [next section](#deploying-reserve-funds) for details.
 
-If you wish to avoid order fulfillments in a particular chain, use the [`disableFulfill`](./ADVANCED.md#disablefulfill) filter in the config file, however you are **still required** to fill the variables with correct values to enable orders coming from such chain. For example, if you wouldn't want to deploy liquidity on Solana (and thus avoid fulfillments in this chain), add the `disableFulfill` filter to the Solana's section of the configuration file, but you'll still be able to fulfill orders coming **from** Solana. If you wish to exclude the chain from processing, skipping orders coming from and to such chain, just comment out the corresponding section in the config file: in this case, any order coming from or to Solana would be dropped by your instance of `dln-taker`.
+## Configuring order requirements
 
+The `srcConstraints` top-level section imposes several important constraints each new order must meet:
+- `minProfitabilityBps` (default: `4`) sets the desired margin you are willing to take from each order
+- `unlockBatchSize` (default: `10`) sets the number of orders to be accumulated after successful fulfillment to be further unlocked in a batch. Mind that decreasing this parameter you negatively affect order profitability, as the lesser the batch the more operating expenses are needed to cover the order execution, and most orders are placed with expenses laid to cover 1/10th of the unlock procedure
+
+Any of these options can be overridden on a source per-chain basis: for example, it is possible to set slightly higher margin for orders coming FROM a particular chain (e.g. Fantom) to any other chain, example:
+
+```ts
+
+  srcConstraints: {
+    minProfitabilityBps: 4,                                                     // <!-- default margin
+  },
+
+  chains: [
+    {
+      chain: ChainId.Fantom,
+      chainRpc: `${process.env.FANTOM_RPC}`,
+
+      constraints: {
+        minProfitabilityBps: 5,                                                 // <!-- overridden margin
+      },
+
+      beneficiary: `${process.env.FANTOM_BENEFICIARY}`,
+      takerPrivateKey: `${process.env.FANTOM_TAKER_PRIVATE_KEY}`,
+    },
+  ],
+
+```
+
+
+## Configuring chains
+
+### Setting beneficiary
+
+Each chain (regardless of whether it is allowed to fulfill orders coming into it [or not](#disabling-order-fulfillment)) must have a valid beneficiary address set to receive funds unlocked after fulfilled order has been claimed on another enabled chain. This is because how DLN works: orders are placed on one chain and are fulfilled on other chains; after the order is being fulfilled, an `unlock` command is being sent from the destination chain to the source chain to unlock funds initially locked upon order placement. This beneficiary address acts as a recipient for these funds.
+
+In case the chain is not disabled, it is advised to set beneficiary to the address of the authority used to fulfill orders in this chain, effectively making a closed loop of funds.
+
+Example:
+
+```ts
+  chains: [
+    {
+      chain: ChainId.Ethereum,
+      chainRpc: `${process.env.ETHEREUM_RPC}`,
+
+      beneficiary: `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`,
+    },
+  ],
+```
+
+### Setting authority
+
+Each chain (unless order fulfillment [is not explicitly disabled](#disabling-order-fulfillment)) must have explicitly defined a fulfill authority which would be used to sign-off transactions.
+
+The default type of authority is private key-based authority: you need to provide a raw private key so that dln-taker service can access funds and sign-off transactions on its behalf. Here is how it defined:
+
+```ts
+  chains: [
+    {
+      chain: ChainId.Ethereum,
+      chainRpc: `${process.env.ETHEREUM_RPC}`,
+
+      beneficiary: `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045`,
+
+      fulfillAuthority: {
+        type: 'PK', // private-key authority
+        privateKey: `${process.env.ETHEREUM_PRIVATE_KEY}`
+      },
+    },
+  ],
+```
+
+This authority would be used to sign-off several types of transactions:
+- initialization transactions:
+  - on Solana: transactions that initialize ALTs
+  - on EVM-based chains: transactions that set infinity allowances to the whitelisted DLN contracts
+- fulfillment transactions: this type of transactions attempt to fulfill profitable orders coming into supported enabled chains
+- `claim_unlock` transactions: this type of transactions initiate the unlock procedure to claim and unlock funds locked by orders that were successfully fulfilled by the fulfill authority
+
+#### Advanced setup: using separate authorities
+
+It is possible to use different authorities for each type of transactions:
+- a separate `initAuthority` could be used only on Solana to initialize ALTs separately for the fulfill authority. This can be useful if a complex MPC setup is used for the `fulfillAuthority`, and it is necessary to initialize ALTs quickly and easily without involving complex transaction pipeline.
+- a separate `unlockAuthority` could be used as an isolated pipeline for unlocking fulfilled orders. This can be useful to avoid theoretical congestion on the EVM-based chains, when the flow of fulfillment transactions should not be slowed down by lesser priority `claim_unlock` transactions
+
+
+#### Advanced setup: MPC authority
+
+Along with the private key based authority (`type: 'PK'`), `dln-taker` now supports [FORDEFI](https://www.fordefi.com/)-compatible MPC authority. Here is how it defined:
+
+```ts
+    fulfillAuthority: {
+      type: "ForDefi",
+      accessToken: `${process.env.FORDEFI_ACCESS_TOKEN}`,
+      vaultId: `9c5b94b1-35ad-49bb-b118-8e8fc24abf8`,
+      signerPrivateKey: `-----BEGIN EC PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-256-CBC,B749F0FD24B3836329290EF55B1F95ED
+
+njbqdC+He+XJkvM00CFusueH3Fes5YxVCqalvLQxuLxfjKQgygNt7btI/T5vOHQS
+qynyhDad+hZG0sj+hNOAa54yy7QmCgYeGZW6UmgOpgOcElF71LdzoIczpmQavD0l
+C0WyvEW1RIW3wddtGwJT28kGcch6me+9bZYXhPLDxFk=
+-----END EC PRIVATE KEY-----`,
+      privateKeyPassphrase: `${process.env.FORDEFI_SIGNER_PRIVATE_KEY_PASSPHRASE}`,
+    },
+```
+
+Worth mentioning that it is possible to use [separate authorities](#advanced-setup-using-separate-authorities) of different types. When dealing with Solana, it is advised to use a separate private key based `initAuthority` to simplify setup without compromising funds.
+
+### Disabling order fulfillment
+
+If you wish to avoid order fulfillments within a particular chain, set the `disableFulfill` flag of that chain section to `true`. In this case, you can ignore setting a private key for this chain, but still required to set the beneficiary address because this is the address where funds would be unlocked to when the order coming from this chain is being fulfilled and unlocked from another enabled chain. For example, if you wouldn't want to deploy liquidity on Solana (and thus avoid fulfillments in this chain), add the `disableFulfill: true` property to the Solana's section of the configuration file, but you'll still be able to fulfill orders coming **from** Solana. If you wish to exclude the chain from processing, skipping orders coming from and to such chain, just comment out the corresponding section in the config file: in this case, any order coming from or to Solana would be dropped by your instance of `dln-taker`.
+
+Example:
+
+```ts
+  chains: [
+    {
+      chain: ChainId.Solana,
+      chainRpc: `${process.env.SOLANA_RPC}`,
+      disableFulfill: true,
+
+      beneficiary: `3emsAVdmGKERbHjmGfQ6oZ1e35dkf5iYcS6U4CPKFVaa`,
+    },
+  ],
+```
 
 ### Understanding reserve funds
 
@@ -362,6 +497,9 @@ Several kernel-related parameters can be fine-tuned using environment variables.
   - BNB Chain
     - `EVM_BNB_MIN_GAS_PRICE`
     - `EVM_BNB_MAX_GAS_PRICE`
+- ForDefi
+  - `FORDEFI_DISABLE_PREDICTION_FAILURE_FOR_*` (`*` should be replaced with a chain name taken from the `ChainId` enum uppercased)
+  - `FORDEFI_DISALLOW_HIGH_GAS_PRIORITY_FOR_*` (`*` should be replaced with a chain name taken from the `ChainId` enum uppercased)
 
 ### Development
 - `IS_TEST`
