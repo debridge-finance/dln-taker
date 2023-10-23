@@ -55,7 +55,22 @@ type PrivateKeyAuthority = {
   type: 'PK';
   privateKey: string;
 };
-export type SignerAuthority = PrivateKeyAuthority;
+
+type ForDefiAuthority = {
+  type: 'ForDefi';
+  accessToken: string;
+  vaultId: string;
+  address: string;
+  signerPrivateKey: string;
+  privateKeyPassphrase?: string;
+};
+
+// type ForDefiSolanaAuthority = ForDefiAuthority & {
+//   type: "ForDefiSolana";
+//   initWalletPrivateKey?: string;
+// }
+
+export type SignerAuthority = PrivateKeyAuthority | ForDefiAuthority;
 
 export class EvmRebroadcastAdapterOpts {
   /**
