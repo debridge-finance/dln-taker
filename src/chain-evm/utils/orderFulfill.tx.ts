@@ -1,6 +1,5 @@
 import { ChainEngine, EvmInstruction } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import BigNumber from 'bignumber.js';
 import { InputTransaction } from '../signer';
 import { assert } from '../../errors';
 import { createClientLogger } from '../../dln-ts-client.utils';
@@ -59,7 +58,7 @@ export async function getFulfillTx(
     to: ix.to,
     data: ix.data,
     value: ix.value.toString(),
-    cappedFee: cappedFee ? new BigNumber(cappedFee.toString()) : undefined,
+    cappedFee,
   };
 
   logger.debug(`Crafted txn: ${JSON.stringify(tx)}`);

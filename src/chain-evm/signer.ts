@@ -1,5 +1,4 @@
 import { ChainId, tokenStringToBuffer } from '@debridge-finance/dln-client';
-import BigNumber from 'bignumber.js';
 import { Logger } from 'pino';
 import { clearInterval } from 'timers';
 import Web3 from 'web3';
@@ -11,9 +10,10 @@ import {
   EvmRebroadcastAdapterOpts,
   SupportedChain,
 } from '../config';
+import { BumpedFeeManager } from './bumpedFeeManager';
 
 type TransactionConfig = Parameters<Web3['eth']['sendTransaction']>[0];
-type BroadcastedTx = {
+export type BroadcastedTx = {
   tx: TransactionConfig;
   hash: string;
   time: Date;
@@ -23,20 +23,6 @@ export type EvmTxContext = {
   logger: Logger;
 };
 
-// see https://docs.rs/ethers-core/latest/src/ethers_core/types/chain.rs.html#55-166
-const eip1559Compatible: { [key in SupportedChain]: boolean } = {
-  [ChainId.Arbitrum]: true,
-  [ChainId.Avalanche]: true,
-  [ChainId.BSC]: false,
-  [ChainId.Ethereum]: true,
-  [ChainId.Fantom]: false,
-  [ChainId.Linea]: true,
-  [ChainId.Polygon]: true,
-  [ChainId.Solana]: false,
-  [ChainId.Base]: true,
-  [ChainId.Optimism]: true,
-};
-
 export type InputTransaction = {
   data: string;
   to: string;
@@ -44,7 +30,7 @@ export type InputTransaction = {
   gasLimit?: number;
 
   // represents a max gas*gasPrice this tx is allowed to increase to during re-broadcasting
-  cappedFee?: BigNumber;
+  cappedFee?: bigint;
 };
 
 /**
@@ -64,6 +50,8 @@ export class EvmTxSigner implements Authority {
 
   readonly #privateKey: string;
 
+  readonly #feeManager: BumpedFeeManager;
+
   constructor(
     private readonly chainId: ChainId,
     private readonly connection: Web3,
@@ -74,6 +62,11 @@ export class EvmTxSigner implements Authority {
     this.#address = accountEvmFromPrivateKey.address;
     this.#privateKey = accountEvmFromPrivateKey.privateKey;
     this.rebroadcast = this.fillDefaultVariables(rebroadcast);
+    this.#feeManager = new BumpedFeeManager(
+      this.rebroadcast.bumpGasPriceMultiplier,
+      chainId,
+      connection,
+    );
   }
 
   public get address(): string {
@@ -92,108 +85,6 @@ export class EvmTxSigner implements Authority {
     return BLOCK_CONFIRMATIONS_HARD_CAPS[this.chainId as unknown as SupportedChain];
   }
 
-  get isLegacy(): boolean {
-    return eip1559Compatible[this.chainId as unknown as SupportedChain] === false;
-  }
-
-  /**
-   * Priority fee: takes a p75 tip across latest and pending block if any of them is utilized > 50%. Otherwise, takes p50
-   * Base fee: takes max base fee across pending and next-to-pending block (in case we are late to be included in the
-   * pending block, and we are sure that next-to-pending block is almost ready)
-   */
-  private async getOptimisticFee(): Promise<{
-    baseFee: BigNumber;
-    maxFeePerGas: BigNumber;
-    maxPriorityFeePerGas: BigNumber;
-  }> {
-    if (this.isLegacy) {
-      throw new Error('Unsupported method');
-    }
-    const history = await this.connection.eth.getFeeHistory(2, 'pending', [25, 50]);
-
-    // tip is taken depending of two blocks: latest, pending. If any of them is utilized > 50%, put the highest (p75) bid
-    const expectedBaseGasGrowth = Math.max(...history.gasUsedRatio) > 0.5;
-    const takePercentile = expectedBaseGasGrowth ? 1 : 0;
-    const maxPriorityFeePerGas = BigNumber.max(
-      ...history.reward.map((r) => BigNumber(r[takePercentile])),
-    );
-
-    // however, the base fee must be taken according to pending and next-to-pending block, because that's were we compete
-    // for block space
-    const baseFee = BigNumber.max(...history.baseFeePerGas.slice(-2));
-
-    return {
-      baseFee,
-      maxFeePerGas: baseFee.plus(maxPriorityFeePerGas),
-      maxPriorityFeePerGas,
-    };
-  }
-
-  /**
-   * Increases optimistic fee if the new txn must overbid (replace) the existing one
-   */
-  private async getRequiredFee(
-    replaceTx?: BroadcastedTx,
-  ): Promise<{ baseFee: BigNumber; maxFeePerGas: BigNumber; maxPriorityFeePerGas: BigNumber }> {
-    if (this.isLegacy) {
-      throw new Error('Unsupported method');
-    }
-
-    const fees = await this.getOptimisticFee();
-
-    if (!replaceTx) return fees;
-
-    // if we need to replace a transaction, we must bump both maxPriorityFee and maxFeePerGas
-    fees.maxPriorityFeePerGas = BigNumber.max(
-      fees.maxPriorityFeePerGas,
-      new BigNumber(replaceTx.tx.maxPriorityFeePerGas as string).multipliedBy(
-        this.rebroadcast.bumpGasPriceMultiplier!,
-      ),
-    );
-
-    fees.maxFeePerGas = BigNumber.max(
-      fees.baseFee.plus(fees.maxPriorityFeePerGas),
-      new BigNumber(replaceTx.tx.maxFeePerGas as string).multipliedBy(
-        this.rebroadcast.bumpGasPriceMultiplier!,
-      ),
-    );
-
-    return fees;
-  }
-
-  private async getOptimisticLegacyFee(): Promise<BigNumber> {
-    if (!this.isLegacy) {
-      throw new Error('Unsupported method');
-    }
-    let price = BigNumber(await this.connection.eth.getGasPrice());
-
-    // BNB chain: ensure gas price is between [3gwei, 5gwei]
-    if (this.chainId === ChainId.BSC) {
-      price = BigNumber.max(3e9, price); // >=3gwei
-      price = BigNumber.min(price, 5e9); // <=5gwei
-    }
-
-    return price;
-  }
-
-  private async getRequiredLegacyFee(replaceTx?: BroadcastedTx): Promise<BigNumber> {
-    if (!this.isLegacy) {
-      throw new Error('Unsupported method');
-    }
-    let gasPrice = await this.getOptimisticLegacyFee();
-
-    if (replaceTx) {
-      gasPrice = BigNumber.max(
-        gasPrice,
-        new BigNumber(replaceTx.tx.gasPrice as string).multipliedBy(
-          this.rebroadcast.bumpGasPriceMultiplier!,
-        ),
-      );
-    }
-
-    return gasPrice;
-  }
-
   private async checkStaleTx(): Promise<void> {
     if (this.staleTx) {
       const nonce = await this.connection.eth.getTransactionCount(this.address);
@@ -204,52 +95,36 @@ export class EvmTxSigner implements Authority {
   }
 
   /**
-   * Returns required gasPrice (assuming we want to replace a pending txn, if any)
-   */
-  async getRequiredGasPrice(): Promise<BigNumber> {
-    await this.checkStaleTx();
-
-    if (this.isLegacy) {
-      return BigNumber(await this.getRequiredLegacyFee(this.staleTx));
-    }
-
-    const fee = await this.getRequiredFee(this.staleTx);
-    return fee.maxFeePerGas;
-  }
-
-  /**
    * Populates txn with fees, taking capped gas price into consideration
    */
   private async tryPopulateTxPricing(
     inputTx: TransactionConfig,
     replaceTx?: BroadcastedTx,
-    cappedFee?: BigNumber,
+    cappedFee?: bigint,
   ): Promise<TransactionConfig> {
+    await this.checkStaleTx();
     const tx = await this.populateTransaction(inputTx);
+    const txGas = BigInt(tx.gas.toString());
 
-    if (this.isLegacy) {
-      const gasPrice = await this.getRequiredLegacyFee(replaceTx);
-      if (cappedFee && cappedFee.lt(gasPrice.multipliedBy(tx.gas))) {
-        const message = `Unable to populate pricing: transaction fee (gasPrice=${gasPrice}, gasLimit=${
-          inputTx.gas
-        }, fee=${gasPrice.multipliedBy(tx.gas)}) is greater than cappedFee (${cappedFee})`;
+    if (this.#feeManager.isLegacy) {
+      const gasPrice = await this.#feeManager.getRequiredLegacyFee(replaceTx);
+      const actualFee = gasPrice * txGas;
+      if (cappedFee && cappedFee < actualFee) {
+        const message = `Unable to populate pricing: transaction fee (gasPrice=${gasPrice}, gasLimit=${txGas}, fee=${actualFee}) is greater than cappedFee (${cappedFee})`;
         throw new Error(message);
       }
-      tx.gasPrice = gasPrice.toFixed(0);
+      tx.gasPrice = gasPrice.toString();
       return tx;
     }
 
-    const fees = await this.getRequiredFee(replaceTx);
-    if (cappedFee && cappedFee.lt(fees.maxFeePerGas.multipliedBy(tx.gas))) {
-      const message = `Unable to populate pricing: transaction fee (maxFeePerGas=${
-        fees.maxFeePerGas
-      }, gasLimit=${inputTx.gas}, fee=${fees.maxFeePerGas.multipliedBy(
-        tx.gas,
-      )}) is greater than cappedFee (${cappedFee})`;
+    const fees = await this.#feeManager.getRequiredFee(replaceTx);
+    const actualFee = fees.maxFeePerGas * txGas;
+    if (cappedFee && cappedFee < actualFee) {
+      const message = `Unable to populate pricing: transaction fee (maxFeePerGas=${fees.maxFeePerGas}, gasLimit=${inputTx.gas}, fee=${actualFee}) is greater than cappedFee (${cappedFee})`;
       throw new Error(message);
     }
-    tx.maxFeePerGas = fees.maxFeePerGas.toFixed(0);
-    tx.maxPriorityFeePerGas = fees.maxPriorityFeePerGas.toFixed(0);
+    tx.maxFeePerGas = fees.maxFeePerGas.toString();
+    tx.maxPriorityFeePerGas = fees.maxPriorityFeePerGas.toString();
 
     return tx;
   }
