@@ -83,6 +83,8 @@ export type UniversalProcessorParams = {
   preFulfillSwapMaxAllowedSlippageBps: number;
 
   mempool: MempoolOpts;
+
+  featureEnableOpHorizon?: boolean;
 };
 
 // Represents all necessary information about Created order during its internal lifecycle
@@ -644,7 +646,7 @@ class UniversalProcessor extends BaseOrderProcessor {
 
     let evmFulfillGasLimit: number | undefined;
     let evmFulfillCappedGasPrice: BigNumber | undefined;
-    let preswapTx: SwapConnectorRequest['preferEstimation'] | undefined;
+    let preswapTx: SwapConnectorRequest['routeHint'] | undefined;
     if (getEngineByChainId(this.takeChain.chain) === ChainEngine.EVM) {
       // we need to perform fulfill estimation (to obtain planned gasLimit),
       // but we don't know yet how much reserveAmount should we pass. So, we simply pick
@@ -737,6 +739,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           ? BigInt(evmFulfillCappedGasPrice.integerValue().toString())
           : undefined,
         swapEstimationPreference: preswapTx,
+        isFeatureEnableOpHorizon: !!this.params.featureEnableOpHorizon,
       },
     );
 
@@ -935,11 +938,11 @@ class UniversalProcessor extends BaseOrderProcessor {
     reserveDstToken: Uint8Array,
     reservedAmount: string,
     evaluatedTakeAmount: bigint,
-    preferEstimation: SwapConnectorRequest['preferEstimation'] | undefined,
+    routeHint: SwapConnectorRequest['routeHint'] | undefined,
     context: OrderProcessorContext,
     logger: Logger,
   ): Promise<{
-    swapResult?: SwapConnectorRequest['preferEstimation'];
+    swapResult?: SwapConnectorRequest['routeHint'];
     transaction: Awaited<ReturnType<DlnClient['preswapAndFulfillOrder']>>;
   }> {
     if (buffersAreEqual(reserveDstToken, order.take.tokenAddress)) {
@@ -970,7 +973,7 @@ class UniversalProcessor extends BaseOrderProcessor {
         slippageBps: buffersAreEqual(reserveDstToken, order.take.tokenAddress)
           ? 0
           : this.getPreFulfillSlippage(evaluatedTakeAmount, order.take.amount),
-        preferEstimation,
+        routeHint,
         fromAddress: this.takeChain.fulfillProvider.bytesAddress,
         destReceiver: context.config.client.getForwarderAddress(order.take.chainId),
       },
