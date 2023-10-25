@@ -83,8 +83,6 @@ export type UniversalProcessorParams = {
   preFulfillSwapMaxAllowedSlippageBps: number;
 
   mempool: MempoolOpts;
-
-  featureEnableOpHorizon?: boolean;
 };
 
 // Represents all necessary information about Created order during its internal lifecycle
@@ -739,7 +737,7 @@ class UniversalProcessor extends BaseOrderProcessor {
           ? BigInt(evmFulfillCappedGasPrice.integerValue().toString())
           : undefined,
         swapEstimationPreference: preswapTx,
-        isFeatureEnableOpHorizon: !!this.params.featureEnableOpHorizon,
+        isFeatureEnableOpHorizon: process.env.FEATURE_OP_HORIZON_CAMPAIGN === 'true',
       },
     );
 
