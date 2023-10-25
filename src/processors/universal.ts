@@ -10,6 +10,7 @@ import {
   OrderState,
   tokenAddressToString,
   SwapConnectorRequest,
+  SwapConnectorResult,
 } from '@debridge-finance/dln-client';
 import BigNumber from 'bignumber.js';
 import { Logger } from 'pino';
@@ -940,7 +941,7 @@ class UniversalProcessor extends BaseOrderProcessor {
     context: OrderProcessorContext,
     logger: Logger,
   ): Promise<{
-    swapResult?: SwapConnectorRequest['routeHint'];
+    swapResult?: SwapConnectorResult;
     transaction: Awaited<ReturnType<DlnClient['preswapAndFulfillOrder']>>;
   }> {
     if (buffersAreEqual(reserveDstToken, order.take.tokenAddress)) {
