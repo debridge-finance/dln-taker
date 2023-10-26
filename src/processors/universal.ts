@@ -254,7 +254,13 @@ class UniversalProcessor extends BaseOrderProcessor {
         const metadata = this.getCreatedOrderMetadata(context.orderInfo.orderId);
         try {
           metadata.attempts++;
+          const timeBefore = new Date().getTime();
+          metadata.context.context.logger.info(`running order evaluation, tag: ${timeBefore}`);
           await this.evaluateAndFulfill(metadata);
+          const elapsedTime = new Date().getTime() - timeBefore;
+          metadata.context.context.logger.info(
+            `order evaluation finished, tag: ${timeBefore}, processing took ${elapsedTime / 1000}s`,
+          );
         } catch (e) {
           const message = `processing order failed with an unhandled error: ${e}`;
           orderContext.logger.error(message);
