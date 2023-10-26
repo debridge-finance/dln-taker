@@ -6,7 +6,11 @@ import { getFulfillTx } from './utils/orderFulfill.tx';
 import { EVM_GAS_LIMIT_MULTIPLIER, InputTransaction } from './signer';
 
 export class EVMOrderValidator extends OrderValidator {
-  public static readonly EVM_FULFILL_GAS_LIMIT_NAME = 'evmFulfillGasLimit';
+  public static readonly PAYLOAD_ENTRY__EVM_FULFILL_GAS_LIMIT =
+    'EVMOrderValidator.PAYLOAD_ENTRY__EVM_FULFILL_GAS_LIMIT';
+
+  public static readonly PAYLOAD_ENTRY__EVM_FULFILL_DISABLE_TX_CAPPED_FEE =
+    'EVMOrderValidator,PAYLAOD_ENTRY__EVM_FULFILL_DISABLE_TX_CAPPED_FEE';
 
   /**
    * Reasonable multiplier for gas obtained from the estimateGas() RPC call, because sometimes there are cases when
@@ -15,9 +19,6 @@ export class EVMOrderValidator extends OrderValidator {
    * profitability
    */
   public static readonly EVM_FULFILL_GAS_LIMIT_MULTIPLIER = EVM_GAS_LIMIT_MULTIPLIER;
-
-  public static readonly EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME =
-    'EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME';
 
   protected async runChecks() {
     await super.runChecks();
@@ -33,11 +34,12 @@ export class EVMOrderValidator extends OrderValidator {
       {
         order: this.order,
         isProfitable: true,
-        requiredReserveAmount: await this.order.getMaxProfitableReserveAmount(),
+        requiredReserveAmount:
+          await this.order.getMaxProfitableReserveAmountWithoutOperatingExpenses(),
         projectedFulfillAmount: this.order.orderData.take.amount,
-        preFulfillSwapResult: this.preliminarySwapResult,
         payload: {
-          [EVMOrderValidator.EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME]: true,
+          preFulfillSwap: this.payload.validationPreFulfillSwap,
+          [EVMOrderValidator.PAYLOAD_ENTRY__EVM_FULFILL_DISABLE_TX_CAPPED_FEE]: true,
         },
       },
       this.logger.child({ routine: 'checkEvmEstimation' }),
@@ -45,10 +47,10 @@ export class EVMOrderValidator extends OrderValidator {
 
     try {
       const gasLimit = await this.estimateTx(tx);
+      this.setPayloadEntry(EVMOrderValidator.PAYLOAD_ENTRY__EVM_FULFILL_GAS_LIMIT, gasLimit);
       this.logger.debug(
         `estimated gas needed for the fulfill tx with roughly estimated reserve amount: ${gasLimit} gas units`,
       );
-      this.setPayloadEntry<number>(EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_NAME, gasLimit);
     } catch (e) {
       return this.sc.postpone(
         PostponingReason.FULFILLMENT_EVM_TX_PREESTIMATION_FAILED,
@@ -74,7 +76,6 @@ export class EVMOrderValidator extends OrderValidator {
   protected getOrderEstimator() {
     return new EVMOrderEstimator(this.order, {
       logger: this.logger,
-      preSwapRouteHint: this.preliminarySwapResult,
       validationPayload: this.payload,
     });
   }

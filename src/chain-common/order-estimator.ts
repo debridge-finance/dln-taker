@@ -1,19 +1,14 @@
 import { buffersAreEqual } from '@debridge-finance/dln-client';
 import { calculateExpectedTakeAmount } from '@debridge-finance/legacy-dln-profitability';
-import {
-  SwapConnectorRequest,
-  SwapConnectorResult,
-} from 'node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector';
 import { Logger } from 'pino';
 import { assert } from '../errors';
 import { createClientLogger } from '../dln-ts-client.utils';
 import { CreatedOrder } from './order';
 import './mixins';
-import { OrderEvaluationContextual, OrderEvaluationPayload } from './shared';
+import { OrderEvaluationContextual, OrderEvaluationPayload } from './order-evaluation-context';
 
 type OrderEstimatorContext = {
   logger: Logger;
-  preSwapRouteHint?: SwapConnectorRequest['routeHint'];
   validationPayload: OrderEvaluationPayload;
 };
 
@@ -74,27 +69,11 @@ type RawOrderEstimation = {
   projectedFulfillAmount: bigint;
 };
 
-function toOrderEstimation(
-  rawOrderEstimation: RawOrderEstimation,
-  order: CreatedOrder,
-  payload?: OrderEvaluationPayload,
-): OrderEstimation {
-  return {
-    order,
-    isProfitable: rawOrderEstimation.isProfitable,
-    requiredReserveAmount: rawOrderEstimation.requiredReserveAmount,
-    projectedFulfillAmount: rawOrderEstimation.projectedFulfillAmount,
-    preFulfillSwapResult: undefined,
-    payload: payload || {},
-  };
-}
-
 export type OrderEstimation = {
   readonly order: CreatedOrder;
   readonly isProfitable: boolean;
   readonly requiredReserveAmount: bigint;
   readonly projectedFulfillAmount: bigint;
-  readonly preFulfillSwapResult: SwapConnectorResult | undefined;
   readonly payload: OrderEvaluationPayload;
 };
 
@@ -109,6 +88,19 @@ export class OrderEstimator extends OrderEvaluationContextual {
     this.logger = context.logger.child({ service: OrderEstimator.name });
   }
 
+  private getRouteHint() {
+    if (this.order.route.requiresSwap) {
+      const routeHint = this.payload.validationPreFulfillSwap;
+      assert(
+        routeHint !== undefined,
+        'missing validationPreFulfillSwap from the validator for route hinting when building final swap txn',
+      );
+      return routeHint;
+    }
+
+    return undefined;
+  }
+
   protected async getExpectedTakeAmountContext(): Promise<
     Parameters<typeof calculateExpectedTakeAmount>['2']
   > {
@@ -119,7 +111,7 @@ export class OrderEstimator extends OrderEvaluationContextual {
       swapConnector: this.order.executor.swapConnector,
       logger: createClientLogger(this.logger),
       batchSize: await this.getBatchUnlockSizeForProfitability(),
-      swapEstimationPreference: this.context.preSwapRouteHint,
+      swapEstimationPreference: this.getRouteHint(),
       isFeatureEnableOpHorizon: process.env.FEATURE_OP_HORIZON_CAMPAIGN === 'true',
     };
   }
@@ -154,9 +146,9 @@ export class OrderEstimator extends OrderEvaluationContextual {
 
     // provide a swap that would be executed upon fulfillment: this is crucial because this swap may be outdated
     // making estimation not profitable
-    let swapResult;
+    let preFulfillSwap;
     if (this.order.route.requiresSwap) {
-      swapResult = await this.order.executor.swapConnector.getSwap(
+      preFulfillSwap = await this.order.executor.swapConnector.getSwap(
         {
           amountIn: rawOrderEstimation.requiredReserveAmount,
           chainId: this.order.orderData.take.chainId,
@@ -166,7 +158,7 @@ export class OrderEstimator extends OrderEvaluationContextual {
             rawOrderEstimation.projectedFulfillAmount,
             this.order.orderData.take.amount,
           ),
-          routeHint: this.context.preSwapRouteHint,
+          routeHint: this.getRouteHint(),
           fromAddress: this.order.takeChain.fulfillAuthority.bytesAddress,
           destReceiver: this.order.executor.client.getForwarderAddress(
             this.order.orderData.take.chainId,
@@ -177,15 +169,20 @@ export class OrderEstimator extends OrderEvaluationContextual {
         },
       );
 
-      rawOrderEstimation.projectedFulfillAmount = swapResult.amountOut;
-      if (swapResult.amountOut < this.order.orderData.take.amount) {
+      rawOrderEstimation.projectedFulfillAmount = preFulfillSwap.amountOut;
+      if (preFulfillSwap.amountOut < this.order.orderData.take.amount) {
         rawOrderEstimation.isProfitable = false;
       }
+
+      this.setPayloadEntry('preFulfillSwap', preFulfillSwap);
     }
 
     return {
-      ...toOrderEstimation(rawOrderEstimation, this.order, this.payload),
-      preFulfillSwapResult: swapResult,
+      order: this.order,
+      isProfitable: rawOrderEstimation.isProfitable,
+      requiredReserveAmount: rawOrderEstimation.requiredReserveAmount,
+      projectedFulfillAmount: rawOrderEstimation.projectedFulfillAmount,
+      payload: this.payload,
     };
   }
 

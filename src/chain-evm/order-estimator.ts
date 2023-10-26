@@ -7,9 +7,11 @@ export class EVMOrderEstimator extends OrderEstimator {
   // Must cover up to 12.5% block base fee increase. Must be in sync with EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_MULTIPLIER
   public static readonly EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.075;
 
-  public static readonly EVM_ESTIMATED_GAS_PRICE_NAME = 'evmEstimatedGasPrice';
+  public static readonly PAYLOAD_ENTRY__EVM_ESTIMATED_GAS_PRICE =
+    'EVMOrderEstimator.PAYLOAD_ENTRY__EVM_ESTIMATED_GAS_PRICE';
 
-  public static readonly EVM_ESTIMATED_FEE_NAME = 'evmEstimatedFee';
+  public static readonly PAYLOAD_ENTRY__EVM_ESTIMATED_FEE =
+    'EVMOrderEstimator.PAYLOAD_ENTRY__EVM_ESTIMATED_FEE';
 
   /**
    * Estimate gas price that would be relevant during the next few moments. An order would be estimated against
@@ -29,7 +31,10 @@ export class EVMOrderEstimator extends OrderEstimator {
     this.logger.debug(
       `estimated gas price for the next block: ${estimatedNextGasPrice}, buffered: ${bufferedGasPrice}`,
     );
-    this.setPayloadEntry<bigint>(EVMOrderEstimator.EVM_ESTIMATED_GAS_PRICE_NAME, bufferedGasPrice);
+    this.setPayloadEntry(
+      EVMOrderEstimator.PAYLOAD_ENTRY__EVM_ESTIMATED_GAS_PRICE,
+      bufferedGasPrice,
+    );
 
     return bufferedGasPrice;
   }
@@ -41,8 +46,13 @@ export class EVMOrderEstimator extends OrderEstimator {
     Parameters<typeof calculateExpectedTakeAmount>['2']
   > {
     const gasPrice = await this.getEstimatedGasPrice();
-    const gasLimit = this.getPayloadEntry<number>(EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_NAME);
-    this.setPayloadEntry(EVMOrderEstimator.EVM_ESTIMATED_FEE_NAME, gasPrice * BigInt(gasLimit));
+    const gasLimit = this.getPayloadEntry<number>(
+      EVMOrderValidator.PAYLOAD_ENTRY__EVM_FULFILL_GAS_LIMIT,
+    );
+    this.setPayloadEntry(
+      EVMOrderEstimator.PAYLOAD_ENTRY__EVM_ESTIMATED_FEE,
+      gasPrice * BigInt(gasLimit),
+    );
 
     const parentContext = await super.getExpectedTakeAmountContext();
     return {

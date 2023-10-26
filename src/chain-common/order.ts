@@ -10,7 +10,6 @@ import { findExpectedBucket } from '@debridge-finance/legacy-dln-profitability';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Logger } from 'pino';
 import { EVMOrderValidator } from '../chain-evm/order-validator';
-import { BLOCK_CONFIRMATIONS_HARD_CAPS, SupportedChain } from '../config';
 import {
   IExecutor,
   ExecutorSupportedChain,
@@ -86,7 +85,7 @@ export class CreatedOrder {
     );
   }
 
-  async getMaxProfitableReserveAmount(): Promise<bigint> {
+  async getMaxProfitableReserveAmountWithoutOperatingExpenses(): Promise<bigint> {
     // getting the rough amount we are willing to spend after reserving our intended margin
     const margin = BigInt(this.giveChain.srcConstraints.profitability);
     const reserveDstAmount = await this.getGiveAmountInReserveToken();
@@ -95,8 +94,7 @@ export class CreatedOrder {
   }
 
   get blockConfirmations(): number {
-    if (this.finalization === 'Finalized')
-      return BLOCK_CONFIRMATIONS_HARD_CAPS[this.giveChain.chain as unknown as SupportedChain];
+    if (this.finalization === 'Finalized') return this.giveChain.network.finalizedBlockCount;
     return this.finalization;
   }
 

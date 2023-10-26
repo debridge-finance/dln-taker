@@ -3,6 +3,7 @@ import { Logger } from 'pino';
 import { InitTransactionBuilder } from 'src/processor';
 import { FulfillTransactionBuilder } from 'src/chain-common/order-taker';
 import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
+import { setTimeout } from 'timers/promises';
 import { unlockTx } from './utils/unlock.tx';
 import { tryInitTakerALT } from './utils/init-alts.tx';
 import { createOrderFullfillTx } from './utils/orderFulfill.tx';
@@ -67,10 +68,15 @@ export class SolanaTransactionBuilder
 
         return [];
       } catch (e) {
-        logger.info(`Unable to initialize alts (attempt ${i}/${maxAttempts})`);
-        logger.error(e);
+        const attempt = i + 1;
+        logger.info(`Unable to initialize alts (attempt ${attempt}/${maxAttempts})`);
+        if (attempt === maxAttempts) logger.error(e);
+        // sleep for 2s
+        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+        await setTimeout(2000);
       }
     }
-    throw new Error('Unable to initialize alts');
+
+    throw new Error('Unable to initialize alts, restart the taker');
   }
 }

@@ -30,7 +30,11 @@ export async function tryInitTakerALT(
 ) {
   // WARN: initForTaket requires explicit payer (tx signer) and actual taker addresses
   // On MPC feat activation initForTaker payer will be = helper wallet and taker = mpc address
-  const maybeTxs = await solanaClient.initForTaker(new PublicKey(solanaAdapter.bytesAddress), new PublicKey(takerAddress), chains);
+  const maybeTxs = await solanaClient.initForTaker(
+    new PublicKey(solanaAdapter.bytesAddress),
+    new PublicKey(takerAddress),
+    chains,
+  );
   if (!maybeTxs) {
     logger.info(
       `ALT already initialized or was found: ${solanaClient.fulfillPreswapALT!.toBase58()}`,

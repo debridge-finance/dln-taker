@@ -13,13 +13,14 @@ import {
 import { BumpedFeeManager } from './bumpedFeeManager';
 
 type TransactionConfig = Parameters<Web3['eth']['sendTransaction']>[0];
+
 export type BroadcastedTx = {
   tx: TransactionConfig;
   hash: string;
   time: Date;
 };
 
-export type EvmTxContext = {
+type EvmTxContext = {
   logger: Logger;
 };
 

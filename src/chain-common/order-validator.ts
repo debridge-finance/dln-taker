@@ -1,5 +1,4 @@
 import { buffersAreEqual, OrderState, ChainId, Order } from '@debridge-finance/dln-client';
-import { SwapConnectorResult } from 'node_modules/@debridge-finance/dln-client/dist/types/swapConnector/swap.connector';
 import { Logger } from 'pino';
 import { helpers } from '@debridge-finance/solana-utils';
 import { DexlessChains } from '../config';
@@ -8,7 +7,7 @@ import { RejectionReason, PostponingReason } from '../hooks/HookEnums';
 import { createClientLogger } from '../dln-ts-client.utils';
 import { CreatedOrder } from './order';
 import { OrderEstimator } from './order-estimator';
-import { OrderEvaluationContextual } from './shared';
+import { OrderEvaluationContextual } from './order-evaluation-context';
 import { TakerShortCircuit } from './order-taker';
 
 // gets the amount of sec to additionally wait until this order can be processed
@@ -29,8 +28,6 @@ function getOrderRemainingDelay(firstSeen: Date, delay: number): number {
 export class OrderValidator extends OrderEvaluationContextual {
   readonly #logger: Logger;
 
-  #preliminarySwapResult?: SwapConnectorResult;
-
   constructor(
     protected readonly order: CreatedOrder,
     protected readonly sc: TakerShortCircuit,
@@ -38,10 +35,6 @@ export class OrderValidator extends OrderEvaluationContextual {
   ) {
     super();
     this.#logger = context.logger.child({ service: OrderValidator.name });
-  }
-
-  protected get preliminarySwapResult() {
-    return this.#preliminarySwapResult;
   }
 
   protected get logger() {
@@ -74,7 +67,6 @@ export class OrderValidator extends OrderEvaluationContextual {
   protected getOrderEstimator() {
     return new OrderEstimator(this.order, {
       logger: this.#logger,
-      preSwapRouteHint: this.#preliminarySwapResult,
       validationPayload: this.payload,
     });
   }
@@ -193,9 +185,7 @@ export class OrderValidator extends OrderEvaluationContextual {
       if (currentGiveTVL + usdValue > TVLBudgetController.budget) {
         const message = `order worth $${usdValue} increases TVL of the ${
           ChainId[this.order.giveChain.chain]
-        } over a budget of $${
-          TVLBudgetController.budget
-        } (current TVL: $${currentGiveTVL}), thus postponing`;
+        } over a budget of $${TVLBudgetController.budget} (current TVL: $${currentGiveTVL})`;
         return this.sc.postpone(PostponingReason.TVL_BUDGET_EXCEEDED, message);
       }
     }
@@ -245,7 +235,7 @@ export class OrderValidator extends OrderEvaluationContextual {
     );
 
     if (isThrottled) {
-      const message = 'order does not fit the throughput, postponing';
+      const message = 'order does not fit throttled throughput';
       return this.sc.postpone(PostponingReason.CAPPED_THROUGHPUT, message);
     }
     return Promise.resolve();
@@ -297,9 +287,7 @@ export class OrderValidator extends OrderEvaluationContextual {
     // reject orders that require pre-fulfill swaps on the dexless chains (e.g. Linea)
     const { reserveDstToken } = this.order.route;
     if (DexlessChains[take.chainId] && !buffersAreEqual(reserveDstToken, take.tokenAddress)) {
-      const message = `swaps are unavailable on ${
-        ChainId[take.chainId]
-      }, can't perform pre-fulfill swap from ${reserveDstToken.toAddress(
+      const message = `pre-fulfill swaps are unavailable, can't perform pre-fulfill swap from ${reserveDstToken.toAddress(
         take.chainId,
       )} to ${take.tokenAddress.toAddress(take.chainId)}`;
       return this.sc.reject(RejectionReason.UNAVAILABLE_PRE_FULFILL_SWAP, message);
@@ -312,7 +300,8 @@ export class OrderValidator extends OrderEvaluationContextual {
     const { reserveDstToken } = this.order.route;
 
     // reserveSrcToken is eq to reserveDstToken, but need to sync decimals
-    const maxProfitableReserveAmount = await this.order.getMaxProfitableReserveAmount();
+    const maxProfitableReserveAmount =
+      await this.order.getMaxProfitableReserveAmountWithoutOperatingExpenses();
 
     const accountReserveBalance = await this.order.executor.client
       .getClient(this.order.takeChain.chain)
@@ -340,7 +329,8 @@ export class OrderValidator extends OrderEvaluationContextual {
   }
 
   private async checkRoughProfitability(): Promise<void> {
-    const maxProfitableReserveAmount = await this.order.getMaxProfitableReserveAmount();
+    const maxProfitableReserveAmount =
+      await this.order.getMaxProfitableReserveAmountWithoutOperatingExpenses();
     this.#logger.debug(`obtained max profitable reserve amount: ${maxProfitableReserveAmount}`);
 
     // now compare if aforementioned rough amount is still profitable
@@ -368,7 +358,7 @@ export class OrderValidator extends OrderEvaluationContextual {
         return this.sc.postpone(PostponingReason.NOT_PROFITABLE, message);
       }
 
-      this.#preliminarySwapResult = preliminarySwapResult;
+      this.setPayloadEntry('validationPreFulfillSwap', preliminarySwapResult);
     } else if (maxProfitableReserveAmount < this.order.orderData.take.amount) {
       const message = `rough profitability estimation failed, max profitable reserve amount is less than order's take amount; expected: ${this.order.orderData.take.amount} but actual: ${maxProfitableReserveAmount}`;
       return this.sc.postpone(PostponingReason.NOT_PROFITABLE, message);

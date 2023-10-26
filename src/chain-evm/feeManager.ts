@@ -1,5 +1,6 @@
 import { ChainId } from '@debridge-finance/dln-client';
 import { SupportedChain } from 'src/config';
+import { assert } from 'src/errors';
 import Web3 from 'web3';
 
 export type EIP1551Fee = {
@@ -55,9 +56,8 @@ export class EvmFeeManager {
    * pending block, and we are sure that next-to-pending block is almost ready)
    */
   async getOptimisticFee(): Promise<EIP1551Fee> {
-    if (this.isLegacy) {
-      throw new Error('Unsupported method');
-    }
+    assert(!this.isLegacy, 'Unsupported method');
+
     const history = await this.#connection.eth.getFeeHistory(2, 'pending', [25, 50]);
 
     // tip is taken depending of two blocks: latest, pending. If any of them is utilized > 50%, put the highest (p75) bid
@@ -79,9 +79,7 @@ export class EvmFeeManager {
   }
 
   async getOptimisticLegacyFee(): Promise<bigint> {
-    if (!this.isLegacy) {
-      throw new Error('Unsupported method');
-    }
+    assert(this.isLegacy, 'Unsupported method');
     let price = BigInt(await this.#connection.eth.getGasPrice());
 
     // BNB chain: ensure gas price is between [3gwei, 5gwei]

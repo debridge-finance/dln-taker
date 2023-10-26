@@ -15,7 +15,8 @@ export async function unlockTx(
   orders: Array<OrderDataWithId>,
   logger: Logger,
 ): Promise<InputTransaction> {
-  assert(orders.length > 0, 'unexpected: zero orders passed for unlock');
+  assert(orders.length > 0, 'empty array of orders given for batch unlock');
+
   const order = orders[0];
   const giveChain = executor.getSupportedChain(order.give.chainId);
   const takeChain = executor.getSupportedChain(order.take.chainId);

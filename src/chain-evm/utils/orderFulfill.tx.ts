@@ -12,12 +12,15 @@ async function getLowLevelEvmInstruction(
   logger: Logger,
 ): Promise<EvmInstruction> {
   const { order } = estimation;
-  if (estimation.preFulfillSwapResult) {
+  if (estimation.order.route.requiresSwap) {
+    const swapResult = estimation.payload.preFulfillSwap;
+    assert(swapResult !== undefined, 'missing preFulfillSwap payload entry');
+
     return order.executor.client.preswapAndFulfillOrder<ChainEngine.EVM>(
       {
         order: order.getWithId(),
         taker: order.takeChain.fulfillAuthority.bytesAddress,
-        swapResult: estimation.preFulfillSwapResult,
+        swapResult,
         loggerInstance: createClientLogger(logger),
       },
       {
@@ -47,11 +50,12 @@ export async function getFulfillTx(
 ): Promise<InputTransaction> {
   const ix = await getLowLevelEvmInstruction(estimation, logger);
   const cappedFee = <bigint | undefined>(
-    estimation.payload[EVMOrderEstimator.EVM_ESTIMATED_FEE_NAME]
+    estimation.payload[EVMOrderEstimator.PAYLOAD_ENTRY__EVM_ESTIMATED_FEE]
   );
   assert(
     (typeof cappedFee === 'bigint' && cappedFee > 0) ||
-      estimation.payload[EVMOrderValidator.EVM_FULFILL_DISABLE_TX_CAPPED_FEE_NAME] === true,
+      estimation.payload[EVMOrderValidator.PAYLOAD_ENTRY__EVM_FULFILL_DISABLE_TX_CAPPED_FEE] ===
+        true,
     'evm order fulfill expects either a capped fee or explicitly disabled fee capping',
   );
   const tx = {

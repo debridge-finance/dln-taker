@@ -1,6 +1,7 @@
 import { ChainEngine } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 import { VersionedTransaction } from '@solana/web3.js';
+import { assert } from 'src/errors';
 import { createClientLogger } from '../../dln-ts-client.utils';
 import { OrderEstimation } from '../../chain-common/order-estimator';
 
@@ -9,18 +10,20 @@ export async function createOrderFullfillTx(
   logger: Logger,
 ): Promise<VersionedTransaction> {
   const { order } = estimation;
-  if (estimation.preFulfillSwapResult) {
+  if (estimation.order.route.requiresSwap) {
+    const swapResult = estimation.payload.preFulfillSwap;
+    assert(swapResult !== undefined, 'missing preFulfillSwap payload entry');
+
     return order.executor.client.preswapAndFulfillOrder<ChainEngine.Solana>(
       {
         order: order.getWithId(),
         taker: order.takeChain.fulfillAuthority.bytesAddress,
-        swapResult: estimation.preFulfillSwapResult,
+        swapResult,
         loggerInstance: createClientLogger(logger),
       },
       {
         unlockAuthority: order.takeChain.unlockAuthority.bytesAddress,
         computeUnitsLimit: 600_000,
-        // externalCallRewardBeneficiary: this.order.takeChain.beneficiary,
       },
     );
   }
@@ -31,10 +34,8 @@ export async function createOrderFullfillTx(
       loggerInstance: createClientLogger(logger),
     },
     {
-      // permit: '0x',
       taker: order.takeChain.fulfillAuthority.bytesAddress,
       unlockAuthority: order.takeChain.unlockAuthority.bytesAddress,
-      // externalCallRewardBeneficiary: this.order.takeChain.beneficiary,
     },
   );
 }

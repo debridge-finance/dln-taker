@@ -9,7 +9,8 @@ export async function unlockTx(
   orders: Array<OrderDataWithId>,
   logger: Logger,
 ) {
-  assert(orders.length > 0, '');
+  assert(orders.length > 0, 'empty array of orders given for batch unlock');
+
   const order = orders[0];
   const giveChain = executor.getSupportedChain(order.give.chainId);
   const takeChain = executor.getSupportedChain(order.take.chainId);
@@ -46,8 +47,6 @@ export async function unlockTx(
       orders,
     },
     {
-      // solanaInitWalletReward: fees.rewards[0],
-      // solanaClaimUnlockReward: fees.rewards[1],
       unlocker: takeChain.unlockAuthority.bytesAddress,
     },
   );
