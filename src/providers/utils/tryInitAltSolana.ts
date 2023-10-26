@@ -25,11 +25,13 @@ export async function tryInitTakerALT(
   chains: ChainId[],
   solanaClient: Solana.DlnClient,
   logger: Logger,
-  retries = 3,
+  retries = 5,
 ) {
   for (let i = 0; i < retries; i += 1) {
+    // WARN: initForTaket requires explicit payer (tx signer) and actual taker addresses
+    // On MPC feat activation initForTaker payer will be = helper wallet and taker = mpc address
     // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-    const maybeTxs = await solanaClient.initForTaker(wallet.publicKey, chains);
+    const maybeTxs = await solanaClient.initForTaker(wallet.publicKey, wallet.publicKey, chains);
     if (!maybeTxs) {
       logger.info(
         `ALT already initialized or was found: ${solanaClient.fulfillPreswapALT!.toBase58()}`,
