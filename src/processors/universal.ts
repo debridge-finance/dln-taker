@@ -395,6 +395,7 @@ class UniversalProcessor extends BaseOrderProcessor {
   }
 
   private async evaluateAndFulfill(metadata: CreatedOrderMetadata): Promise<void> {
+    const timeStart = new Date().getTime();
     const { context, orderInfo } = metadata.context;
     const { orderId } = orderInfo;
     const { logger } = context;
@@ -903,7 +904,8 @@ class UniversalProcessor extends BaseOrderProcessor {
     // order is fulfilled, remove it from queues (the order may have come again thru WS)
     this.clearInternalQueues(orderInfo.orderId);
     context.giveChain.TVLBudgetController.flushCache();
-    logger.info(`order fulfilled: ${orderId}`);
+    const elapsedTime = new Date().getTime() - timeStart;
+    logger.info(`order ${orderId} probably fulfilled in ${elapsedTime / 1000}s`);
 
     // putting the order to the mempool, in case fulfill_txn gets lost
     const fulfillCheckDelay: number =
