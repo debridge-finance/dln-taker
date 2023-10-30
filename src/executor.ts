@@ -19,9 +19,9 @@ import bs58 from 'bs58';
 import { Logger } from 'pino';
 
 import { TokensBucket, setSlippageOverloader } from '@debridge-finance/legacy-dln-profitability';
-import { DlnConfig } from 'node_modules/@debridge-finance/dln-client/dist/types/evm/core/models/config.model';
 import BigNumber from 'bignumber.js';
 import Web3 from 'web3';
+import { DlnConfig } from 'node_modules/@debridge-finance/dln-client/dist/types/evm/index';
 import {
   ChainDefinition,
   ExecutorLaunchConfig,

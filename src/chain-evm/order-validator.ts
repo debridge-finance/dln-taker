@@ -2,7 +2,7 @@ import Web3 from 'web3';
 import { PostponingReason } from '../hooks/HookEnums';
 import { OrderValidator } from '../chain-common/order-validator';
 import { EVMOrderEstimator } from './order-estimator';
-import { getFulfillTx } from './utils/orderFulfill.tx';
+import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { EVM_GAS_LIMIT_MULTIPLIER, InputTransaction } from './signer';
 
 export class EVMOrderValidator extends OrderValidator {
@@ -30,7 +30,7 @@ export class EVMOrderValidator extends OrderValidator {
   }
 
   private async checkEvmEstimation(): Promise<void> {
-    const tx = await getFulfillTx(
+    const tx = await createOrderFullfillTx(
       {
         order: this.order,
         isProfitable: true,

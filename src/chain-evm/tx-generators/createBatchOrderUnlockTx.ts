@@ -1,14 +1,20 @@
-import { ChainEngine, OrderDataWithId, OrderEstimationStage } from '@debridge-finance/dln-client';
+import {
+  ChainEngine,
+  ChainId,
+  OrderDataWithId,
+  OrderEstimationStage,
+} from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 import { assert } from '../../errors';
 import { IExecutor } from '../../executor';
 import { createClientLogger } from '../../dln-ts-client.utils';
+import { InputTransaction } from '../signer';
 
-export async function unlockTx(
+export async function createBatchOrderUnlockTx(
   executor: IExecutor,
   orders: Array<OrderDataWithId>,
   logger: Logger,
-) {
+): Promise<InputTransaction> {
   assert(orders.length > 0, 'empty array of orders given for batch unlock');
 
   const order = orders[0];
@@ -39,15 +45,26 @@ export async function unlockTx(
     },
   );
 
-  return executor.client.sendBatchUnlock<ChainEngine.Solana>(
+  const extraPayload =
+    giveChain.chain === ChainId.Solana
+      ? {
+          solanaInitWalletReward: fees.rewards[0],
+          solanaClaimUnlockReward: fees.rewards[1],
+        }
+      : {};
+
+  const tx = await executor.client.sendBatchUnlock<ChainEngine.EVM>(
     {
       beneficiary: giveChain.unlockBeneficiary,
       executionFee: fees.total,
       loggerInstance: createClientLogger(logger),
       orders,
     },
-    {
-      unlocker: takeChain.unlockAuthority.bytesAddress,
-    },
+    extraPayload,
   );
+  return {
+    to: tx.to,
+    data: tx.data,
+    value: tx.value?.toString() || undefined,
+  };
 }

@@ -44,7 +44,7 @@ async function getLowLevelEvmInstruction(
   );
 }
 
-export async function getFulfillTx(
+export async function createOrderFullfillTx(
   estimation: OrderEstimation,
   logger: Logger,
 ): Promise<InputTransaction> {

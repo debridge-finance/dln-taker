@@ -4,9 +4,9 @@ import { InitTransactionBuilder } from 'src/processor';
 import { FulfillTransactionBuilder } from 'src/chain-common/order-taker';
 import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
 import { setTimeout } from 'timers/promises';
-import { unlockTx } from './utils/unlock.tx';
-import { tryInitTakerALT } from './utils/init-alts.tx';
-import { createOrderFullfillTx } from './utils/orderFulfill.tx';
+import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
+import { tryInitTakerALT } from './tx-generators/tryInitTakerALT';
+import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { SolanaTxSigner } from './signer';
 import { IExecutor } from '../executor';
 import { OrderEstimation } from '../chain-common/order-estimator';
@@ -44,7 +44,7 @@ export class SolanaTransactionBuilder
 
   getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {
     return async () =>
-      this.signer.sendTransaction(await unlockTx(this.executor, orders, logger), {
+      this.signer.sendTransaction(await createBatchOrderUnlockTx(this.executor, orders, logger), {
         logger,
         options: {},
       });
