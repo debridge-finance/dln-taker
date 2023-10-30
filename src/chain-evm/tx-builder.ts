@@ -1,15 +1,15 @@
 import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 import Web3 from 'web3';
-import { InitTransactionBuilder } from 'src/processor';
-import { FulfillTransactionBuilder } from 'src/chain-common/order-taker';
-import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
 import { OrderEstimation } from '../chain-common/order-estimator';
 import { IExecutor } from '../executor';
 import { EvmTxSigner } from './signer';
 import { createERC20ApproveTxs } from './tx-generators/createERC20ApproveTxs';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
+import { InitTransactionBuilder } from '../processor';
+import { BatchUnlockTransactionBuilder } from '../processors/BatchUnlocker';
+import { FulfillTransactionBuilder } from '../chain-common/order-taker';
 
 export class EvmTransactionBuilder
   implements InitTransactionBuilder, FulfillTransactionBuilder, BatchUnlockTransactionBuilder

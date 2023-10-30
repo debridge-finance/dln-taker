@@ -1,6 +1,6 @@
 import { OrderDataWithId } from '@debridge-finance/dln-client';
 import { Logger, LoggerOptions } from 'pino';
-import { InitTransactionBuilder } from 'src/processor';
+import { InitTransactionBuilder } from '../processor';
 import { BatchUnlockTransactionBuilder } from '../processors/BatchUnlocker';
 import { OrderEstimation } from './order-estimator';
 import { FulfillTransactionBuilder } from './order-taker';

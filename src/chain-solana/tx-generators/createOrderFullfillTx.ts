@@ -1,9 +1,9 @@
 import { ChainEngine } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 import { VersionedTransaction } from '@solana/web3.js';
-import { assert } from 'src/errors';
 import { createClientLogger } from '../../dln-ts-client.utils';
 import { OrderEstimation } from '../../chain-common/order-estimator';
+import { assert } from '../../errors';
 
 export async function createOrderFullfillTx(
   estimation: OrderEstimation,

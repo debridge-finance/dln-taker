@@ -9,9 +9,9 @@ import {
 import { Logger } from 'pino';
 
 import { helpers } from '@debridge-finance/solana-utils';
-import { Authority } from 'src/interfaces';
 import { TransactionSender } from '../chain-common/tx-builder';
 import { ExecutorSupportedChain, IExecutor } from '../executor';
+import { Authority } from '../interfaces';
 
 export interface BatchUnlockTransactionBuilder {
   unlockAuthority: Authority;

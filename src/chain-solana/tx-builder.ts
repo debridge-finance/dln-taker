@@ -1,8 +1,5 @@
 import { ChainId, OrderDataWithId, Solana } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { InitTransactionBuilder } from 'src/processor';
-import { FulfillTransactionBuilder } from 'src/chain-common/order-taker';
-import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
 import { setTimeout } from 'timers/promises';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { tryInitTakerALT } from './tx-generators/tryInitTakerALT';
@@ -10,6 +7,9 @@ import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { SolanaTxSigner } from './signer';
 import { IExecutor } from '../executor';
 import { OrderEstimation } from '../chain-common/order-estimator';
+import { InitTransactionBuilder } from '../processor';
+import { FulfillTransactionBuilder } from '../chain-common/order-taker';
+import { BatchUnlockTransactionBuilder } from '../processors/BatchUnlocker';
 
 export class SolanaTransactionBuilder
   implements InitTransactionBuilder, FulfillTransactionBuilder, BatchUnlockTransactionBuilder

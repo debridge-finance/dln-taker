@@ -21,7 +21,6 @@ import { Logger } from 'pino';
 import { TokensBucket, setSlippageOverloader } from '@debridge-finance/legacy-dln-profitability';
 import BigNumber from 'bignumber.js';
 import Web3 from 'web3';
-import { DlnConfig } from 'node_modules/@debridge-finance/dln-client/dist/types/evm/index';
 import {
   ChainDefinition,
   ExecutorLaunchConfig,
@@ -52,6 +51,8 @@ import { EvmTransactionBuilder } from './chain-evm/tx-builder';
 import { SwapConnectorImplementationService } from './processors/swap-connector-implementation.service';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
+
+type EvmClientChainConfig = ConstructorParameters<typeof Evm.DlnClient>[0]['chainConfig'];
 
 export type DstOrderConstraints = Readonly<{
   fulfillmentDelay: number;
@@ -272,7 +273,7 @@ export class Executor implements IExecutor {
     }
 
     const clients: ClientImplementation[] = [];
-    const evmChainConfig: DlnConfig['chainConfig'] = {};
+    const evmChainConfig: EvmClientChainConfig = {};
     for (const chain of config.chains) {
       this.logger.info(`initializing ${ChainId[chain.chain]}...`);
 

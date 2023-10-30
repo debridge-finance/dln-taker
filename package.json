@@ -1,6 +1,6 @@
 {
   "name": "@debridge-finance/dln-taker",
-  "version": "3.0.0-rc.0",
+  "version": "3.0.0-rc.1",
   "description": "DLN executor is the rule-based daemon service developed to automatically execute orders placed on the deSwap Liquidity Network (DLN) across supported blockchains",
   "license": "GPL-3.0-only",
   "author": "deBridge",
@@ -17,7 +17,7 @@
     "build": "npm-run-all clean compile && chmod +x ./dist/cli/bootstrap.js",
     "clean": "rimraf ./dist",
     "compile": "tsc -P tsconfig.build.json",
-    "executor": "ts-node -r tsconfig-paths/register -P tsconfig.dev.json ./src/cli/bootstrap.ts",
+    "executor": "ts-node -P tsconfig.dev.json ./src/cli/bootstrap.ts",
     "format": "npm-run-all lint pretty",
     "lint": "npm-run-all lint:ts lint:tsc",
     "lint:ts": "eslint --fix \"{src,tests}/**/*.ts\" sample.config.ts",
@@ -28,7 +28,7 @@
     "pretty:package": "prettier-package-json --write",
     "pretty:ts": "prettier --write \"{src,tests}/**/*.ts\" sample.config.ts",
     "start:compiled": "./dist/cli/bootstrap.js",
-    "test": "mocha -r ts-node/register -r tsconfig-paths/register -b -t 100000 ./tests/**/*.test.ts"
+    "test": "mocha -r ts-node/register -b -t 100000 ./tests/**/*.test.ts"
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
@@ -79,7 +79,6 @@
     "prettier-package-json": "^2.8.0",
     "rimraf": "3.0.2",
     "ts-node": "10.9.1",
-    "tsconfig-paths": "^4.2.0",
     "typescript": "~5.1.6"
   },
   "keywords": [

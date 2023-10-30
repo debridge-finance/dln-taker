@@ -1,7 +1,7 @@
 import { ChainId } from '@debridge-finance/dln-client';
-import { SupportedChain } from 'src/config';
-import { assert } from 'src/errors';
 import Web3 from 'web3';
+import { SupportedChain } from '../config';
+import { assert } from '../errors';
 
 export type EIP1551Fee = {
   baseFee: bigint;

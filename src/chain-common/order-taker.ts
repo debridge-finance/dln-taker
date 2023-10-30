@@ -1,7 +1,7 @@
 import { Logger } from 'pino';
-import { Authority } from 'src/interfaces';
 import { assert } from '../errors';
 import { PostponingReason, RejectionReason } from '../hooks/HookEnums';
+import { Authority } from '../interfaces';
 
 import { CreatedOrder } from './order';
 import { explainEstimation, OrderEstimation } from './order-estimator';
