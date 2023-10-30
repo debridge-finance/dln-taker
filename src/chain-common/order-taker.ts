@@ -28,6 +28,8 @@ export class CreatedOrderTaker {
   }
 
   async take(sc: TakerShortCircuit, transactionBuilder: FulfillTransactionBuilder) {
+    const startedAt = new Date().getTime();
+
     this.#logger.debug('+ attempting to validate');
     const estimator = await this.order.getValidator(sc).validate();
 
@@ -38,10 +40,14 @@ export class CreatedOrderTaker {
       return sc.postpone(PostponingReason.NOT_PROFITABLE, await explainEstimation(estimation));
     }
 
-    this.#logger.debug('+ attempting to fulfill');
+    const evaluationTime = (new Date().getTime() - startedAt) / 1000;
+    this.#logger.debug(`+ attempting to fulfill after evaluating for ${evaluationTime}s`);
     const fulfillTxHash = await this.attemptFulfil(transactionBuilder, estimation, sc);
     assert(typeof fulfillTxHash === 'string', 'should have raised an error');
-    this.#logger.info(`✔ fulfill tx broadcasted, txhash: ${fulfillTxHash}`);
+    const elapsedTime = (new Date().getTime() - startedAt) / 1000;
+    this.#logger.info(
+      `✔ fulfill tx broadcasted, txhash: ${fulfillTxHash}, took ${evaluationTime}s to evaluate, ${elapsedTime}s overall`,
+    );
 
     // we add this order to the budget controller right before the txn is broadcasted
     // Mind that in case of an error (see the catch{} block below) we don't remove it from the
