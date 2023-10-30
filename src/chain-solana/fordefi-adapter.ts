@@ -1,16 +1,13 @@
-import { OrderDataWithId } from '@debridge-finance/dln-client';
+import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
-import { VersionedTransaction } from '@solana/web3.js';
 import { Logger, LoggerOptions } from 'pino';
 import { OrderEstimation } from 'src/chain-common/order-estimator';
 import { IExecutor } from 'src/executor';
-import {
-  CreateSolanaRawTransactionRequest,
-  CreateTransactionRequest,
-} from 'src/forDefiClient/create-transaction-requests';
+import { CreateTransactionRequest } from 'src/forDefiClient/create-transaction-requests';
 import { FordefiAdapter } from 'src/forDefiClient/tx-builder';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
+import { SolanaForDefiConverter } from './fordefi-converter';
 
 const enum ForDefiTransactionAction {
   FulfillOrder = 'FulfillOrder',
@@ -36,9 +33,14 @@ export class SolanaForDefiTransactionAdapter implements FordefiAdapter {
 
   readonly #executor: IExecutor;
 
+  readonly #converter: SolanaForDefiConverter;
+
   constructor(vaultId: string, executor: IExecutor) {
     this.#vaultId = vaultId;
     this.#executor = executor;
+    this.#converter = new SolanaForDefiConverter(
+      this.#executor.client.getConnection<ChainId.Solana>(ChainId.Solana),
+    );
   }
 
   async getBatchOrderUnlockTxSender(
@@ -50,7 +52,7 @@ export class SolanaForDefiTransactionAdapter implements FordefiAdapter {
       ForDefiTransactionAction.BatchOrderUnlock,
       { orderIds: orders.map((order) => helpers.bufferToHex(order.orderId)) },
     );
-    return this.convert(versionedTx, note);
+    return this.#converter.convert(versionedTx, note, this.#vaultId);
   }
 
   async getOrderFulfillTxSender(
@@ -64,32 +66,11 @@ export class SolanaForDefiTransactionAdapter implements FordefiAdapter {
         orderId: orderEstimation.order.orderId,
       },
     );
-    return this.convert(versionedTx, note);
+    return this.#converter.convert(versionedTx, note, this.#vaultId);
   }
 
   // eslint-disable-next-line class-methods-use-this -- Required by the interface
   getInitTxSenders(): Promise<CreateTransactionRequest[]> {
     throw new Error('Method not supported, use separate PK authority.');
-  }
-
-  private convert(_tx: VersionedTransaction, note: string): CreateSolanaRawTransactionRequest {
-    // here is where Solana's VersionedTransaction must be repacked
-    // feel free to introduce a separate class for conversion, and cover it with tests
-    const req: CreateSolanaRawTransactionRequest = {
-      vault_id: this.#vaultId,
-      note,
-      signer_type: 'api_signer',
-      type: 'solana_transaction',
-      details: {
-        type: 'solana_raw_transaction',
-        chain: 'solana_mainnet',
-        version: 'legacy', // <!-- legacy | v0
-        instructions: [], // <!--
-        accounts: [], // <!--
-        address_table_lookups: [], // <!--
-      },
-    };
-
-    return req;
   }
 }
