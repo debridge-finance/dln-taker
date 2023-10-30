@@ -22,13 +22,16 @@ export class BumpedFeeManager extends EvmFeeManager {
     // if we need to replace a transaction, we must bump both maxPriorityFee and maxFeePerGas
     fees.maxPriorityFeePerGas = findMaxBigInt(
       fees.maxPriorityFeePerGas,
-      BigInt(replaceTx.tx.maxPriorityFeePerGas?.toString() || 0n) *
-        BigInt(this.#bumpGasPriceMultiplier),
+      (BigInt(replaceTx.tx.maxPriorityFeePerGas?.toString() || 0n) *
+        BigInt(this.#bumpGasPriceMultiplier * 10_000)) /
+        10_000n,
     );
 
     fees.maxFeePerGas = findMaxBigInt(
       fees.baseFee + fees.maxPriorityFeePerGas,
-      BigInt(replaceTx.tx.maxFeePerGas?.toString() || 0n) * BigInt(this.#bumpGasPriceMultiplier),
+      (BigInt(replaceTx.tx.maxFeePerGas?.toString() || 0n) *
+        BigInt(this.#bumpGasPriceMultiplier * 10_000)) /
+        10_000n,
     );
 
     return fees;
@@ -39,7 +42,9 @@ export class BumpedFeeManager extends EvmFeeManager {
 
     if (replaceTx) {
       const replacementTxGasPrice =
-        BigInt(replaceTx.tx.gasPrice?.toString() || 0n) * BigInt(this.#bumpGasPriceMultiplier);
+        (BigInt(replaceTx.tx.gasPrice?.toString() || 0n) *
+          BigInt(this.#bumpGasPriceMultiplier * 10_000)) /
+        10_000n;
       if (replacementTxGasPrice > gasPrice) gasPrice = replacementTxGasPrice;
     }
 

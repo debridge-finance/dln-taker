@@ -24,7 +24,7 @@ const eip1559Compatible: { [key in SupportedChain]: boolean } = {
 };
 
 export function findMaxBigInt(...bigInts: Array<bigint>) {
-  return bigInts.reduce((max, curr) => (curr > max ? curr : max), BigInt(0));
+  return bigInts.reduce((max, curr) => (curr > max ? curr : max), 0n);
 }
 
 export class EvmFeeManager {
