@@ -1,12 +1,14 @@
 import crypto from 'crypto';
-import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
+import { buffersAreEqual, ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 import { OrderEstimation } from 'src/chain-common/order-estimator';
-import { ForDefiClient } from 'src/forDefiClient/client';
+import { convertChainIdToChain, ForDefiClient } from 'src/forDefiClient/client';
 import { InitTransactionBuilder } from 'src/processor';
 import { FulfillTransactionBuilder } from 'src/chain-common/order-taker';
 import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
 import { CreateTransactionRequest } from 'src/forDefiClient/create-transaction-requests';
+import { SupportedChain } from 'src/config';
+import { helpers } from '@debridge-finance/solana-utils';
 import { ForDefiSigner } from './signer';
 
 function generateHash(...params: string[]): Buffer {
@@ -39,6 +41,43 @@ export interface FordefiAdapter {
     logger: Logger,
   ): Promise<CreateTransactionRequest>;
   getInitTxSenders(logger: Logger): Promise<Array<CreateTransactionRequest>>;
+}
+
+enum ForDefiTransactionAction {
+  FulfillOrder = 'FulfillOrder',
+  BatchOrderUnlock = 'BatchOrderUnlock',
+}
+
+type TransactionActionPayload<T extends ForDefiTransactionAction> =
+  {} & (T extends ForDefiTransactionAction.FulfillOrder ? { orderId: string } : {}) &
+    (T extends ForDefiTransactionAction.BatchOrderUnlock ? { orderIds: string[] } : {});
+
+function encodeNote<T extends ForDefiTransactionAction>(
+  action: T,
+  payload: TransactionActionPayload<T>,
+) {
+  return JSON.stringify({
+    action,
+    payload,
+  });
+}
+
+function safeDecodeNote<T extends ForDefiTransactionAction>(
+  data: string,
+  action: T,
+): TransactionActionPayload<T> | undefined {
+  try {
+    const obj = JSON.parse(data);
+    if ('action' in obj && 'payload' in obj) {
+      if (action === obj.action && obj.action in ForDefiTransactionAction) {
+        return obj.payload;
+      }
+    }
+  } catch (e) {
+    return undefined;
+  }
+
+  return undefined;
 }
 
 export class ForDefiTransactionBuilder
@@ -81,15 +120,45 @@ export class ForDefiTransactionBuilder
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
     return async () => {
       const req = await this.#txAdapter.getOrderFulfillTxSender(orderEstimation, logger);
+      req.note = encodeNote<ForDefiTransactionAction.FulfillOrder>(
+        ForDefiTransactionAction.FulfillOrder,
+        {
+          orderId: orderEstimation.order.orderId,
+        },
+      );
 
-      // const transactions = await this.#forDefiApi.getTransactions({
-      //   vaultId: this.#vaultId,
-      //   chain: this.#chain.toString(),
-      //   initiator: this.#forDefiSigner.address,
-      //   states: ['approved', 'waiting_for_approval']
-      // });
+      // todo fetch all pages until the txn we are looking for is found
+      const { transactions } = await this.#forDefiApi.listTransactions({
+        size: 100,
+        vault_ids: [req.vault_id],
+        chains: [convertChainIdToChain(this.#chain as any as SupportedChain)],
+        states: ['approved', 'pending'],
+        sort_by: 'created_at_desc',
+      });
 
-      // if has_any for the given order_id - do not publish new txn
+      // find transaction which fulfills same order id
+      const similarTxns = transactions.filter((transaction) => {
+        const payload = safeDecodeNote<ForDefiTransactionAction.FulfillOrder>(
+          transaction.note,
+          ForDefiTransactionAction.FulfillOrder,
+        );
+        return (
+          payload &&
+          payload.orderId &&
+          buffersAreEqual(
+            helpers.hexToBuffer(payload.orderId),
+            helpers.hexToBuffer(orderEstimation.order.orderId),
+          )
+        );
+      });
+      if (similarTxns.length > 0) {
+        logger.debug(
+          `found ${similarTxns.length} pending transactions fulfilling same order: ${similarTxns
+            .map((tx) => `${tx.id} (${tx.state})`)
+            .join(', ')}`,
+        );
+        return similarTxns[0].id;
+      }
 
       const signedRequest = this.#forDefiSigner.sign(req);
 
@@ -101,6 +170,10 @@ export class ForDefiTransactionBuilder
   getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {
     return async () => {
       const req = await this.#txAdapter.getBatchOrderUnlockTxSender(orders, logger);
+      req.note = encodeNote<ForDefiTransactionAction.BatchOrderUnlock>(
+        ForDefiTransactionAction.BatchOrderUnlock,
+        { orderIds: orders.map((order) => helpers.bufferToHex(order.orderId)) },
+      );
       const signedRequest = this.#forDefiSigner.sign(req);
 
       const idempotenceId = generateUUIDv4FromParams(this.#chain.toString(), req.note);
