@@ -1,37 +1,19 @@
 import crypto from 'crypto';
-import { helpers } from '@debridge-finance/solana-utils';
 import { Logger } from 'pino';
-import { Authority } from '../interfaces';
 import {
   CreateEvmRawTransactionRequest,
   CreateSolanaRawTransactionRequest,
 } from './create-transaction-requests';
+import { SignedCreateTransactionRequest } from './types/createTransaction';
 
-type SignedCreateTransactionRequest = {
-  requestBody: string;
-  timestamp: string;
-  signature: string;
-};
-
-export class ForDefiSigner implements Authority {
-  readonly #address: Uint8Array;
-
+export class ForDefiSigner {
   readonly #signerPrivateKey: crypto.KeyObject;
 
   readonly #logger: Logger;
 
-  constructor(bytesAddress: Uint8Array, signerPrivateKey: crypto.KeyObject, logger: Logger) {
-    this.#address = bytesAddress;
+  constructor(signerPrivateKey: crypto.KeyObject, logger: Logger) {
     this.#signerPrivateKey = signerPrivateKey;
     this.#logger = logger.child({ service: ForDefiSigner.name });
-  }
-
-  public get address(): string {
-    return helpers.bufferToHex(this.#address);
-  }
-
-  public get bytesAddress(): Uint8Array {
-    return this.#address;
   }
 
   sign(
