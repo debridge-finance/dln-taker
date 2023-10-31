@@ -1,13 +1,13 @@
 import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Logger, LoggerOptions } from 'pino';
-import { OrderEstimation } from 'src/chain-common/order-estimator';
-import { IExecutor } from 'src/executor';
-import { CreateTransactionRequest } from 'src/forDefiClient/create-transaction-requests';
-import { FordefiAdapter } from 'src/forDefiClient/tx-builder';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { SolanaForDefiConverter } from './fordefi-converter';
+import { OrderEstimation } from '../chain-common/order-estimator';
+import { IExecutor } from '../executor';
+import { CreateTransactionRequest } from '../forDefiClient/create-transaction-requests';
+import { FordefiAdapter } from '../forDefiClient/tx-builder';
 
 const enum ForDefiTransactionAction {
   FulfillOrder = 'FulfillOrder',
