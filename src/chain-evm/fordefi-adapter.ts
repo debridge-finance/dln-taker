@@ -4,7 +4,7 @@ import { Logger, LoggerOptions } from 'pino';
 import Web3 from 'web3';
 import { EvmFeeManager } from './feeManager';
 import { InputTransaction } from './signer';
-import { FordefiAdapter } from '../forDefiClient/tx-builder';
+import { ForDefiTransactionBuilderAdapter } from '../forDefiClient/tx-builder';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { createERC20ApproveTxs } from './tx-generators/createERC20ApproveTxs';
@@ -50,12 +50,14 @@ function encodeNote<T extends ForDefiTransactionAction>(
   });
 }
 
-export class EvmForDefiTransactionAdapter implements FordefiAdapter {
+export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAdapter {
   readonly #chainId: ChainId;
 
   readonly #feeManager: EvmFeeManager;
 
   readonly #vaultId: string;
+
+  readonly #vaultAddress: Uint8Array;
 
   readonly #executor: IExecutor;
 
@@ -65,18 +67,26 @@ export class EvmForDefiTransactionAdapter implements FordefiAdapter {
 
   constructor(
     chain: ChainId,
-    vaultId: string,
+    vault: { id: string; address: Uint8Array },
     connection: Web3,
-    private signerAuthority: string,
     executor: IExecutor,
     contractsForApprove: string[],
   ) {
     this.#chainId = chain;
-    this.#vaultId = vaultId;
+    this.#vaultId = vault.id;
+    this.#vaultAddress = vault.address;
     this.#executor = executor;
     this.#connection = connection;
     this.#contractsForApprove = contractsForApprove;
     this.#feeManager = new EvmFeeManager(chain, connection);
+  }
+
+  public get address(): string {
+    return helpers.bufferToHex(this.#vaultAddress);
+  }
+
+  public get bytesAddress(): Uint8Array {
+    return this.#vaultAddress;
   }
 
   async getBatchOrderUnlockTxSender(
@@ -111,7 +121,7 @@ export class EvmForDefiTransactionAdapter implements FordefiAdapter {
       this.#chainId,
       this.#contractsForApprove,
       this.#connection,
-      this.signerAuthority,
+      this.address,
       this.#executor,
       logger,
     );
@@ -137,7 +147,7 @@ export class EvmForDefiTransactionAdapter implements FordefiAdapter {
       to: craftedTx.to,
       data: craftedTx.data,
       value: craftedTx.value,
-      from: this.signerAuthority,
+      from: this.address,
     });
 
     const tx = this.#feeManager.isLegacy
