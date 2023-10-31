@@ -1,5 +1,5 @@
 import { VersionedTransaction, clusterApiUrl, Connection } from '@solana/web3.js';
-import { SolanaForDefiConverter } from 'src/chain-solana/fordefi-converter';
+import { SolanaForDefiConverter } from '../src/chain-solana/fordefi-converter';
 
 describe('Can convert versioned tx into fordefi format', () => {
   const conn = new Connection(clusterApiUrl('mainnet-beta'));

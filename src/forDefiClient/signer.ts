@@ -1,11 +1,11 @@
 import crypto from 'crypto';
-import { Authority } from 'src/interfaces';
+import { helpers } from '@debridge-finance/solana-utils';
+import { Logger } from 'pino';
+import { Authority } from '../interfaces';
 import {
   CreateEvmRawTransactionRequest,
   CreateSolanaRawTransactionRequest,
-} from 'src/forDefiClient/create-transaction-requests';
-import { helpers } from '@debridge-finance/solana-utils';
-import { Logger } from 'pino';
+} from './create-transaction-requests';
 
 type SignedCreateTransactionRequest = {
   requestBody: string;

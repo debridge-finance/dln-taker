@@ -1,6 +1,6 @@
+import assert from 'assert';
 import { Logger } from 'pino';
-import { SupportedChain } from 'src/config';
-import { assert } from 'src/errors';
+import { SupportedChain } from '../config';
 
 type Signature = {
   requestBody: string;

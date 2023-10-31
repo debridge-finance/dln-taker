@@ -1,15 +1,15 @@
 import crypto from 'crypto';
 import { buffersAreEqual, ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
-import { OrderEstimation } from 'src/chain-common/order-estimator';
-import { convertChainIdToChain, ForDefiClient } from 'src/forDefiClient/client';
-import { InitTransactionBuilder } from 'src/processor';
-import { FulfillTransactionBuilder } from 'src/chain-common/order-taker';
-import { BatchUnlockTransactionBuilder } from 'src/processors/BatchUnlocker';
-import { CreateTransactionRequest } from 'src/forDefiClient/create-transaction-requests';
-import { SupportedChain } from 'src/config';
 import { helpers } from '@debridge-finance/solana-utils';
 import { ForDefiSigner } from './signer';
+import { OrderEstimation } from '../chain-common/order-estimator';
+import { FulfillTransactionBuilder } from '../chain-common/order-taker';
+import { SupportedChain } from '../config';
+import { InitTransactionBuilder } from '../processor';
+import { BatchUnlockTransactionBuilder } from '../processors/BatchUnlocker';
+import { ForDefiClient, convertChainIdToChain } from './client';
+import { CreateTransactionRequest } from './create-transaction-requests';
 
 function generateHash(...params: string[]): Buffer {
   const hash = crypto.createHash('sha256');

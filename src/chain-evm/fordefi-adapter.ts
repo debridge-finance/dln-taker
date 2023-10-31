@@ -1,9 +1,6 @@
 import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Logger, LoggerOptions } from 'pino';
-import { OrderEstimation } from 'src/chain-common/order-estimator';
-import { IExecutor } from 'src/executor';
-import { CreateEvmRawTransactionRequest } from 'src/forDefiClient/create-transaction-requests';
 import Web3 from 'web3';
 import { EvmFeeManager } from './feeManager';
 import { InputTransaction } from './signer';
@@ -11,6 +8,9 @@ import { FordefiAdapter } from '../forDefiClient/tx-builder';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { createERC20ApproveTxs } from './tx-generators/createERC20ApproveTxs';
+import { OrderEstimation } from '../chain-common/order-estimator';
+import { IExecutor } from '../executor';
+import { CreateEvmRawTransactionRequest } from '../forDefiClient/create-transaction-requests';
 
 type EvmRawLegacyTransaction = {
   to: string;
