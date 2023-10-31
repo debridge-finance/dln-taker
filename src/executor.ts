@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop -- Intentional because works only during initialization */
+
 import crypto from 'crypto';
 import {
   Address,
@@ -371,17 +373,17 @@ export class Executor implements IExecutor {
           getCurrentEnvironment().environment,
         );
 
-        const fulfillBuilder = this.getSolanaProvider(
+        const fulfillBuilder = await this.getSolanaProvider(
           chain,
           client,
           connection,
           chain.fulfillAuthority,
         );
         const initBuilder = chain.initAuthority
-          ? this.getSolanaProvider(chain, client, connection, chain.initAuthority)
+          ? await this.getSolanaProvider(chain, client, connection, chain.initAuthority)
           : fulfillBuilder;
         const unlockBuilder = chain.unlockAuthority
-          ? this.getSolanaProvider(chain, client, connection, chain.unlockAuthority)
+          ? await this.getSolanaProvider(chain, client, connection, chain.unlockAuthority)
           : fulfillBuilder;
 
         transactionBuilder = new CommonTransactionBuilder(
@@ -424,14 +426,14 @@ export class Executor implements IExecutor {
         if (chain.initAuthority)
           throw new Error('initAuthority is not supported for EVM-based chains');
 
-        const fulfillBuilder = this.getEVMProvider(
+        const fulfillBuilder = await this.getEVMProvider(
           chain,
           contractsForApprove,
           connection,
           chain.fulfillAuthority,
         );
         const unlockBuilder = chain.unlockAuthority
-          ? this.getEVMProvider(chain, [], connection, chain.unlockAuthority)
+          ? await this.getEVMProvider(chain, [], connection, chain.unlockAuthority)
           : fulfillBuilder;
         transactionBuilder = new CommonTransactionBuilder(
           fulfillBuilder,
@@ -446,7 +448,7 @@ export class Executor implements IExecutor {
       }
 
       // append global filters to the list of dstFilters
-      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+
       const dstFilters = await Promise.all(
         [...dstFiltersInitializers, ...(config.filters || [])].map((filter) =>
           filter(chain.chain, {
@@ -455,7 +457,6 @@ export class Executor implements IExecutor {
         ),
       );
 
-      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
       const srcFilters = await Promise.all(
         (chain.srcFilters || []).map((initializer) =>
           initializer(chain.chain, {
@@ -523,7 +524,6 @@ export class Executor implements IExecutor {
         },
       };
 
-      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
       this.processors[chain.chain] = await OrderProcessor.initialize(
         transactionBuilder,
         this.chains[chain.chain]!,
@@ -581,12 +581,12 @@ export class Executor implements IExecutor {
     this.#isInitialized = true;
   }
 
-  private getEVMProvider(
+  private async getEVMProvider(
     chain: ChainDefinition,
     contracts: string[],
     connection: Web3,
     authority: SignerAuthority,
-  ): ITransactionBuilder {
+  ): Promise<ITransactionBuilder> {
     switch (authority.type) {
       case 'PK': {
         return new EvmTransactionBuilder(
@@ -605,7 +605,6 @@ export class Executor implements IExecutor {
 
       case 'ForDefi': {
         const signer = new ForDefiSigner(
-          helpers.hexToBuffer(authority.address),
           crypto.createPrivateKey({
             key: authority.signerPrivateKey,
             passphrase: authority.privateKeyPassphrase,
@@ -613,15 +612,18 @@ export class Executor implements IExecutor {
           this.logger,
         );
 
+        const client = new ForDefiClient(authority.accessToken, this.logger);
+
+        const vaultAddress = await Executor.getVault(chain.chain, client, authority.vaultId);
+
         return new ForDefiTransactionBuilder(
           chain.chain,
-          new ForDefiClient(authority.accessToken, this.logger),
+          client,
           signer,
           new EvmForDefiTransactionAdapter(
             chain.chain,
-            authority.vaultId,
+            { id: authority.vaultId, address: vaultAddress },
             connection,
-            signer.address,
             this,
             contracts,
           ),
@@ -635,12 +637,25 @@ export class Executor implements IExecutor {
     }
   }
 
-  private getSolanaProvider(
+  private static async getVault(
+    chainId: ChainId,
+    client: ForDefiClient,
+    vaultId: string,
+  ): Promise<Uint8Array> {
+    try {
+      const vault = await client.getVault(vaultId);
+      return tokenStringToBuffer(chainId, vault.address);
+    } catch (e) {
+      throw new Error(`Unable to retrieve ForDefi vault ${vaultId}: ${e}`);
+    }
+  }
+
+  private async getSolanaProvider(
     chain: ChainDefinition,
     client: Solana.DlnClient,
     connection: Connection,
     authority: SignerAuthority,
-  ): ITransactionBuilder {
+  ): Promise<ITransactionBuilder> {
     const decodeKey = (key: string) =>
       Keypair.fromSecretKey(key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key));
 
@@ -654,18 +669,24 @@ export class Executor implements IExecutor {
       }
 
       case 'ForDefi': {
+        const forDefiClient = new ForDefiClient(authority.accessToken, this.logger);
+        const vaultAddress = await Executor.getVault(chain.chain, forDefiClient, authority.vaultId);
+
         return new ForDefiTransactionBuilder(
           chain.chain,
-          new ForDefiClient(authority.accessToken, this.logger),
+          forDefiClient,
           new ForDefiSigner(
-            helpers.hexToBuffer(authority.address),
             crypto.createPrivateKey({
               key: authority.signerPrivateKey,
               passphrase: authority.privateKeyPassphrase,
             }),
             this.logger,
           ),
-          new SolanaForDefiTransactionAdapter(authority.vaultId, this),
+          new SolanaForDefiTransactionAdapter(
+            { id: authority.vaultId, address: vaultAddress },
+            this,
+            connection,
+          ),
         );
       }
 

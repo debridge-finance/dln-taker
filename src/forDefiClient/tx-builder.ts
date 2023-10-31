@@ -8,40 +8,12 @@ import { FulfillTransactionBuilder } from '../chain-common/order-taker';
 import { SupportedChain } from '../config';
 import { InitTransactionBuilder } from '../processor';
 import { BatchUnlockTransactionBuilder } from '../processors/BatchUnlocker';
-import { ForDefiClient, convertChainIdToChain } from './client';
+import { ForDefiClient } from './client';
 import { CreateTransactionRequest } from './create-transaction-requests';
+import { convertChainIdToChain } from './client-adapter';
+import { Authority } from '../interfaces';
 
-function generateHash(...params: string[]): Buffer {
-  const hash = crypto.createHash('sha256');
-  hash.update(params.join('|'));
-  return hash.digest();
-}
-
-// Convert the hash to a UUIDv4 format
-function generateUUIDv4FromParams(...params: string[]): string {
-  const hash = generateHash(...params);
-  return [
-    hash.slice(0, 4).toString('hex'),
-    hash.slice(4, 6).toString('hex'),
-    `4${hash.slice(6, 8).toString('hex').substring(1)}`,
-    // eslint-disable-next-line no-bitwise -- Intentional, but better rewrite in the future
-    ((parseInt(hash.slice(8, 9).toString('hex'), 16) & 0x0f) | 0x80).toString(16) +
-      hash.slice(9, 10).toString('hex'),
-    hash.slice(10, 16).toString('hex'),
-  ].join('-');
-}
-
-export interface FordefiAdapter {
-  getBatchOrderUnlockTxSender(
-    orders: OrderDataWithId[],
-    logger: Logger,
-  ): Promise<CreateTransactionRequest>;
-  getOrderFulfillTxSender(
-    orderEstimation: OrderEstimation,
-    logger: Logger,
-  ): Promise<CreateTransactionRequest>;
-  getInitTxSenders(logger: Logger): Promise<Array<CreateTransactionRequest>>;
-}
+// #region Utils
 
 enum ForDefiTransactionAction {
   FulfillOrder = 'FulfillOrder',
@@ -80,6 +52,39 @@ function safeDecodeNote<T extends ForDefiTransactionAction>(
   return undefined;
 }
 
+function generateHash(...params: string[]): Buffer {
+  const hash = crypto.createHash('sha256');
+  hash.update(params.join('|'));
+  return hash.digest();
+}
+
+// Convert the hash to a UUIDv4 format
+function generateUUIDv4FromParams(...params: string[]): string {
+  const hash = generateHash(...params);
+  return [
+    hash.slice(0, 4).toString('hex'),
+    hash.slice(4, 6).toString('hex'),
+    `4${hash.slice(6, 8).toString('hex').substring(1)}`,
+    // eslint-disable-next-line no-bitwise -- Intentional, but better rewrite in the future
+    ((parseInt(hash.slice(8, 9).toString('hex'), 16) & 0x0f) | 0x80).toString(16) +
+      hash.slice(9, 10).toString('hex'),
+    hash.slice(10, 16).toString('hex'),
+  ].join('-');
+}
+// #endregion
+
+export interface ForDefiTransactionBuilderAdapter extends Authority {
+  getBatchOrderUnlockTxSender(
+    orders: OrderDataWithId[],
+    logger: Logger,
+  ): Promise<CreateTransactionRequest>;
+  getOrderFulfillTxSender(
+    orderEstimation: OrderEstimation,
+    logger: Logger,
+  ): Promise<CreateTransactionRequest>;
+  getInitTxSenders(logger: Logger): Promise<Array<CreateTransactionRequest>>;
+}
+
 export class ForDefiTransactionBuilder
   implements InitTransactionBuilder, FulfillTransactionBuilder, BatchUnlockTransactionBuilder
 {
@@ -89,13 +94,13 @@ export class ForDefiTransactionBuilder
 
   readonly #forDefiSigner: ForDefiSigner;
 
-  readonly #txAdapter: FordefiAdapter;
+  readonly #txAdapter: ForDefiTransactionBuilderAdapter;
 
   constructor(
     chain: ChainId,
     forDefiApi: ForDefiClient,
     forDefiSigner: ForDefiSigner,
-    adapter: FordefiAdapter,
+    adapter: ForDefiTransactionBuilderAdapter,
   ) {
     this.#chain = chain;
     this.#forDefiApi = forDefiApi;
@@ -105,15 +110,15 @@ export class ForDefiTransactionBuilder
 
   get fulfillAuthority() {
     return {
-      address: this.#forDefiSigner.address,
-      bytesAddress: this.#forDefiSigner.bytesAddress,
+      address: this.#txAdapter.address,
+      bytesAddress: this.#txAdapter.bytesAddress,
     };
   }
 
   get unlockAuthority() {
     return {
-      address: this.#forDefiSigner.address,
-      bytesAddress: this.#forDefiSigner.bytesAddress,
+      address: this.#txAdapter.address,
+      bytesAddress: this.#txAdapter.bytesAddress,
     };
   }
 

@@ -60,7 +60,6 @@ type ForDefiAuthority = {
   type: 'ForDefi';
   accessToken: string;
   vaultId: string;
-  address: string;
   signerPrivateKey: string;
   privateKeyPassphrase?: string;
 };

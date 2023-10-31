@@ -28,11 +28,15 @@ export async function tryInitTakerALT(
   solanaClient: Solana.DlnClient,
   logger: Logger,
 ) {
+  // console.log('🔴', {
+  //   payer: tokenAddressToString(ChainId.Solana, solanaAdapter.bytesAddress),
+  //   taker: tokenAddressToString(ChainId.Solana, takerAddress),
+  // })
   // WARN: initForTaket requires explicit payer (tx signer) and actual taker addresses
   // On MPC feat activation initForTaker payer will be = helper wallet and taker = mpc address
   const maybeTxs = await solanaClient.initForTaker(
-    new PublicKey(solanaAdapter.bytesAddress),
-    new PublicKey(takerAddress),
+    new PublicKey(solanaAdapter.bytesAddress), // payer
+    new PublicKey(takerAddress), // taker
     chains,
   );
   if (!maybeTxs) {

@@ -1,13 +1,14 @@
-import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
+import { OrderDataWithId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Logger, LoggerOptions } from 'pino';
+import { Connection } from '@solana/web3.js';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { SolanaForDefiConverter } from './fordefi-converter';
 import { OrderEstimation } from '../chain-common/order-estimator';
 import { IExecutor } from '../executor';
 import { CreateTransactionRequest } from '../forDefiClient/create-transaction-requests';
-import { FordefiAdapter } from '../forDefiClient/tx-builder';
+import { ForDefiTransactionBuilderAdapter } from '../forDefiClient/tx-builder';
 
 const enum ForDefiTransactionAction {
   FulfillOrder = 'FulfillOrder',
@@ -28,19 +29,32 @@ function encodeNote<T extends ForDefiTransactionAction>(
   });
 }
 
-export class SolanaForDefiTransactionAdapter implements FordefiAdapter {
+export class SolanaForDefiTransactionAdapter implements ForDefiTransactionBuilderAdapter {
   readonly #vaultId: string;
+
+  readonly #vaultAddress: Uint8Array;
 
   readonly #executor: IExecutor;
 
   readonly #converter: SolanaForDefiConverter;
 
-  constructor(vaultId: string, executor: IExecutor) {
-    this.#vaultId = vaultId;
+  constructor(
+    vault: { id: string; address: Uint8Array },
+    executor: IExecutor,
+    connection: Connection,
+  ) {
+    this.#vaultId = vault.id;
+    this.#vaultAddress = vault.address;
     this.#executor = executor;
-    this.#converter = new SolanaForDefiConverter(
-      this.#executor.client.getConnection<ChainId.Solana>(ChainId.Solana),
-    );
+    this.#converter = new SolanaForDefiConverter(connection);
+  }
+
+  public get address(): string {
+    return helpers.bufferToHex(this.#vaultAddress);
+  }
+
+  public get bytesAddress(): Uint8Array {
+    return this.#vaultAddress;
   }
 
   async getBatchOrderUnlockTxSender(
