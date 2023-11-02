@@ -4,12 +4,7 @@ import { clearInterval } from 'timers';
 import Web3 from 'web3';
 import { Authority } from '../interfaces';
 
-import {
-  avgBlockSpeed,
-  BLOCK_CONFIRMATIONS_HARD_CAPS,
-  EvmRebroadcastAdapterOpts,
-  SupportedChain,
-} from '../config';
+import { avgBlockSpeed, EvmRebroadcastAdapterOpts, SupportedChain } from '../config';
 import { BumpedFeeManager } from './bumpedFeeManager';
 
 type TransactionConfig = Parameters<Web3['eth']['sendTransaction']>[0];
@@ -80,10 +75,6 @@ export class EvmTxSigner implements Authority {
 
   get avgBlockSpeed(): number {
     return avgBlockSpeed[this.chainId as unknown as SupportedChain];
-  }
-
-  get finalizedBlockCount(): number {
-    return BLOCK_CONFIRMATIONS_HARD_CAPS[this.chainId as unknown as SupportedChain];
   }
 
   private async checkStaleTx(): Promise<void> {

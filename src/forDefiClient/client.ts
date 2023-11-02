@@ -6,6 +6,7 @@ import {
 } from './types/createTransaction';
 import { GetEvmVaultResponse, GetSolanaVaultResponse } from './types/getVault';
 import { ListTransactionsRequest, ListTransactionsResponse } from './types/listTransactions';
+import { ErrorResponse } from './types/shared';
 
 function convertRequestToQueryParams(data: { [key in string]: any }): URLSearchParams {
   const params = new URLSearchParams();
@@ -94,9 +95,12 @@ export class ForDefiClient {
       return <T>parsedData;
     }
 
-    this.#logger.error(`fordefi returned code=${status}`);
+    const error = <ErrorResponse>parsedData;
+    this.#logger.error(
+      `fordefi returned code=${status}: ${error.title} | ${error.detail} | ${error.request_id}`,
+    );
     this.#logger.error(parsedData);
-    throw new Error(`fordefi returned code=${status}`);
+    throw new Error(`fordefi returned code=${status}; ${error.title} (${error.detail})`);
   }
 
   private async readResponse(
@@ -122,7 +126,7 @@ export class ForDefiClient {
     request: Parameters<typeof fetch>[1],
   ): Promise<{ status: number; body: string }> {
     try {
-      this.#logger.trace(`sending request to ${path}`);
+      this.#logger.debug(`forDefi: requesting ${path}`);
       const response = await fetch(`https://${this.apiHost}${path}`, request);
       return {
         status: response.status,
