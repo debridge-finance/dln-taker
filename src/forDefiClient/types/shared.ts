@@ -72,3 +72,9 @@ export type SolanaTransaction = {
   note: string;
   state: TxState;
 };
+
+export type ErrorResponse = {
+  title: string;
+  detail: string;
+  request_id: string;
+};
