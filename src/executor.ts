@@ -428,13 +428,14 @@ export class Executor implements IExecutor {
           throw new Error('initAuthority is not supported for EVM-based chains');
 
         const fulfillBuilder = await this.getEVMProvider(
+          'fulfill',
           chain,
           contractsForApprove,
           connection,
           chain.fulfillAuthority,
         );
         const unlockBuilder = chain.unlockAuthority
-          ? await this.getEVMProvider(chain, [], connection, chain.unlockAuthority)
+          ? await this.getEVMProvider('unlock', chain, [], connection, chain.unlockAuthority)
           : fulfillBuilder;
         transactionBuilder = new CommonTransactionBuilder(
           fulfillBuilder,
@@ -583,6 +584,7 @@ export class Executor implements IExecutor {
   }
 
   private async getEVMProvider(
+    type: 'fulfill' | 'unlock',
     chain: ChainDefinition,
     contracts: string[],
     connection: Web3,
@@ -590,6 +592,12 @@ export class Executor implements IExecutor {
   ): Promise<ITransactionBuilder> {
     switch (authority.type) {
       case 'PK': {
+        if (!EvmTxSigner.isValidPrivateKey(authority.privateKey)) {
+          throw new Error(
+            `Invalid private key given for ${type} authority on ${ChainId[chain.chain]}`,
+          );
+        }
+
         return new EvmTransactionBuilder(
           chain.chain,
           contracts,

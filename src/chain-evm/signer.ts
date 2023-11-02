@@ -65,6 +65,26 @@ export class EvmTxSigner implements Authority {
     );
   }
 
+  static isValidPrivateKey(privateKey: string) {
+    // Check length: 64 hex characters
+    if (!/^[a-fA-F0-9]{64}$/.test(privateKey)) {
+      return false;
+    }
+
+    const getBN = (rawPK: string) => {
+      try {
+        return BigInt(`0x${rawPK}`);
+      } catch (e) {
+        return 0n;
+      }
+    };
+
+    const n = BigInt('0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141');
+    const key = getBN(privateKey);
+
+    return key > 0n && key < n;
+  }
+
   public get address(): string {
     return this.#address;
   }
