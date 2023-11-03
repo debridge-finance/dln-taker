@@ -64,11 +64,6 @@ type ForDefiAuthority = {
   privateKeyPassphrase?: string;
 };
 
-// type ForDefiSolanaAuthority = ForDefiAuthority & {
-//   type: "ForDefiSolana";
-//   initWalletPrivateKey?: string;
-// }
-
 export type SignerAuthority = PrivateKeyAuthority | ForDefiAuthority;
 
 export class EvmRebroadcastAdapterOpts {
@@ -217,7 +212,7 @@ export interface ChainDefinition {
   /**
    * Forcibly disable fulfills in this chain?
    */
-  disabled?: boolean;
+  disableFulfill?: boolean;
 
   /**
    * chain context related
