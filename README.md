@@ -1,6 +1,6 @@
 # `dln-taker`
 
-[<img src="https://user-images.githubusercontent.com/31035222/204026000-2f1950b0-104e-4491-a4ed-00d98cd54d46.png" height="50" />](https://github.com/debridge-finance/debridge-security/blob/master/Debridge_solana_tx_parser_Whitebox_Pentest_Report_Halborn_Final.pdf)
+[<img src="https://user-images.githubusercontent.com/31035222/204026000-2f1950b0-104e-4491-a4ed-00d98cd54d46.png" height="50" />](https://github.com/debridge-finance/debridge-security/blob/master/DeBridge_DLN_Taker_Code_Security_Assessment_Report_Halborn_Final.pdf)
 
 `dln-taker` is the rule-based daemon service built to automatically execute profitable orders placed on the deSwap Liquidity Network (DLN) across supported blockchains.
 
