@@ -58,6 +58,7 @@ import { ForDefiClient } from './forDefiClient/client';
 import { EvmForDefiTransactionAdapter } from './chain-evm/fordefi-adapter';
 import { SolanaForDefiTransactionAdapter } from './chain-solana/fordefi-adapter';
 import { EmptyTransactionBuilder } from './chain-common/tx-builder-disabled';
+import { isValidEvmAddress } from './chain-evm/utils';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
@@ -333,6 +334,7 @@ export class Executor implements IExecutor {
       let client;
       let connection: Web3 | Connection;
       let contractsForApprove: string[] = [];
+      let unlockBeneficiary: Uint8Array;
 
       if (chain.chain === ChainId.Solana) {
         connection = new Connection(chain.chainRpc, {
@@ -416,6 +418,12 @@ export class Executor implements IExecutor {
         }
 
         clients.push(client);
+
+        unlockBeneficiary = safeExec(() => {
+          const buffer = tokenStringToBuffer(chain.chain, chain.beneficiary);
+          if (buffer.length !== 32) throw new Error();
+          return buffer;
+        }, `Invalid beneficiary for ${ChainId[chain.chain]}`);
       } else {
         connection = new Web3(chain.chainRpc);
 
@@ -479,6 +487,10 @@ export class Executor implements IExecutor {
             unlockBuilder,
           );
         }
+
+        if (!isValidEvmAddress(chain.beneficiary))
+          throw new Error(`Invalid beneficiary for ${ChainId[chain.chain]}`);
+        unlockBeneficiary = tokenStringToBuffer(chain.chain, chain.beneficiary);
       }
 
       const dstFiltersInitializers = chain.dstFilters || [];
@@ -556,7 +568,7 @@ export class Executor implements IExecutor {
           chain.constraints?.TVLBudget || 0,
           this.logger,
         ),
-        unlockBeneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
+        unlockBeneficiary,
         srcConstraints,
         dstConstraints: {
           ...Executor.getDstConstraints(chain.dstConstraints || {}),
