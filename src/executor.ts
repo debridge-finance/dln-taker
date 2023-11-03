@@ -57,10 +57,19 @@ import { ForDefiSigner } from './forDefiClient/signer';
 import { ForDefiClient } from './forDefiClient/client';
 import { EvmForDefiTransactionAdapter } from './chain-evm/fordefi-adapter';
 import { SolanaForDefiTransactionAdapter } from './chain-solana/fordefi-adapter';
+import { EmptyTransactionBuilder } from './chain-common/tx-builder-disabled';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
 type EvmClientChainConfig = ConstructorParameters<typeof Evm.DlnClient>[0]['chainConfig'];
+
+const safeExec = (func: Function, error: string) => {
+  try {
+    return func();
+  } catch (e) {
+    throw new Error(`${error}: ${e}`);
+  }
+};
 
 export type DstOrderConstraints = Readonly<{
   fulfillmentDelay: number;
@@ -93,6 +102,7 @@ export type SrcConstraintsPerOrderValue = SrcOrderConstraints &
 
 export type ExecutorSupportedChain = Readonly<{
   chain: ChainId;
+  disabledFulfill: boolean;
   connection: any;
   network: {
     avgBlockSpeed: number;
@@ -289,6 +299,7 @@ export class Executor implements IExecutor {
         throw new Error(`${ChainId[chain.chain]} is not supported, remove it from the config`);
       }
 
+      // convert old-fashioned takerPrivateKey to the new fulfillAuthority
       if (chain.takerPrivateKey) {
         if (chain.fulfillAuthority)
           throw new Error(
@@ -300,10 +311,10 @@ export class Executor implements IExecutor {
           type: 'PK',
           privateKey: chain.takerPrivateKey,
         };
+        delete chain.takerPrivateKey;
       }
-      if (!chain.fulfillAuthority)
-        throw new Error(`fulfillAuthority is not set for ${ChainId[chain.chain]}`);
 
+      // convert old-fashioned unlockAuthorityPrivateKey to the new unlockAuthority
       if (chain.unlockAuthorityPrivateKey) {
         if (chain.unlockAuthority)
           throw new Error(
@@ -315,17 +326,10 @@ export class Executor implements IExecutor {
           type: 'PK',
           privateKey: chain.unlockAuthorityPrivateKey,
         };
-      }
-      if (chain.unlockAuthority) {
-        // if both authorities share the same PK, let's reuse a single object for both
-        if (chain.unlockAuthority.type === 'PK' && chain.fulfillAuthority.type === 'PK') {
-          if (chain.unlockAuthority.privateKey === chain.fulfillAuthority.privateKey) {
-            chain.unlockAuthority = undefined;
-          }
-        }
+        delete chain.unlockAuthorityPrivateKey;
       }
 
-      let transactionBuilder: CommonTransactionBuilder;
+      let transactionBuilder: ITransactionBuilder;
       let client;
       let connection: Web3 | Connection;
       let contractsForApprove: string[] = [];
@@ -368,24 +372,48 @@ export class Executor implements IExecutor {
           getCurrentEnvironment().environment,
         );
 
-        const fulfillBuilder = await this.getSolanaProvider(
-          chain,
-          client,
-          connection,
-          chain.fulfillAuthority,
-        );
-        const initBuilder = chain.initAuthority
-          ? await this.getSolanaProvider(chain, client, connection, chain.initAuthority)
-          : fulfillBuilder;
-        const unlockBuilder = chain.unlockAuthority
-          ? await this.getSolanaProvider(chain, client, connection, chain.unlockAuthority)
-          : fulfillBuilder;
+        if (chain.disableFulfill) {
+          this.logger.warn(
+            `Chain ${
+              ChainId[chain.chain]
+            } is disabled: orders coming to this chain would be ignored, but orders coming from it to other enabled chains would be accepted for evaluation`,
+          );
+          transactionBuilder = new EmptyTransactionBuilder(chain.chain);
+        } else {
+          if (!chain.fulfillAuthority) {
+            throw new Error(
+              `fulfillAuthority is not set for ${
+                ChainId[chain.chain]
+              }. Did you forget to set disabled:true for this chain?`,
+            );
+          }
 
-        transactionBuilder = new CommonTransactionBuilder(
-          initBuilder,
-          fulfillBuilder,
-          unlockBuilder,
-        );
+          const fulfillBuilder = await this.getSolanaProvider(
+            'fulfill',
+            chain,
+            client,
+            connection,
+            chain.fulfillAuthority,
+          );
+          const initBuilder = chain.initAuthority
+            ? await this.getSolanaProvider('init', chain, client, connection, chain.initAuthority)
+            : fulfillBuilder;
+          const unlockBuilder = chain.unlockAuthority
+            ? await this.getSolanaProvider(
+                'unlock',
+                chain,
+                client,
+                connection,
+                chain.unlockAuthority,
+              )
+            : fulfillBuilder;
+
+          transactionBuilder = new CommonTransactionBuilder(
+            initBuilder,
+            fulfillBuilder,
+            unlockBuilder,
+          );
+        }
 
         clients.push(client);
       } else {
@@ -411,35 +439,50 @@ export class Executor implements IExecutor {
             getCurrentEnvironment().defaultEvmAddresses?.evm!.forwarderContract!,
         };
 
-        if (!chain.disabled) {
-          contractsForApprove = [
-            evmChainConfig[chain.chain]!.dlnDestinationAddress,
-            evmChainConfig[chain.chain]!.crossChainForwarderAddress,
-          ];
-        }
+        contractsForApprove = [
+          evmChainConfig[chain.chain]!.dlnDestinationAddress,
+          evmChainConfig[chain.chain]!.crossChainForwarderAddress,
+        ];
 
         if (chain.initAuthority)
           throw new Error('initAuthority is not supported for EVM-based chains');
 
-        const fulfillBuilder = await this.getEVMProvider(
-          'fulfill',
-          chain,
-          contractsForApprove,
-          connection,
-          chain.fulfillAuthority,
-        );
-        const unlockBuilder = chain.unlockAuthority
-          ? await this.getEVMProvider('unlock', chain, [], connection, chain.unlockAuthority)
-          : fulfillBuilder;
-        transactionBuilder = new CommonTransactionBuilder(
-          fulfillBuilder,
-          fulfillBuilder,
-          unlockBuilder,
-        );
+        if (chain.disableFulfill) {
+          this.logger.warn(
+            `Chain ${
+              ChainId[chain.chain]
+            } is disabled: orders coming to this chain would be ignored, but orders coming from it to other enabled chains would be accepted for evaluation`,
+          );
+          transactionBuilder = new EmptyTransactionBuilder(chain.chain);
+        } else {
+          if (!chain.fulfillAuthority) {
+            throw new Error(
+              `fulfillAuthority is not set for ${
+                ChainId[chain.chain]
+              }. Did you forget to set disabled:true for this chain?`,
+            );
+          }
+
+          const fulfillBuilder = await this.getEVMProvider(
+            'fulfill',
+            chain,
+            contractsForApprove,
+            connection,
+            chain.fulfillAuthority,
+          );
+          const unlockBuilder = chain.unlockAuthority
+            ? await this.getEVMProvider('unlock', chain, [], connection, chain.unlockAuthority)
+            : fulfillBuilder;
+          transactionBuilder = new CommonTransactionBuilder(
+            fulfillBuilder,
+            fulfillBuilder,
+            unlockBuilder,
+          );
+        }
       }
 
       const dstFiltersInitializers = chain.dstFilters || [];
-      if (chain.disabled) {
+      if (chain.disableFulfill) {
         dstFiltersInitializers.push(filters.disableFulfill());
       }
 
@@ -476,6 +519,7 @@ export class Executor implements IExecutor {
 
       this.chains[chain.chain] = {
         chain: chain.chain,
+        disabledFulfill: chain.disableFulfill || false,
         connection,
         network: {
           avgBlockSpeed: avgBlockSpeed[chain.chain as unknown as SupportedChain],
@@ -551,10 +595,12 @@ export class Executor implements IExecutor {
     orderFeed.setLogger(this.logger);
     this.orderFeed = orderFeed;
 
-    const unlockAuthorities = Object.values(this.chains).map((chain) => ({
-      chainId: chain.chain,
-      address: chain.unlockAuthority.address as string,
-    }));
+    const unlockAuthorities = Object.values(this.chains)
+      .filter((chain) => !chain.disabledFulfill)
+      .map((chain) => ({
+        chainId: chain.chain,
+        address: chain.unlockAuthority.address,
+      }));
 
     const minConfirmationThresholds = Object.values(this.chains)
       .map((chain) => ({
@@ -608,10 +654,14 @@ export class Executor implements IExecutor {
 
       case 'ForDefi': {
         const signer = new ForDefiSigner(
-          crypto.createPrivateKey({
-            key: authority.signerPrivateKey,
-            passphrase: authority.privateKeyPassphrase,
-          }),
+          safeExec(
+            () =>
+              crypto.createPrivateKey({
+                key: authority.signerPrivateKey,
+                passphrase: authority.privateKeyPassphrase,
+              }),
+            `Invalid private key given for ${type} authority on ${ChainId[chain.chain]}`,
+          ),
           this.logger,
         );
 
@@ -649,24 +699,33 @@ export class Executor implements IExecutor {
       const vault = await client.getVault(vaultId);
       return tokenStringToBuffer(chainId, vault.address);
     } catch (e) {
-      throw new Error(`Unable to retrieve ForDefi vault ${vaultId}: ${e}`);
+      throw new Error(`Unable to retrieve ForDefi vault ${vaultId} for ${ChainId[chainId]}: ${e}`);
     }
   }
 
   private async getSolanaProvider(
+    type: 'init' | 'fulfill' | 'unlock',
     chain: ChainDefinition,
     client: Solana.DlnClient,
     connection: Connection,
     authority: SignerAuthority,
   ): Promise<ITransactionBuilder> {
-    const decodeKey = (key: string) =>
-      Keypair.fromSecretKey(key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key));
-
     switch (authority.type) {
       case 'PK': {
         return new SolanaTransactionBuilder(
           client,
-          new SolanaTxSigner(connection, decodeKey(authority.privateKey)),
+          new SolanaTxSigner(
+            connection,
+            safeExec(
+              () =>
+                Keypair.fromSecretKey(
+                  authority.privateKey.startsWith('0x')
+                    ? helpers.hexToBuffer(authority.privateKey)
+                    : bs58.decode(authority.privateKey),
+                ),
+              `Invalid private key given for ${type} authority on ${ChainId[chain.chain]}`,
+            ),
+          ),
           this,
         );
       }
@@ -679,10 +738,14 @@ export class Executor implements IExecutor {
           chain.chain,
           forDefiClient,
           new ForDefiSigner(
-            crypto.createPrivateKey({
-              key: authority.signerPrivateKey,
-              passphrase: authority.privateKeyPassphrase,
-            }),
+            safeExec(
+              () =>
+                crypto.createPrivateKey({
+                  key: authority.signerPrivateKey,
+                  passphrase: authority.privateKeyPassphrase,
+                }),
+              `Invalid private key given for ${type} authority on ${ChainId[chain.chain]}`,
+            ),
             this.logger,
           ),
           new SolanaForDefiTransactionAdapter(
