@@ -5,7 +5,7 @@ import {
   VersionedTransaction,
   MessageV0,
 } from '@solana/web3.js';
-import { CreateSolanaRawTransactionRequest } from '../forDefiClient/create-transaction-requests';
+import { CreateSolanaRawTransactionRequest } from '../forDefiClient/types/createTransaction';
 
 // separate class to make testing easier
 export class SolanaForDefiConverter {

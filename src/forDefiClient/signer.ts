@@ -3,8 +3,8 @@ import { Logger } from 'pino';
 import {
   CreateEvmRawTransactionRequest,
   CreateSolanaRawTransactionRequest,
-} from './create-transaction-requests';
-import { SignedCreateTransactionRequest } from './types/createTransaction';
+  SignedCreateTransactionRequest,
+} from './types/createTransaction';
 
 export class ForDefiSigner {
   readonly #signerPrivateKey: crypto.KeyObject;
