@@ -204,6 +204,16 @@ export class OrderProcessor {
 
         break;
       }
+      case OrderInfoStatus.UnlockSent:
+      case OrderInfoStatus.UnlockClaim: {
+        this.clearInternalQueues(orderId);
+        this.clearOrderStore(orderId);
+        context.giveChain.TVLBudgetController.flushCache();
+        context.takeChain.TVLBudgetController.flushCache();
+        this.#batchUnlocker.remove(context.takeChain.chain, orderId);
+
+        break;
+      }
       case OrderInfoStatus.Fulfilled: {
         this.clearInternalQueues(orderId);
         this.clearOrderStore(orderId);

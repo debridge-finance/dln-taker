@@ -50,14 +50,16 @@ export class OrderValidator extends OrderEvaluationContextual {
     await this.checkAllowedTaker();
     await this.checkRouting();
     await this.checkPrefulfillSwapAbility();
-    await this.checkAccountBalance();
+
+    await this.checkTakeStatus();
+    await this.checkGiveStatus();
+
     await this.checkFilters();
+    await this.checkAccountBalance();
     await this.checkTVLBudget();
     await this.checkFinalization();
     await this.checkFulfillmentDelay();
     await this.checkThroughput();
-    await this.checkTakeStatus();
-    await this.checkGiveStatus();
     await this.checkRoughProfitability();
     await this.runChecks();
 

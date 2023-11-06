@@ -39,6 +39,13 @@ export class BatchUnlocker {
     });
   }
 
+  remove(takeChain: ChainId, orderId: string) {
+    if (this.unlockBatchesOrderIdMap.has(takeChain)) {
+      this.unlockBatchesOrderIdMap.get(takeChain)!.delete(orderId);
+      this.ordersDataMap.delete(orderId);
+    }
+  }
+
   async unlockOrder(orderId: string, order: OrderData): Promise<void> {
     // validate current order state:
     const orderState = await this.executor.client.getTakeOrderState(
