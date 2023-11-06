@@ -1,28 +1,29 @@
 import crypto from 'crypto';
-import { buffersAreEqual, ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
+import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 import { helpers } from '@debridge-finance/solana-utils';
 import { ForDefiSigner } from './signer';
 import { OrderEstimation } from '../chain-common/order-estimator';
 import { FulfillTransactionBuilder } from '../chain-common/order-taker';
-import { SupportedChain } from '../config';
 import { InitTransactionBuilder } from '../processor';
 import { BatchUnlockTransactionBuilder } from '../processors/BatchUnlocker';
 import { ForDefiClient } from './client';
-import { CreateTransactionRequest } from './create-transaction-requests';
-import { convertChainIdToChain } from './client-adapter';
 import { Authority } from '../interfaces';
+import { CreateTransactionRequest } from './types/createTransaction';
 
 // #region Utils
 
 enum ForDefiTransactionAction {
+  Init = 'Init',
   FulfillOrder = 'FulfillOrder',
   BatchOrderUnlock = 'BatchOrderUnlock',
 }
 
-type TransactionActionPayload<T extends ForDefiTransactionAction> =
-  {} & (T extends ForDefiTransactionAction.FulfillOrder ? { orderId: string } : {}) &
-    (T extends ForDefiTransactionAction.BatchOrderUnlock ? { orderIds: string[] } : {});
+type TransactionActionPayload<T extends ForDefiTransactionAction> = {
+  attempt: number;
+} & (T extends ForDefiTransactionAction.Init ? { uid: string } : {}) &
+  (T extends ForDefiTransactionAction.FulfillOrder ? { orderId: string } : {}) &
+  (T extends ForDefiTransactionAction.BatchOrderUnlock ? { orderIds: string[] } : {});
 
 function encodeNote<T extends ForDefiTransactionAction>(
   action: T,
@@ -32,24 +33,6 @@ function encodeNote<T extends ForDefiTransactionAction>(
     action,
     payload,
   });
-}
-
-function safeDecodeNote<T extends ForDefiTransactionAction>(
-  data: string,
-  action: T,
-): TransactionActionPayload<T> | undefined {
-  try {
-    const obj = JSON.parse(data);
-    if ('action' in obj && 'payload' in obj) {
-      if (action === obj.action && obj.action in ForDefiTransactionAction) {
-        return obj.payload;
-      }
-    }
-  } catch (e) {
-    return undefined;
-  }
-
-  return undefined;
 }
 
 function generateHash(...params: string[]): Buffer {
@@ -125,76 +108,81 @@ export class ForDefiTransactionBuilder
   getOrderFulfillTxSender(orderEstimation: OrderEstimation, logger: Logger) {
     return async () => {
       const req = await this.#txAdapter.getOrderFulfillTxSender(orderEstimation, logger);
-      req.note = encodeNote<ForDefiTransactionAction.FulfillOrder>(
+      return this.proposeTransaction<ForDefiTransactionAction.FulfillOrder>(
+        req,
+        logger,
         ForDefiTransactionAction.FulfillOrder,
         {
+          attempt: 0,
           orderId: orderEstimation.order.orderId,
         },
       );
-
-      // todo fetch all pages until the txn we are looking for is found
-      const { transactions } = await this.#forDefiApi.listTransactions({
-        size: 100,
-        vault_ids: [req.vault_id],
-        chains: [convertChainIdToChain(this.#chain as any as SupportedChain)],
-        states: ['approved', 'pending'],
-        sort_by: 'created_at_desc',
-      });
-
-      // find transaction which fulfills same order id
-      const similarTxns = transactions.filter((transaction) => {
-        const payload = safeDecodeNote<ForDefiTransactionAction.FulfillOrder>(
-          transaction.note,
-          ForDefiTransactionAction.FulfillOrder,
-        );
-        return (
-          payload &&
-          payload.orderId &&
-          buffersAreEqual(
-            helpers.hexToBuffer(payload.orderId),
-            helpers.hexToBuffer(orderEstimation.order.orderId),
-          )
-        );
-      });
-      if (similarTxns.length > 0) {
-        logger.debug(
-          `found ${similarTxns.length} pending transactions fulfilling same order: ${similarTxns
-            .map((tx) => `${tx.id} (${tx.state})`)
-            .join(', ')}`,
-        );
-        return similarTxns[0].id;
-      }
-
-      const signedRequest = this.#forDefiSigner.sign(req);
-
-      const resp = await this.#forDefiApi.createTransaction(signedRequest);
-      return resp.id;
     };
   }
 
   getBatchOrderUnlockTxSender(orders: OrderDataWithId[], logger: Logger): () => Promise<string> {
     return async () => {
       const req = await this.#txAdapter.getBatchOrderUnlockTxSender(orders, logger);
-      req.note = encodeNote<ForDefiTransactionAction.BatchOrderUnlock>(
+      return this.proposeTransaction<ForDefiTransactionAction.BatchOrderUnlock>(
+        req,
+        logger,
         ForDefiTransactionAction.BatchOrderUnlock,
-        { orderIds: orders.map((order) => helpers.bufferToHex(order.orderId)) },
+        {
+          attempt: 0,
+          orderIds: orders.map((order) => helpers.bufferToHex(order.orderId)),
+        },
       );
-      const signedRequest = this.#forDefiSigner.sign(req);
-
-      const idempotenceId = generateUUIDv4FromParams(this.#chain.toString(), req.note);
-      const resp = await this.#forDefiApi.createTransaction(signedRequest, idempotenceId);
-      return resp.id;
     };
   }
 
   async getInitTxSenders(logger: Logger) {
     const txs = await this.#txAdapter.getInitTxSenders(logger);
-    return txs.map((req) => async () => {
-      const signedRequest = this.#forDefiSigner.sign(req);
+    return txs.map(
+      (req) => async () =>
+        this.proposeTransaction(req, logger, ForDefiTransactionAction.Init, {
+          attempt: 0,
+          uid: req.note,
+        }),
+    );
+  }
 
+  private async proposeTransaction<T extends ForDefiTransactionAction>(
+    req: CreateTransactionRequest,
+    logger: Logger,
+    action: T,
+    payload: TransactionActionPayload<T>,
+  ) {
+    let attempt = 0;
+    do {
+      req.note = encodeNote(action, {
+        ...payload,
+        attempt,
+      });
+
+      const signedRequest = this.#forDefiSigner.sign(req);
       const idempotenceId = generateUUIDv4FromParams(this.#chain.toString(), req.note);
+      // eslint-disable-next-line no-await-in-loop -- Intentional: we must be sure created transaction is not aborted
       const resp = await this.#forDefiApi.createTransaction(signedRequest, idempotenceId);
-      return resp.id;
-    });
+
+      switch (resp.state) {
+        case 'aborted':
+        case 'error_signing':
+        case 'error_pushing_to_blockchain':
+        case 'mined_reverted':
+        case 'completed_reverted':
+        case 'canceling':
+        case 'cancelled': {
+          logger.debug(
+            `tx ${resp.id} (at attempt=${attempt}) found with state=${resp.state}, retrying txn...`,
+          );
+          attempt++;
+          break;
+        }
+
+        default: {
+          return resp.id;
+        }
+      }
+    } while (true);
   }
 }
