@@ -3,42 +3,23 @@ import { helpers } from '@debridge-finance/solana-utils';
 import { Logger, LoggerOptions } from 'pino';
 import Web3 from 'web3';
 import { EvmFeeManager } from './feeManager';
-import { InputTransaction } from './signer';
+import { EVM_GAS_LIMIT_MULTIPLIER, InputTransaction } from './signer';
 import { ForDefiTransactionBuilderAdapter } from '../forDefiClient/tx-builder';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { createERC20ApproveTxs } from './tx-generators/createERC20ApproveTxs';
 import { OrderEstimation } from '../chain-common/order-estimator';
 import { IExecutor } from '../executor';
-import { CreateEvmRawTransactionRequest } from '../forDefiClient/create-transaction-requests';
-
-type EvmRawLegacyTransaction = {
-  to: string;
-  data: string;
-  value?: string;
-  gasLimit: number;
-  gasPrice: bigint;
-};
-
-type EvmRawTransaction = {
-  to: string;
-  data: string;
-  value?: string;
-  gasLimit: number;
-  maxFeePerGas: bigint;
-  maxPriorityFeePerGas: bigint;
-};
+import { convertChainIdToChain } from '../forDefiClient/client-adapter';
+import { SupportedChain } from '../config';
+import { CreateEvmRawTransactionRequest } from '../forDefiClient/types/createTransaction';
 
 const enum ForDefiTransactionAction {
-  FulfillOrder = 'FulfillOrder',
-  BatchOrderUnlock = 'BatchOrderUnlock',
   SetAllowance = 'SetAllowance',
 }
 
 type TransactionActionPayload<T extends ForDefiTransactionAction> =
-  {} & (T extends ForDefiTransactionAction.FulfillOrder ? { orderId: string } : {}) &
-    (T extends ForDefiTransactionAction.BatchOrderUnlock ? { orderIds: string[] } : {}) &
-    (T extends ForDefiTransactionAction.SetAllowance ? { token: string; spender: string } : {});
+  T extends ForDefiTransactionAction.SetAllowance ? { token: string; spender: string } : {};
 
 function encodeNote<T extends ForDefiTransactionAction>(
   action: T,
@@ -94,11 +75,7 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
     logger: Logger,
   ): Promise<CreateEvmRawTransactionRequest> {
     const craftedTx = await createBatchOrderUnlockTx(this.#executor, orders, logger);
-    const note = encodeNote<ForDefiTransactionAction.BatchOrderUnlock>(
-      ForDefiTransactionAction.BatchOrderUnlock,
-      { orderIds: orders.map((order) => helpers.bufferToHex(order.orderId)) },
-    );
-    return this.getCreateTransactionRequest(note, craftedTx);
+    return this.getCreateTransactionRequest('', craftedTx);
   }
 
   async getOrderFulfillTxSender(
@@ -106,14 +83,7 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
     logger: Logger,
   ): Promise<CreateEvmRawTransactionRequest> {
     const craftedTx = await createOrderFullfillTx(orderEstimation, logger);
-
-    const note = encodeNote<ForDefiTransactionAction.FulfillOrder>(
-      ForDefiTransactionAction.FulfillOrder,
-      {
-        orderId: orderEstimation.order.orderId,
-      },
-    );
-    return this.getCreateTransactionRequest(note, craftedTx);
+    return this.getCreateTransactionRequest('', craftedTx);
   }
 
   async getInitTxSenders(logger: Logger<LoggerOptions>): Promise<CreateEvmRawTransactionRequest[]> {
@@ -139,28 +109,23 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
     return txs;
   }
 
-  private async getCreateTransactionRequest(
-    note: string,
-    craftedTx: InputTransaction,
-  ): Promise<CreateEvmRawTransactionRequest> {
-    const gasLimit = await this.#connection.eth.estimateGas({
-      to: craftedTx.to,
-      data: craftedTx.data,
-      value: craftedTx.value,
+  private async estimateTx(tx: InputTransaction): Promise<number> {
+    const gas = await this.#connection.eth.estimateGas({
+      to: tx.to,
+      data: tx.data,
+      value: tx.value,
       from: this.address,
     });
-
-    const tx = this.#feeManager.isLegacy
-      ? await this.populateLegacyTx(craftedTx, gasLimit, craftedTx.cappedFee || 0n)
-      : await this.populateTx(craftedTx, gasLimit, craftedTx.cappedFee || 0n);
-
-    return this.convertToRequest(note, tx);
+    const gasLimit = Math.round(gas * EVM_GAS_LIMIT_MULTIPLIER);
+    return gasLimit;
   }
 
-  private convertToRequest(
+  private async getCreateTransactionRequest(
     note: string,
-    tx: EvmRawLegacyTransaction | EvmRawTransaction,
-  ): CreateEvmRawTransactionRequest {
+    tx: InputTransaction,
+  ): Promise<CreateEvmRawTransactionRequest> {
+    const gasLimit = await this.estimateTx(tx);
+
     const request: CreateEvmRawTransactionRequest = {
       vault_id: this.#vaultId,
       note,
@@ -169,22 +134,8 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
       details: {
         type: 'evm_raw_transaction',
         use_secure_node: false,
-        chain: this.#chainId,
-        gas: {
-          gas_limit: tx.gasLimit.toString(),
-          type: 'custom',
-          details:
-            'gasPrice' in tx
-              ? {
-                  type: 'legacy',
-                  price: tx.gasPrice.toString(),
-                }
-              : {
-                  type: 'dynamic',
-                  max_fee_per_gas: tx.maxFeePerGas.toString(),
-                  max_priority_fee_per_gas: tx.maxPriorityFeePerGas.toString(),
-                },
-        },
+        chain: convertChainIdToChain(this.#chainId as any as SupportedChain),
+        gas: await this.safeGetCustomGasPricing(tx, gasLimit),
         to: tx.to,
         value: tx.value?.toString() || '0',
         data: {
@@ -197,47 +148,65 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
     return request;
   }
 
-  private async populateLegacyTx(
-    craftedTx: InputTransaction,
+  private async safeGetCustomGasPricing(
+    tx: InputTransaction,
     gasLimit: number,
-    cappedFee: bigint,
-  ): Promise<EvmRawLegacyTransaction> {
-    const tx: EvmRawLegacyTransaction = {
-      to: craftedTx.to,
-      data: craftedTx.data,
-      value: craftedTx.value,
-      gasLimit,
-      gasPrice: await this.#feeManager.getOptimisticLegacyFee(),
+  ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
+    if (tx.cappedFee && tx.cappedFee > 0)
+      return this.#feeManager.isLegacy
+        ? this.safeGetCustomLegacyGas(tx.cappedFee, gasLimit)
+        : this.safeGetCustomGas(tx.cappedFee, gasLimit);
+    return {
+      type: 'priority',
+      priority_level: 'high',
+      gas_limit: gasLimit.toString(),
     };
-
-    if (cappedFee > 0n) {
-      const actualFee = BigInt(tx.gasLimit) * tx.gasPrice;
-      if (cappedFee < actualFee) throw new Error('Out of capped fee');
-    }
-
-    return tx;
   }
 
-  private async populateTx(
-    craftedTx: InputTransaction,
-    gasLimit: number,
+  private async safeGetCustomLegacyGas(
     cappedFee: bigint,
-  ): Promise<EvmRawTransaction> {
-    const fee = await this.#feeManager.getOptimisticFee();
-    const tx: EvmRawTransaction = {
-      to: craftedTx.to,
-      data: craftedTx.data,
-      value: craftedTx.value,
-      gasLimit,
-      maxFeePerGas: fee.maxFeePerGas,
-      maxPriorityFeePerGas: fee.maxPriorityFeePerGas,
-    };
-
+    gasLimit: number,
+  ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
+    const gasPrice = await this.#feeManager.getOptimisticLegacyFee();
     if (cappedFee > 0n) {
-      const actualFee = BigInt(tx.gasLimit) * tx.maxFeePerGas;
-      if (cappedFee < actualFee) throw new Error('Out of capped fee');
+      const actualFee = BigInt(gasLimit) * gasPrice;
+      if (cappedFee < actualFee)
+        throw new Error(
+          `can't populate pricing: actualFee (${actualFee}) > cappedFee (${cappedFee})`,
+        );
     }
 
-    return tx;
+    return {
+      gas_limit: gasLimit.toString(),
+      type: 'custom',
+      details: {
+        type: 'legacy',
+        price: gasPrice.toString(),
+      },
+    };
+  }
+
+  private async safeGetCustomGas(
+    cappedFee: bigint,
+    gasLimit: number,
+  ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
+    const fee = await this.#feeManager.getOptimisticFee();
+    if (cappedFee > 0n) {
+      const actualFee = BigInt(gasLimit) * fee.maxFeePerGas;
+      if (cappedFee < actualFee)
+        throw new Error(
+          `can't populate pricing: actualFee (${actualFee}) > cappedFee (${cappedFee})`,
+        );
+    }
+
+    return {
+      gas_limit: gasLimit.toString(),
+      type: 'custom',
+      details: {
+        type: 'dynamic',
+        max_fee_per_gas: fee.maxFeePerGas.toString(),
+        max_priority_fee_per_gas: fee.maxPriorityFeePerGas.toString(),
+      },
+    };
   }
 }
