@@ -21,7 +21,7 @@ enum ForDefiTransactionAction {
 
 type TransactionActionPayload<T extends ForDefiTransactionAction> = {
   attempt: number;
-} & (T extends ForDefiTransactionAction.Init ? { uid: string } : {}) &
+} & (T extends ForDefiTransactionAction.Init ? { rawNote: string } : {}) &
   (T extends ForDefiTransactionAction.FulfillOrder ? { orderId: string } : {}) &
   (T extends ForDefiTransactionAction.BatchOrderUnlock ? { orderIds: string[] } : {});
 
@@ -139,10 +139,15 @@ export class ForDefiTransactionBuilder
     const txs = await this.#txAdapter.getInitTxSenders(logger);
     return txs.map(
       (req) => async () =>
-        this.proposeTransaction(req, logger, ForDefiTransactionAction.Init, {
-          attempt: 0,
-          uid: req.note,
-        }),
+        this.proposeTransaction<ForDefiTransactionAction.Init>(
+          req,
+          logger,
+          ForDefiTransactionAction.Init,
+          {
+            attempt: 0,
+            rawNote: req.note,
+          },
+        ),
     );
   }
 
