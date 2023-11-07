@@ -4,15 +4,15 @@ import { Logger, LoggerOptions } from 'pino';
 import Web3 from 'web3';
 import { EvmFeeManager } from './feeManager';
 import { EVM_GAS_LIMIT_MULTIPLIER, InputTransaction } from './signer';
-import { ForDefiTransactionBuilderAdapter } from '../forDefiClient/tx-builder';
+import { ForDefiTransactionBuilderAdapter } from '../authority-forDefi/tx-builder';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
 import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { createERC20ApproveTxs } from './tx-generators/createERC20ApproveTxs';
 import { OrderEstimation } from '../chain-common/order-estimator';
 import { IExecutor } from '../executor';
-import { convertChainIdToChain } from '../forDefiClient/client-adapter';
+import { convertChainIdToChain } from '../authority-forDefi/client-adapter';
 import { SupportedChain } from '../config';
-import { CreateEvmRawTransactionRequest } from '../forDefiClient/types/createTransaction';
+import { CreateEvmRawTransactionRequest } from '../authority-forDefi/types/createTransaction';
 
 const enum ForDefiTransactionAction {
   SetAllowance = 'SetAllowance',
