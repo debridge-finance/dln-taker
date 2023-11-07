@@ -34,9 +34,9 @@
   "dependencies": {
     "@debridge-finance/dln-client": "8.3.1",
     "@debridge-finance/legacy-dln-profitability": "2.2.2",
-    "@debridge-finance/solana-utils": "4.2.1",
+    "@debridge-finance/solana-utils": "4.3.1",
     "@protobuf-ts/plugin": "2.8.1",
-    "@solana/web3.js": "1.66.2",
+    "@solana/web3.js": "^1.87.1",
     "axios": "0.21.4",
     "axios-cache-adapter": "2.7.3",
     "bignumber.js": "9.1.2",

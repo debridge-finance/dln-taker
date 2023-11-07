@@ -769,7 +769,6 @@ export class Executor implements IExecutor {
           new SolanaForDefiTransactionAdapter(
             { id: authority.vaultId, address: vaultAddress },
             this,
-            connection,
           ),
         );
       }

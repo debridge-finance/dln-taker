@@ -1,4 +1,4 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Commitment, Connection, PublicKey } from '@solana/web3.js';
 import { helpers } from '@debridge-finance/solana-utils';
 import { ChainId, Solana } from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
@@ -30,6 +30,7 @@ export async function tryInitTakerALT(
 ) {
   // WARN: initForTaket requires explicit payer (tx signer) and actual taker addresses
   // On MPC feat activation initForTaker payer will be = helper wallet and taker = mpc address
+  const commitment: Commitment = 'processed';
   const maybeTxs = await solanaClient.initForTaker(
     new PublicKey(solanaAdapter.bytesAddress), // payer
     new PublicKey(takerAddress), // taker
@@ -50,7 +51,7 @@ export async function tryInitTakerALT(
     logger,
     options: {
       convertIntoTxV0: false,
-      blockhashCommitment: 'confirmed',
+      blockhashCommitment: commitment,
     },
   });
   logger.info(`Initialized ALT: ${initTxId}`);
@@ -62,7 +63,7 @@ export async function tryInitTakerALT(
       logger,
       options: {
         convertIntoTxV0: false,
-        blockhashCommitment: 'confirmed',
+        blockhashCommitment: commitment,
       },
     });
     await Promise.all(fillIds.map((txId) => waitSolanaTxFinalized(solanaConnection, txId)));
@@ -73,7 +74,7 @@ export async function tryInitTakerALT(
       logger,
       options: {
         convertIntoTxV0: false,
-        blockhashCommitment: 'confirmed',
+        blockhashCommitment: commitment,
       },
     });
     logger.info(`Freezed ALT: ${freezeId}`);

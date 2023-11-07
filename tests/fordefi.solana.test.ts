@@ -1,9 +1,8 @@
 import { VersionedTransaction, clusterApiUrl, Connection } from '@solana/web3.js';
-import { SolanaForDefiConverter } from '../src/chain-solana/fordefi-converter';
+import { fordefiConvert } from '../src/chain-solana/fordefi-converter';
 
 describe('Can convert versioned tx into fordefi format', () => {
   const conn = new Connection(clusterApiUrl('mainnet-beta'));
-  const converter = new SolanaForDefiConverter(conn);
   it('can convert tx', async () => {
     const sig =
       '62ARAHz7gkgkR7tVsT4iiP9X8s6kRgGjAADHnYZg43TWWNwJfy3ebfPFLGAdHHmjpYxbyyQ8GWHVx5VCMS4uRVcA';
@@ -45,7 +44,7 @@ describe('Can convert versioned tx into fordefi format', () => {
       { signer: false, writable: false, address: 'Sysvar1nstructions1111111111111111111111111' },
     ];
     const vtx = new VersionedTransaction(tx.transaction.message);
-    const converted = await converter.convert(vtx, '', '1');
+    const converted = fordefiConvert(vtx, '', '1');
     converted.details.accounts.map((acc, idx) => {
       const expected = expectedAccounts[idx];
       if (
