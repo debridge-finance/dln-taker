@@ -4,7 +4,7 @@ import {
   CreateTransactionResponse,
   SignedCreateTransactionRequest,
 } from './types/createTransaction';
-import { GetEvmVaultResponse, GetSolanaVaultResponse } from './types/getVault';
+import { GetVaultResponse } from './types/getVault';
 import { ListTransactionsRequest, ListTransactionsResponse } from './types/listTransactions';
 import { ErrorResponse } from './types/shared';
 
@@ -43,9 +43,9 @@ export class ForDefiClient {
     return this.getResponse<ListTransactionsResponse>(requestPath);
   }
 
-  async getVault(vaultId: string): Promise<GetEvmVaultResponse | GetSolanaVaultResponse> {
+  async getVault(vaultId: string): Promise<GetVaultResponse> {
     const requestPath = `/api/v1/vaults/${vaultId}`;
-    return this.getResponse<GetEvmVaultResponse | GetSolanaVaultResponse>(requestPath);
+    return this.getResponse<GetVaultResponse>(requestPath);
   }
 
   async createTransaction(
