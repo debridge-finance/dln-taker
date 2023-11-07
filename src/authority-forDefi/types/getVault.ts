@@ -1,8 +1,5 @@
-export type GetSolanaVaultResponse = {
+export type GetVaultResponse = {
   id: string;
   address: string;
-};
-export type GetEvmVaultResponse = {
-  id: string;
-  address: string;
+  type: 'evm' | 'solana';
 };

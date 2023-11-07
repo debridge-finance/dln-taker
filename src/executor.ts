@@ -59,14 +59,15 @@ import { EvmForDefiTransactionAdapter } from './chain-evm/fordefi-adapter';
 import { SolanaForDefiTransactionAdapter } from './chain-solana/fordefi-adapter';
 import { EmptyTransactionBuilder } from './chain-common/tx-builder-disabled';
 import { isValidEvmAddress } from './chain-evm/utils';
+import { die } from './errors';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
 type EvmClientChainConfig = ConstructorParameters<typeof Evm.DlnClient>[0]['chainConfig'];
 
-const safeExec = (func: Function, error: string) => {
+const safeExec = async (func: () => Promise<any>, error: string) => {
   try {
-    return func();
+    return await func();
   } catch (e) {
     throw new Error(`${error}: ${e}`);
   }
@@ -419,7 +420,7 @@ export class Executor implements IExecutor {
 
         clients.push(client);
 
-        unlockBeneficiary = safeExec(() => {
+        unlockBeneficiary = await safeExec(async () => {
           const buffer = tokenStringToBuffer(chain.chain, chain.beneficiary);
           if (buffer.length !== 32) throw new Error();
           return buffer;
@@ -666,8 +667,8 @@ export class Executor implements IExecutor {
 
       case 'ForDefi': {
         const signer = new ForDefiSigner(
-          safeExec(
-            () =>
+          await safeExec(
+            async () =>
               crypto.createPrivateKey({
                 key: authority.signerPrivateKey,
                 passphrase: authority.privateKeyPassphrase,
@@ -707,12 +708,31 @@ export class Executor implements IExecutor {
     client: ForDefiClient,
     vaultId: string,
   ): Promise<Uint8Array> {
-    try {
-      const vault = await client.getVault(vaultId);
-      return tokenStringToBuffer(chainId, vault.address);
-    } catch (e) {
-      throw new Error(`Unable to retrieve ForDefi vault ${vaultId} for ${ChainId[chainId]}: ${e}`);
+    const vault = await safeExec(
+      async () => client.getVault(vaultId),
+      `Unable to retrieve ForDefi vault ${vaultId} for ${ChainId[chainId]}`,
+    );
+
+    switch (getEngineByChainId(chainId)) {
+      case ChainEngine.EVM: {
+        if (vault.type !== 'evm')
+          throw new Error(
+            `Unexpected type of vault ${vaultId} for ${ChainId[chainId]}: expected "evm", but got "${vault.type}"`,
+          );
+        break;
+      }
+      case ChainEngine.Solana: {
+        if (vault.type !== 'solana')
+          throw new Error(
+            `Unexpected type of vault ${vaultId} for ${ChainId[chainId]}: expected "solana", but got "${vault.type}"`,
+          );
+        break;
+      }
+      default:
+        die(`Unexpected engine`);
     }
+
+    return tokenStringToBuffer(chainId, vault.address);
   }
 
   private async getSolanaProvider(
@@ -728,8 +748,8 @@ export class Executor implements IExecutor {
           client,
           new SolanaTxSigner(
             connection,
-            safeExec(
-              () =>
+            await safeExec(
+              async () =>
                 Keypair.fromSecretKey(
                   authority.privateKey.startsWith('0x')
                     ? helpers.hexToBuffer(authority.privateKey)
@@ -750,8 +770,8 @@ export class Executor implements IExecutor {
           chain.chain,
           forDefiClient,
           new ForDefiSigner(
-            safeExec(
-              () =>
+            await safeExec(
+              async () =>
                 crypto.createPrivateKey({
                   key: authority.signerPrivateKey,
                   passphrase: authority.privateKeyPassphrase,
