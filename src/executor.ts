@@ -53,9 +53,9 @@ import { CommonTransactionBuilder, ITransactionBuilder } from './chain-common/tx
 import { SolanaTransactionBuilder } from './chain-solana/tx-builder';
 import { EvmTransactionBuilder } from './chain-evm/tx-builder';
 import { SwapConnectorImplementationService } from './processors/swap-connector-implementation.service';
-import { ForDefiTransactionBuilder } from './forDefiClient/tx-builder';
-import { ForDefiSigner } from './forDefiClient/signer';
-import { ForDefiClient } from './forDefiClient/client';
+import { ForDefiTransactionBuilder } from './authority-forDefi/tx-builder';
+import { ForDefiSigner } from './authority-forDefi/signer';
+import { ForDefiClient } from './authority-forDefi/client';
 import { EvmForDefiTransactionAdapter } from './chain-evm/fordefi-adapter';
 import { SolanaForDefiTransactionAdapter } from './chain-solana/fordefi-adapter';
 import { EmptyTransactionBuilder } from './chain-common/tx-builder-disabled';

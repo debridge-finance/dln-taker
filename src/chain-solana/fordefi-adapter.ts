@@ -6,8 +6,8 @@ import { createOrderFullfillTx } from './tx-generators/createOrderFullfillTx';
 import { fordefiConvert } from './fordefi-converter';
 import { OrderEstimation } from '../chain-common/order-estimator';
 import { IExecutor } from '../executor';
-import { ForDefiTransactionBuilderAdapter } from '../forDefiClient/tx-builder';
-import { CreateTransactionRequest } from '../forDefiClient/types/createTransaction';
+import { ForDefiTransactionBuilderAdapter } from '../authority-forDefi/tx-builder';
+import { CreateTransactionRequest } from '../authority-forDefi/types/createTransaction';
 
 export class SolanaForDefiTransactionAdapter implements ForDefiTransactionBuilderAdapter {
   readonly #vaultId: string;

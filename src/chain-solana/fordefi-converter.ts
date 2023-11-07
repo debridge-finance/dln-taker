@@ -1,5 +1,5 @@
 import { VersionedTransaction, MessageV0 } from '@solana/web3.js';
-import { CreateSolanaRawTransactionRequest } from '../forDefiClient/types/createTransaction';
+import { CreateSolanaRawTransactionRequest } from '../authority-forDefi/types/createTransaction';
 
 export function fordefiConvert(
   tx: VersionedTransaction,
