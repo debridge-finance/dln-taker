@@ -19,7 +19,7 @@ enum ForDefiTransactionAction {
   BatchOrderUnlock = 'BatchOrderUnlock',
 }
 
-type TransactionActionPayload<T extends ForDefiTransactionAction> = {
+type ForDefiTransactionActionPayload<T extends ForDefiTransactionAction> = {
   attempt: number;
 } & (T extends ForDefiTransactionAction.Init ? { rawNote: string } : {}) &
   (T extends ForDefiTransactionAction.FulfillOrder ? { orderId: string } : {}) &
@@ -27,7 +27,7 @@ type TransactionActionPayload<T extends ForDefiTransactionAction> = {
 
 function encodeNote<T extends ForDefiTransactionAction>(
   action: T,
-  payload: TransactionActionPayload<T>,
+  payload: ForDefiTransactionActionPayload<T>,
 ) {
   return JSON.stringify({
     action,
@@ -155,7 +155,7 @@ export class ForDefiTransactionBuilder
     req: CreateTransactionRequest,
     logger: Logger,
     action: T,
-    payload: TransactionActionPayload<T>,
+    payload: ForDefiTransactionActionPayload<T>,
   ) {
     let attempt = 0;
     do {
