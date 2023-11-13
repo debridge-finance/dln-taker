@@ -129,7 +129,8 @@ export class ForDefiTransactionBuilder
         ForDefiTransactionAction.BatchOrderUnlock,
         {
           attempt: 0,
-          orderIds: orders.map((order) => helpers.bufferToHex(order.orderId)),
+          // mind that we sort orderIds to avoid almost infinity transaction generation
+          orderIds: orders.map((order) => helpers.bufferToHex(order.orderId)).sort(),
         },
       );
     };
