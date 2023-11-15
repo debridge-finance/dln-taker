@@ -280,6 +280,7 @@ export class Executor implements IExecutor {
         (this.swapConnector as SwapConnectorImplementationService).initSolana({
           solanaConnection,
           jupiterApiToken: undefined,
+          jupiterMaxAccounts: config.jupiterConfig?.maxAccounts,
         });
 
         const solanaPmmSrc = new PublicKey(

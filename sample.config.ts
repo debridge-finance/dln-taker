@@ -1,10 +1,9 @@
-/* eslint-disable import/no-default-export, @typescript-eslint/no-unused-vars -- Allowed to simplify configuration file */
+/* eslint-disable import/no-default-export -- Allowed to simplify configuration file */
 
 import {
   ChainId,
   configurator,
   ExecutorLaunchConfig,
-  filters,
   processors,
   WsNextOrder,
   CURRENT_ENVIRONMENT as environment,
@@ -16,6 +15,10 @@ const config: ExecutorLaunchConfig = {
       Authorization: `Bearer ${process.env.WS_API_KEY}`,
     },
   } as any),
+
+  jupiterConfig: {
+    maxAccounts: 16,
+  },
 
   buckets: [
     //

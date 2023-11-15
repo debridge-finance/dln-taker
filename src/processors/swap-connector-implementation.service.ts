@@ -18,6 +18,7 @@ export class SwapConnectorImplementationService implements SwapConnector {
     oneInchApi: string;
     jupiterApiToken?: string;
     solanaConnection?: Connection;
+    jupiterMaxAccounts?: number;
   }) {
     const oneInchV4Connector = new OneInch.OneInchV4Connector(config.oneInchApi);
     const oneInchV5Connector = new OneInch.OneInchV5Connector(config.oneInchApi);
@@ -46,15 +47,23 @@ export class SwapConnectorImplementationService implements SwapConnector {
       this.initSolana({
         solanaConnection: config.solanaConnection,
         jupiterApiToken: config.jupiterApiToken,
+        jupiterMaxAccounts: config.jupiterMaxAccounts,
       });
     }
   }
 
-  initSolana(config: { jupiterApiToken?: string; solanaConnection: Connection }) {
+  initSolana(config: {
+    jupiterApiToken?: string;
+    solanaConnection: Connection;
+    jupiterMaxAccounts?: number;
+  }) {
+    const jupiterMaxAccounts = config.jupiterMaxAccounts || 16;
+    // eslint-disable-next-line no-console -- Intentional usage in the entry point
+    console.log(`jupiterMaxAccounts=${jupiterMaxAccounts}`);
     this.#connectors[ChainId.Solana] = new Jupiter.JupiterConnectorV6(
       config.solanaConnection,
       config.jupiterApiToken,
-      16,
+      jupiterMaxAccounts,
     );
   }
 
