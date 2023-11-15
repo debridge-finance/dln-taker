@@ -10,16 +10,24 @@ import {
   SwapConnectorResult,
 } from '@debridge-finance/dln-client';
 import { Connection } from '@solana/web3.js';
+import { Logger as PinoLogger } from 'pino';
 
 export class SwapConnectorImplementationService implements SwapConnector {
   readonly #connectors: { [key in ChainId]: SwapConnector | null };
 
-  constructor(config: {
-    oneInchApi: string;
-    jupiterApiToken?: string;
-    solanaConnection?: Connection;
-    jupiterMaxAccounts?: number;
-  }) {
+  readonly #logger: PinoLogger;
+
+  constructor(
+    config: {
+      oneInchApi: string;
+      jupiterApiToken?: string;
+      solanaConnection?: Connection;
+      jupiterMaxAccounts?: number;
+    },
+    logger: PinoLogger,
+  ) {
+    this.#logger = logger;
+
     const oneInchV4Connector = new OneInch.OneInchV4Connector(config.oneInchApi);
     const oneInchV5Connector = new OneInch.OneInchV5Connector(config.oneInchApi);
 
@@ -58,8 +66,7 @@ export class SwapConnectorImplementationService implements SwapConnector {
     jupiterMaxAccounts?: number;
   }) {
     const jupiterMaxAccounts = config.jupiterMaxAccounts || 16;
-    // eslint-disable-next-line no-console -- Intentional usage in the entry point
-    console.log(`jupiterMaxAccounts=${jupiterMaxAccounts}`);
+    this.#logger.info(`solana jupiterMaxAccounts=${jupiterMaxAccounts}`);
     this.#connectors[ChainId.Solana] = new Jupiter.JupiterConnectorV6(
       config.solanaConnection,
       config.jupiterApiToken,
