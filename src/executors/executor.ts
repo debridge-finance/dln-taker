@@ -224,9 +224,12 @@ export class Executor implements IExecutor {
       throw new Error('Custom swapConnector not implemented');
     }
 
-    this.swapConnector = new SwapConnectorImplementationService({
-      oneInchApi: this.#url1Inch,
-    });
+    this.swapConnector = new SwapConnectorImplementationService(
+      {
+        oneInchApi: this.#url1Inch,
+      },
+      this.logger,
+    );
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
@@ -280,6 +283,7 @@ export class Executor implements IExecutor {
         (this.swapConnector as SwapConnectorImplementationService).initSolana({
           solanaConnection,
           jupiterApiToken: undefined,
+          jupiterMaxAccounts: config.jupiterConfig?.maxAccounts,
         });
 
         const solanaPmmSrc = new PublicKey(
