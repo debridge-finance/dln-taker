@@ -1,10 +1,9 @@
-/* eslint-disable import/no-default-export, @typescript-eslint/no-unused-vars -- Allowed to simplify configuration file */
+/* eslint-disable import/no-default-export -- Allowed to simplify configuration file */
 
 import {
   ChainId,
   configurator,
   ExecutorLaunchConfig,
-  filters,
   WsNextOrder,
   CURRENT_ENVIRONMENT as environment,
 } from '@debridge-finance/dln-taker';
@@ -243,6 +242,10 @@ const config: ExecutorLaunchConfig = {
       },
     },
   ],
+
+  jupiterConfig: {
+    maxAccounts: 16,
+  },
 };
 
 export default config;

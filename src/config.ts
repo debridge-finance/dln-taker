@@ -342,4 +342,8 @@ export interface ExecutorLaunchConfig {
   buckets: Array<{
     [key in ChainId]?: string | Array<string>;
   }>;
+
+  jupiterConfig?: {
+    maxAccounts: number;
+  };
 }

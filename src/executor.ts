@@ -260,9 +260,12 @@ export class Executor implements IExecutor {
 
     this.tokenPriceService = config.tokenPriceService || new CoingeckoPriceFeed();
 
-    this.swapConnector = new SwapConnectorImplementationService({
-      oneInchApi: this.#url1Inch,
-    });
+    this.swapConnector = new SwapConnectorImplementationService(
+      {
+        oneInchApi: this.#url1Inch,
+      },
+      this.logger,
+    );
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
     this.hookEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
