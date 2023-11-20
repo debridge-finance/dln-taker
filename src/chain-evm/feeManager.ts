@@ -11,7 +11,7 @@ export type EIP1551Fee = {
 
 // see https://docs.rs/ethers-core/latest/src/ethers_core/types/chain.rs.html#55-166
 const eip1559Compatible: { [key in SupportedChain]: boolean } = {
-  [ChainId.Arbitrum]: true,
+  [ChainId.Arbitrum]: false,
   [ChainId.Avalanche]: true,
   [ChainId.BSC]: false,
   [ChainId.Ethereum]: true,
