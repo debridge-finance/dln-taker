@@ -314,6 +314,8 @@ export interface ExecutorLaunchConfig {
   }>;
 
   jupiterConfig?: {
-    maxAccounts: number;
+    apiToken?: string;
+    maxAccounts?: number;
+    blacklistedDexes?: Array<string>;
   };
 }

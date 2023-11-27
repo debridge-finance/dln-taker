@@ -7,6 +7,7 @@ import {
   CommonDlnClient,
   Evm,
   getEngineByChainId,
+  Jupiter,
   OrderData,
   PriceTokenService,
   Solana,
@@ -131,7 +132,7 @@ export class Executor implements IExecutor {
   tokenPriceService: PriceTokenService;
 
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
-  swapConnector: SwapConnector;
+  swapConnector: SwapConnectorImplementationService;
 
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   orderFeed: GetNextOrder;
@@ -224,12 +225,9 @@ export class Executor implements IExecutor {
       throw new Error('Custom swapConnector not implemented');
     }
 
-    this.swapConnector = new SwapConnectorImplementationService(
-      {
-        oneInchApi: this.#url1Inch,
-      },
-      this.logger,
-    );
+    this.swapConnector = new SwapConnectorImplementationService({
+      oneInchApi: this.#url1Inch,
+    });
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
     const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
@@ -280,11 +278,15 @@ export class Executor implements IExecutor {
           commitment: 'confirmed',
         });
 
-        (this.swapConnector as SwapConnectorImplementationService).initSolana({
-          solanaConnection,
-          jupiterApiToken: undefined,
-          jupiterMaxAccounts: config.jupiterConfig?.maxAccounts,
-        });
+        this.swapConnector.setConnector(
+          ChainId.Solana,
+          new Jupiter.JupiterConnectorV6(
+            solanaConnection,
+            config.jupiterConfig?.apiToken,
+            config.jupiterConfig?.maxAccounts || 16,
+            config.jupiterConfig?.blacklistedDexes || [],
+          ),
+        );
 
         const solanaPmmSrc = new PublicKey(
           chain.environment?.pmmSrc || getCurrentEnvironment().chains[ChainId.Solana]!.pmmSrc!,

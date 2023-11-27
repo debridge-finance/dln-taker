@@ -1,6 +1,5 @@
 import {
   ChainId,
-  Jupiter,
   Logger,
   OneInch,
   SwapConnector,
@@ -9,25 +8,11 @@ import {
   SwapConnectorRequest,
   SwapConnectorResult,
 } from '@debridge-finance/dln-client';
-import { Connection } from '@solana/web3.js';
-import { Logger as PinoLogger } from 'pino';
 
 export class SwapConnectorImplementationService implements SwapConnector {
   readonly #connectors: { [key in ChainId]: SwapConnector | null };
 
-  readonly #logger: PinoLogger;
-
-  constructor(
-    config: {
-      oneInchApi: string;
-      jupiterApiToken?: string;
-      solanaConnection?: Connection;
-      jupiterMaxAccounts?: number;
-    },
-    logger: PinoLogger,
-  ) {
-    this.#logger = logger;
-
+  constructor(config: { oneInchApi: string }) {
     const oneInchV4Connector = new OneInch.OneInchV4Connector(config.oneInchApi);
     const oneInchV5Connector = new OneInch.OneInchV5Connector(config.oneInchApi);
 
@@ -50,28 +35,10 @@ export class SwapConnectorImplementationService implements SwapConnector {
       [ChainId.Base]: oneInchV5Connector,
       [ChainId.Optimism]: oneInchV4Connector,
     };
-
-    if (config.solanaConnection) {
-      this.initSolana({
-        solanaConnection: config.solanaConnection,
-        jupiterApiToken: config.jupiterApiToken,
-        jupiterMaxAccounts: config.jupiterMaxAccounts,
-      });
-    }
   }
 
-  initSolana(config: {
-    jupiterApiToken?: string;
-    solanaConnection: Connection;
-    jupiterMaxAccounts?: number;
-  }) {
-    const jupiterMaxAccounts = config.jupiterMaxAccounts || 16;
-    this.#logger.info(`solana jupiterMaxAccounts=${jupiterMaxAccounts}`);
-    this.#connectors[ChainId.Solana] = new Jupiter.JupiterConnectorV6(
-      config.solanaConnection,
-      config.jupiterApiToken,
-      jupiterMaxAccounts,
-    );
+  setConnector(chainId: ChainId, connector: SwapConnector) {
+    this.#connectors[chainId] = connector;
   }
 
   getEstimate(
