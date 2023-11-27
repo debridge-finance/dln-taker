@@ -79,44 +79,36 @@ export class ForDefiClient {
       },
     };
 
-    {
-      // log request safely
-      // conceal sensitive keys from the log
-      const sanitizedRequestHeaders = {
-        ...request.headers,
-        Authorization: '[concealed]',
-      };
-      this.#logger.debug(`sending request: ${JSON.stringify(sanitizedRequestHeaders)} ${path}`);
+    const logger = this.#logger.child({
+      // use time to track requests across logs!
+      requestWatermark: new Date().getTime(),
+    });
+
+    const response = await this.sendRequest(path, request, logger);
+    const parsedData = await ForDefiClient.readResponse<T>(response, logger);
+    if (!response.ok) {
+      const error = <ErrorResponse>parsedData;
+      logger.debug(
+        `response is not Ok: code: ${response}, details: ${error?.title} (${error?.detail}), body: ${parsedData}`,
+      );
+      throw new Error(
+        `forDefi returned unexpected response code: ${response}; ${error?.title} (${error?.detail})`,
+      );
     }
 
-    const { status, parsedData } = await this.readResponse(path, request);
-    if (Math.round(status / 100) === 2) {
-      this.#logger.trace(parsedData);
-      return <T>parsedData;
-    }
-
-    const error = <ErrorResponse>parsedData;
-    this.#logger.error(
-      `fordefi returned code=${status}: ${error.title} | ${error.detail} | ${error.request_id}`,
-    );
-    this.#logger.error(parsedData);
-    throw new Error(`fordefi returned code=${status}; ${error.title} (${error.detail})`);
+    logger.trace(parsedData);
+    return parsedData;
   }
 
-  private async readResponse(
-    path: string,
-    request: Parameters<typeof fetch>[1],
-  ): Promise<{ status: number; parsedData: any }> {
-    const { status, body } = await this.sendRequest(path, request);
-
+  private static async readResponse<T>(
+    response: Awaited<ReturnType<typeof fetch>>,
+    logger: Logger,
+  ): Promise<T> {
+    const body = await response.text();
     try {
-      const parsedData = JSON.parse(body);
-      return {
-        status,
-        parsedData,
-      };
+      return JSON.parse(body);
     } catch (e) {
-      this.#logger.error(`forDefi returned unrecognizable text: ${body}`);
+      logger.error(`forDefi returned unrecognizable text: ${body}`);
       throw new Error(`forDefi returned unrecognizable text: ${body}`);
     }
   }
@@ -124,18 +116,35 @@ export class ForDefiClient {
   private async sendRequest(
     path: string,
     request: Parameters<typeof fetch>[1],
-  ): Promise<{ status: number; body: string }> {
+    logger: Logger,
+  ): Promise<Awaited<ReturnType<typeof fetch>>> {
+    const startedAt = new Date().getTime();
+
     try {
-      this.#logger.debug(`forDefi: requesting ${path}`);
+      {
+        // log request safely
+        // conceal sensitive keys from the log
+        const sanitizedRequestHeaders = {
+          ...(request?.headers || {}),
+          Authorization: '[concealed]',
+        };
+        logger.debug(
+          `sending request: ${request?.method || 'GET'} ${path} headers: ${JSON.stringify(
+            sanitizedRequestHeaders,
+          )} ${path}`,
+        );
+      }
+
       const response = await fetch(`https://${this.apiHost}${path}`, request);
-      return {
-        status: response.status,
-        body: await response.text(),
-      };
+      return response;
     } catch (e) {
-      this.#logger.error(`error calling forDefi ${path}: ${e}`);
-      this.#logger.error(e);
+      logger.error(`error calling forDefi ${path}: ${e}`);
+      logger.error(e);
       throw e;
+    } finally {
+      // track request timing
+      const elapsedTime = new Date().getTime() - startedAt;
+      logger.debug(`request finished in ${elapsedTime / 1000}s`);
     }
   }
 }
