@@ -142,6 +142,7 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
           type: 'hex',
           hex_data: tx.data,
         },
+        fail_on_prediction_failure: this.#chainId !== ChainId.BSC,
       },
     };
 
