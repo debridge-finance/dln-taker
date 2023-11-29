@@ -89,11 +89,9 @@ export class ForDefiClient {
     if (!response.ok) {
       const error = <ErrorResponse>parsedData;
       logger.debug(
-        `response is not Ok: code: ${response}, details: ${error?.title} (${error?.detail}), body: ${parsedData}`,
+        `response for requestId: ${error.request_id} is not Ok: code: ${response.status}, details: ${error?.title} (${error?.detail}), body: ${parsedData}`,
       );
-      throw new Error(
-        `forDefi returned unexpected response code: ${response}; ${error?.title} (${error?.detail})`,
-      );
+      throw new Error(`forDefi returned error: ${error?.title} (${error?.detail})`);
     }
 
     logger.trace(parsedData);
@@ -108,8 +106,8 @@ export class ForDefiClient {
     try {
       return JSON.parse(body);
     } catch (e) {
-      logger.error(`forDefi returned unrecognizable text: ${body}`);
-      throw new Error(`forDefi returned unrecognizable text: ${body}`);
+      logger.error(`response is not JSON: ${body}`);
+      throw new Error(`forDefi returned unexpected data: ${body}`);
     }
   }
 
@@ -138,9 +136,9 @@ export class ForDefiClient {
       const response = await fetch(`https://${this.apiHost}${path}`, request);
       return response;
     } catch (e) {
-      logger.error(`error calling forDefi ${path}: ${e}`);
+      logger.error(`request to ${path} failed: ${e}`);
       logger.error(e);
-      throw e;
+      throw new Error(`forDefi failed to respond: ${e}`);
     } finally {
       // track request timing
       const elapsedTime = new Date().getTime() - startedAt;
