@@ -47,6 +47,7 @@ export type CreateEvmRawTransactionRequest = {
       type: 'hex';
       hex_data: string;
     };
+    fail_on_prediction_failure?: boolean;
   };
 };
 
