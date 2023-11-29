@@ -20,7 +20,7 @@ const eip1559Compatible: { [key in SupportedChain]: boolean } = {
   [ChainId.Polygon]: true,
   [ChainId.Solana]: false,
   [ChainId.Base]: true,
-  [ChainId.Optimism]: true,
+  [ChainId.Optimism]: false,
 };
 
 export function findMaxBigInt(...bigInts: Array<bigint>) {
