@@ -17,23 +17,24 @@ export class SwapConnectorImplementationService implements SwapConnector {
     const oneInchV5Connector = new OneInch.OneInchV5Connector(config.oneInchApi);
 
     this.#connectors = {
-      [ChainId.Ethereum]: oneInchV4Connector,
-      [ChainId.BSC]: oneInchV4Connector,
-      [ChainId.Heco]: null,
-      [ChainId.Polygon]: oneInchV4Connector,
       [ChainId.Arbitrum]: oneInchV4Connector,
+      [ChainId.ArbitrumTest]: null,
       [ChainId.Avalanche]: oneInchV4Connector,
       [ChainId.AvalancheTest]: null,
-      [ChainId.Kovan]: null,
-      [ChainId.BSCTest]: null,
-      [ChainId.HecoTest]: null,
-      [ChainId.PolygonTest]: null,
-      [ChainId.ArbitrumTest]: null,
-      [ChainId.Solana]: null,
-      [ChainId.Fantom]: oneInchV4Connector,
-      [ChainId.Linea]: oneInchV4Connector,
       [ChainId.Base]: oneInchV5Connector,
+      [ChainId.BSC]: oneInchV4Connector,
+      [ChainId.BSCTest]: null,
+      [ChainId.Ethereum]: oneInchV4Connector,
+      [ChainId.Fantom]: oneInchV4Connector,
+      [ChainId.Heco]: null,
+      [ChainId.HecoTest]: null,
+      [ChainId.Kovan]: null,
+      [ChainId.Linea]: oneInchV4Connector,
+      [ChainId.Neon]: null,
       [ChainId.Optimism]: oneInchV4Connector,
+      [ChainId.Polygon]: oneInchV4Connector,
+      [ChainId.PolygonTest]: null,
+      [ChainId.Solana]: null,
     };
   }
 

@@ -49,6 +49,7 @@ export const avgBlockSpeed: { [key in SupportedChain]: number } = {
 
 export enum DexlessChains {
   Linea = ChainId.Linea,
+  Neon = ChainId.Neon,
 }
 
 export class EvmRebroadcastAdapterOpts {
