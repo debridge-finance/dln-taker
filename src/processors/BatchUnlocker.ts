@@ -152,7 +152,7 @@ export class BatchUnlocker {
   }
 
   private getBatchUnlockSize(giveChainId: ChainId): number {
-    return this.executor.getSupportedChain(giveChainId).srcConstraints.unlockBatchSize;
+    return this.executor.getSupportedChain(giveChainId).srcConstraints.batchUnlockSize;
   }
 
   /**

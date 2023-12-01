@@ -110,7 +110,7 @@ export class OrderEstimator extends OrderEvaluationContextual {
       buckets: this.order.executor.buckets,
       swapConnector: this.order.executor.swapConnector,
       logger: createClientLogger(this.logger),
-      batchSize: await this.getBatchUnlockSizeForProfitability(),
+      batchSize: this.order.giveChain.srcConstraints.batchUnlockSize,
       swapEstimationPreference: this.getRouteHint(),
       isFeatureEnableOpHorizon: process.env.FEATURE_OP_HORIZON_CAMPAIGN === 'true',
     };
@@ -184,18 +184,5 @@ export class OrderEstimator extends OrderEvaluationContextual {
       projectedFulfillAmount: rawOrderEstimation.projectedFulfillAmount,
       payload: this.payload,
     };
-  }
-
-  protected async getBatchUnlockSizeForProfitability(): Promise<number> {
-    const { unlockBatchSize, immediateUnlockAtUsdValue } = this.order.giveChain.srcConstraints;
-    if (immediateUnlockAtUsdValue) {
-      const usdValue = await this.order.getUsdValue();
-      if (usdValue >= immediateUnlockAtUsdValue) {
-        return 1;
-      }
-    }
-
-    // use default for any order
-    return unlockBatchSize;
   }
 }

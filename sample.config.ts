@@ -68,7 +68,7 @@ const config: ExecutorLaunchConfig = {
     // affects order profitability because the deBridge app and the API reserves the cost of unlock in the order's margin,
     // assuming that the order would be unlocked in a batch of size=10. Reducing the batch size to a lower value increases
     // your unlock costs and thus reduces order profitability, making them unprofitable most of the time.
-    unlockBatchSize: 10,
+    batchUnlockSize: 10,
   },
 
   chains: [

@@ -68,8 +68,7 @@ export type DstConstraintsPerOrderValue = DstOrderConstraints &
 export type SrcConstraints = Readonly<{
   TVLBudget: number;
   profitability: number;
-  unlockBatchSize: number;
-  immediateUnlockAtUsdValue: number;
+  batchUnlockSize: number;
 }>;
 
 export type SrcOrderConstraints = Readonly<{
@@ -337,7 +336,7 @@ export class Executor implements IExecutor {
             config.jupiterConfig?.apiToken,
             config.jupiterConfig?.maxAccounts || 16,
             config.jupiterConfig?.blacklistedDexes || [],
-          )
+          ),
         );
 
         const solanaPmmSrc = new PublicKey(
@@ -646,23 +645,19 @@ export class Executor implements IExecutor {
         chainConstraint.minProfitabilityBps ||
         sharedConstraint.minProfitabilityBps ||
         DEFAULT_MIN_PROFITABILITY_BPS,
-      unlockBatchSize:
-        chainConstraint.unlockBatchSize || sharedConstraint.unlockBatchSize || maxBatchSize,
-      immediateUnlockAtUsdValue:
-        chainConstraint.immediateUnlockAtUsdValue ||
-        sharedConstraint.immediateUnlockAtUsdValue ||
-        0,
+      batchUnlockSize:
+        chainConstraint.batchUnlockSize || sharedConstraint.batchUnlockSize || maxBatchSize,
     };
 
-    if (srcConstraints.unlockBatchSize < 1 || srcConstraints.unlockBatchSize > maxBatchSize) {
+    if (srcConstraints.batchUnlockSize < 1 || srcConstraints.batchUnlockSize > maxBatchSize) {
       throw new Error(
-        `Unlock batch size is out of bounds: expected [1,${maxBatchSize}]; actual: ${srcConstraints.unlockBatchSize} for ${ChainId[chainId]}`,
+        `Unlock batch size is out of bounds: expected [1,${maxBatchSize}]; actual: ${srcConstraints.batchUnlockSize} for ${ChainId[chainId]}`,
       );
     }
 
     if (chainId === ChainId.Solana) {
-      if (srcConstraints.unlockBatchSize > maxBatchSizeToSolana) {
-        srcConstraints.unlockBatchSize = maxBatchSizeToSolana;
+      if (srcConstraints.batchUnlockSize > maxBatchSizeToSolana) {
+        srcConstraints.batchUnlockSize = maxBatchSizeToSolana;
         // TODO write WARN to log
         // throw new Error(`Unlock batch size for Solana is out of bounds: expected to be up to ${maxBatchSizeToSolana}, actual: ${srcConstraints.unlockBatchSize}`)
       }
