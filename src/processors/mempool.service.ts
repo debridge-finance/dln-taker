@@ -1,5 +1,5 @@
 import { Logger } from 'pino';
-import { OrderId } from './base';
+import { OrderId } from '../interfaces';
 
 export type OrderConsumer = (orderId: OrderId) => void;
 
@@ -10,28 +10,37 @@ export type MempoolOpts = {
   archivalDelayStep: number;
 };
 
+const defaultOpts: MempoolOpts = {
+  baseDelay: 5,
+  baseArchivalDelay: 60 * 2,
+  delayStep: 10,
+  archivalDelayStep: 60 * 5,
+};
+
 export class MempoolService {
   readonly #logger: Logger;
+
+  readonly #opts: MempoolOpts;
 
   readonly #trackedOrders = new Map<OrderId, ReturnType<typeof setTimeout>>();
 
   constructor(
     logger: Logger,
-    private readonly opts: MempoolOpts,
     private readonly orderConsumer: OrderConsumer,
   ) {
-    this.#logger = logger.child({ service: 'MempoolService' });
+    this.#logger = logger.child({ service: MempoolService.name });
+    this.#opts = defaultOpts;
   }
 
   delayArchivalOrder(orderId: OrderId, attempt: number) {
     this.addOrder(
       orderId,
-      this.opts.baseArchivalDelay + this.opts.archivalDelayStep * (attempt - 1),
+      this.#opts.baseArchivalDelay + this.#opts.archivalDelayStep * (attempt - 1),
     );
   }
 
   delayOrder(orderId: OrderId, attempt: number) {
-    this.addOrder(orderId, this.opts.baseDelay + this.opts.delayStep * (attempt - 1));
+    this.addOrder(orderId, this.#opts.baseDelay + this.#opts.delayStep * (attempt - 1));
   }
 
   /**

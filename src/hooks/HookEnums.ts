@@ -2,7 +2,6 @@ export enum Hooks {
   OrderFeedConnected,
   OrderFeedDisconnected,
   OrderRejected,
-  OrderEstimated,
   OrderPostponed,
   OrderFulfilled,
   OrderUnlockSent,
@@ -26,24 +25,9 @@ export enum PostponingReason {
   FULFILLMENT_TX_FAILED,
 
   /**
-   * indicates the txn to fulfill the order has been reverted for a reason
-   */
-  FULFILLMENT_TX_REVERTED,
-
-  /**
    * indicates the unable to estimate preliminary fulfill
    */
   FULFILLMENT_EVM_TX_PREESTIMATION_FAILED,
-
-  /**
-   * indicates that unable to estimate fulfill tx
-   */
-  FULFILLMENT_EVM_TX_ESTIMATION_FAILED,
-
-  /**
-   * indicates that final fulfill tx requires more gas units
-   */
-  FULFILLMENT_EVM_TX_ESTIMATION_EXCEEDED_PREESTIMATION,
 
   /**
    * Unexpected error
@@ -119,4 +103,6 @@ export enum RejectionReason {
    * Indicates that order includes the provided allowedTakerDst, which differs from the taker's address
    */
   WRONG_TAKER,
+
+  FILTERED_OFF,
 }

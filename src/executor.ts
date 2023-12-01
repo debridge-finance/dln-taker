@@ -20,87 +20,94 @@ import bs58 from 'bs58';
 import { Logger } from 'pino';
 
 import { TokensBucket, setSlippageOverloader } from '@debridge-finance/legacy-dln-profitability';
-import { DlnConfig } from 'node_modules/@debridge-finance/dln-client/dist/types/evm/core/models/config.model';
 import BigNumber from 'bignumber.js';
+import Web3 from 'web3';
 import {
   ChainDefinition,
   ExecutorLaunchConfig,
   SupportedChain,
   DstOrderConstraints as RawDstOrderConstraints,
   SrcOrderConstraints as RawSrcOrderConstraints,
+  SrcConstraints as RawSrcConstraints,
   BLOCK_CONFIRMATIONS_HARD_CAPS,
-} from '../config';
-import * as filters from '../filters';
-import { OrderFilter } from '../filters';
-import { DlnClient, GetNextOrder, IncomingOrder, OrderInfoStatus } from '../interfaces';
-import { WsNextOrder } from '../orderFeeds/ws.order.feed';
-import * as processors from '../processors';
-import { EvmProviderAdapter } from '../providers/evm.provider.adapter';
-import { ProviderAdapter } from '../providers/provider.adapter';
-import { SolanaProviderAdapter } from '../providers/solana.provider.adapter';
-import { HooksEngine } from '../hooks/HooksEngine';
-import { ThroughputController } from '../processors/throughput';
-import { TVLBudgetController } from '../processors/TVLBudgetController';
-import { DataStore } from '../processors/DataStore';
-import { createClientLogger } from '../logger';
-import { getCurrentEnvironment } from '../environments';
-import { SwapConnectorImplementationService } from '../processors/swap-connector-implementation.service';
-import { tryInitTakerALT } from '../providers/utils/tryInitAltSolana';
+  SignerAuthority,
+  avgBlockSpeed,
+} from './config';
+import * as filters from './filters/index';
+import { OrderFilter } from './filters/index';
+import { Authority, GetNextOrder, IncomingOrder, OrderInfoStatus } from './interfaces';
+import { WsNextOrder } from './orderFeeds/ws.order.feed';
+import { EvmTxSigner } from './chain-evm/signer';
+import { SolanaTxSigner } from './chain-solana/signer';
+import { HooksEngine } from './hooks/HooksEngine';
+import { ThroughputController } from './processors/throughput';
+import { TVLBudgetController } from './processors/TVLBudgetController';
+import { DataStore } from './processors/DataStore';
+import { createClientLogger, DlnClient } from './dln-ts-client.utils';
+import { getCurrentEnvironment } from './environments';
+import { OrderProcessor } from './processor';
+import { TransactionBuilder } from './chain-common/tx-builder';
+import { SolanaTransactionBuilder } from './chain-solana/tx-builder';
+import { EvmTransactionBuilder } from './chain-evm/tx-builder';
+import { SwapConnectorImplementationService } from './processors/swap-connector-implementation.service';
 
-export type ExecutorInitializingChain = Readonly<{
-  chain: ChainId;
-  chainRpc: string;
-  unlockProvider: ProviderAdapter;
-  fulfillProvider: ProviderAdapter;
-}>;
+const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
-type DstOrderConstraints = Readonly<{
+type EvmClientChainConfig = ConstructorParameters<typeof Evm.DlnClient>[0]['chainConfig'];
+
+export type DstOrderConstraints = Readonly<{
   fulfillmentDelay: number;
   preFulfillSwapChangeRecipient: 'taker' | 'maker';
 }>;
 
-type DstConstraintsPerOrderValue = Array<
-  DstOrderConstraints &
-    Readonly<{
-      upperThreshold: number;
-    }>
->;
+export type DstConstraintsPerOrderValue = DstOrderConstraints &
+  Readonly<{
+    minBlockConfirmations: number;
+  }>;
 
-type SrcOrderConstraints = Readonly<{
+export type SrcConstraints = Readonly<{
+  TVLBudget: number;
+  profitability: number;
+  batchUnlockSize: number;
+}>;
+
+export type SrcOrderConstraints = Readonly<{
   fulfillmentDelay: number;
   maxFulfillThroughputUSD: number;
   throughputTimeWindowSec: number;
 }>;
 
-type SrcConstraintsPerOrderValue = Array<
-  SrcOrderConstraints &
-    Readonly<{
-      upperThreshold: number;
-      minBlockConfirmations: number;
-    }>
->;
+export type SrcConstraintsPerOrderValue = SrcOrderConstraints &
+  Readonly<{
+    upperThreshold: number;
+    minBlockConfirmations: number;
+  }>;
 
 export type ExecutorSupportedChain = Readonly<{
   chain: ChainId;
-  chainRpc: string;
+  connection: any;
+  network: {
+    avgBlockSpeed: number;
+    finalizedBlockCount: number;
+  };
   srcFilters: OrderFilter[];
   dstFilters: OrderFilter[];
   TVLBudgetController: TVLBudgetController;
   throughput: ThroughputController;
   srcConstraints: Readonly<
-    SrcOrderConstraints & {
-      perOrderValue: SrcConstraintsPerOrderValue;
-    }
+    SrcConstraints &
+      SrcOrderConstraints & {
+        perOrderValue: Array<SrcConstraintsPerOrderValue>;
+      }
   >;
   dstConstraints: Readonly<
     DstOrderConstraints & {
-      perOrderValue: DstConstraintsPerOrderValue;
+      perOrderValue: Array<DstConstraintsPerOrderValue>;
     }
   >;
-  orderProcessor: processors.IOrderProcessor;
-  unlockProvider: ProviderAdapter;
-  fulfillProvider: ProviderAdapter;
-  beneficiary: Address;
+  unlockAuthority: Authority;
+  fulfillAuthority: Authority;
+  unlockBeneficiary: Address;
 }>;
 
 export interface IExecutor {
@@ -111,6 +118,7 @@ export interface IExecutor {
   readonly buckets: TokensBucket[];
   readonly client: DlnClient;
   readonly dlnApi: DataStore;
+  readonly hookEngine: HooksEngine;
 
   getSupportedChainIds(): Array<ChainId>;
   getSupportedChain(chain: ChainId): ExecutorSupportedChain;
@@ -140,7 +148,12 @@ export class Executor implements IExecutor {
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   client: DlnClient;
 
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
+  hookEngine: HooksEngine;
+
   chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
+
+  processors: { [key in ChainId]?: OrderProcessor } = {};
 
   buckets: TokensBucket[] = [];
 
@@ -150,7 +163,13 @@ export class Executor implements IExecutor {
 
   readonly #url1Inch = 'https://nodes.debridge.finance';
 
-  constructor(private readonly logger: Logger) {}
+  private readonly logger: Logger;
+
+  constructor(logger: Logger) {
+    this.logger = logger.child({
+      service: Executor.name,
+    });
+  }
 
   async usdValueOfAsset(chain: ChainId, token: Address, amount: bigint): Promise<number> {
     const tokenPrice = await this.tokenPriceService.getPrice(chain, token, {
@@ -221,16 +240,12 @@ export class Executor implements IExecutor {
 
     this.tokenPriceService = config.tokenPriceService || new CoingeckoPriceFeed();
 
-    if (config.swapConnector) {
-      throw new Error('Custom swapConnector not implemented');
-    }
-
     this.swapConnector = new SwapConnectorImplementationService({
       oneInchApi: this.#url1Inch,
     });
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
-    const hooksEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
+    this.hookEngine = new HooksEngine(config.hookHandlers || {}, this.logger);
 
     const addresses = {} as any;
     // special case for EVM: collect addresses into a shared collection
@@ -258,7 +273,7 @@ export class Executor implements IExecutor {
     }
 
     const clients: ClientImplementation[] = [];
-    const evmChainConfig: DlnConfig['chainConfig'] = {};
+    const evmChainConfig: EvmClientChainConfig = {};
     for (const chain of config.chains) {
       this.logger.info(`initializing ${ChainId[chain.chain]}...`);
 
@@ -266,13 +281,49 @@ export class Executor implements IExecutor {
         throw new Error(`${ChainId[chain.chain]} is not supported, remove it from the config`);
       }
 
+      if (chain.takerPrivateKey) {
+        if (chain.fulfillAuthority)
+          throw new Error(
+            `Both takerPrivateKey and fulfillAuthority are set for ${
+              ChainId[chain.chain]
+            }; prefer using fulfillAuthority`,
+          );
+        chain.fulfillAuthority = {
+          type: 'PK',
+          privateKey: chain.takerPrivateKey,
+        };
+      }
+      if (!chain.fulfillAuthority)
+        throw new Error(`fulfillAuthority is not set for ${ChainId[chain.chain]}`);
+
+      if (chain.unlockAuthorityPrivateKey) {
+        if (chain.unlockAuthority)
+          throw new Error(
+            `Both unlockAuthorityPrivateKey and unlockAuthority are set for ${
+              ChainId[chain.chain]
+            }; prefer using unlockAuthority`,
+          );
+        chain.unlockAuthority = {
+          type: 'PK',
+          privateKey: chain.unlockAuthorityPrivateKey,
+        };
+      }
+      if (chain.unlockAuthority) {
+        // if both authorities share the same PK, let's reuse a single object for both
+        if (chain.unlockAuthority.type === 'PK' && chain.fulfillAuthority.type === 'PK') {
+          if (chain.unlockAuthority.privateKey === chain.fulfillAuthority.privateKey) {
+            chain.unlockAuthority = undefined;
+          }
+        }
+      }
+
+      let transactionBuilder: TransactionBuilder;
       let client;
-      let unlockProvider;
-      let fulfillProvider;
+      let connection: Web3 | Connection;
       let contractsForApprove: string[] = [];
 
       if (chain.chain === ChainId.Solana) {
-        const solanaConnection = new Connection(chain.chainRpc, {
+        connection = new Connection(chain.chainRpc, {
           // force using native fetch because node-fetch throws errors on some RPC providers sometimes
           fetch,
           commitment: 'confirmed',
@@ -281,7 +332,7 @@ export class Executor implements IExecutor {
         this.swapConnector.setConnector(
           ChainId.Solana,
           new Jupiter.JupiterConnectorV6(
-            solanaConnection,
+            connection,
             config.jupiterConfig?.apiToken,
             config.jupiterConfig?.maxAccounts || 16,
             config.jupiterConfig?.blacklistedDexes || [],
@@ -303,21 +354,8 @@ export class Executor implements IExecutor {
             getCurrentEnvironment().chains![ChainId.Solana]!.solana!.debridgeSetting!,
         );
 
-        const decodeKey = (key: string) =>
-          Keypair.fromSecretKey(
-            chain.takerPrivateKey.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key),
-          );
-        fulfillProvider = new SolanaProviderAdapter(
-          solanaConnection,
-          decodeKey(chain.takerPrivateKey),
-        );
-        unlockProvider = new SolanaProviderAdapter(
-          solanaConnection,
-          decodeKey(chain.unlockAuthorityPrivateKey),
-        );
-
         client = new Solana.DlnClient(
-          solanaConnection,
+          connection,
           solanaPmmSrc,
           solanaPmmDst,
           solanaDebridge,
@@ -326,35 +364,28 @@ export class Executor implements IExecutor {
           undefined,
           getCurrentEnvironment().environment,
         );
-        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-        await client.destination.debridge.init();
 
-        // TODO: wait until solana enables getProgramAddress with filters for ALT and init ALT if needed
-
-        // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-        await tryInitTakerALT(
-          new helpers.Wallet(decodeKey(chain.takerPrivateKey)),
-          config.chains.map((chainConfig) => chainConfig.chain),
+        const fulfillBuilder = this.getSolanaProvider(
+          chain,
           client,
-          this.logger,
+          connection,
+          chain.fulfillAuthority,
         );
+        const initBuilder = chain.initAuthority
+          ? this.getSolanaProvider(chain, client, connection, chain.initAuthority)
+          : fulfillBuilder;
+        const unlockBuilder = chain.unlockAuthority
+          ? this.getSolanaProvider(chain, client, connection, chain.unlockAuthority)
+          : fulfillBuilder;
+
+        transactionBuilder = new TransactionBuilder(initBuilder, fulfillBuilder, unlockBuilder);
 
         clients.push(client);
       } else {
-        unlockProvider = new EvmProviderAdapter(
-          chain.chain,
-          chain.chainRpc,
-          chain.unlockAuthorityPrivateKey,
-        );
-        fulfillProvider = new EvmProviderAdapter(
-          chain.chain,
-          chain.chainRpc,
-          chain.takerPrivateKey,
-          chain.environment?.evm?.evmRebroadcastAdapterOpts,
-        );
+        connection = new Web3(chain.chainRpc);
 
         evmChainConfig[chain.chain] = {
-          connection: fulfillProvider.unsafeGetConnection, // connection is required for on-chain data reading. No connection .address is used
+          connection,
           dlnSourceAddress:
             chain.environment?.pmmSrc ||
             getCurrentEnvironment().chains[chain.chain]?.pmmSrc ||
@@ -379,24 +410,21 @@ export class Executor implements IExecutor {
             evmChainConfig[chain.chain]!.crossChainForwarderAddress,
           ];
         }
-      }
 
-      const processorInitializer =
-        chain.orderProcessor || config.orderProcessor || processors.universalProcessor();
-      const initializingChain = {
-        chain: chain.chain,
-        chainRpc: chain.chainRpc,
-        unlockProvider,
-        fulfillProvider,
-      };
-      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
-      const orderProcessor = await processorInitializer(chain.chain, this, {
-        takeChain: initializingChain,
-        buckets: this.buckets,
-        logger: this.logger,
-        hooksEngine,
-        contractsForApprove,
-      });
+        if (chain.initAuthority)
+          throw new Error('initAuthority is not supported for EVM-based chains');
+
+        const fulfillBuilder = this.getEVMProvider(
+          chain,
+          contractsForApprove,
+          connection,
+          chain.fulfillAuthority,
+        );
+        const unlockBuilder = chain.unlockAuthority
+          ? this.getEVMProvider(chain, [], connection, chain.unlockAuthority)
+          : fulfillBuilder;
+        transactionBuilder = new TransactionBuilder(fulfillBuilder, fulfillBuilder, unlockBuilder);
+      }
 
       const dstFiltersInitializers = chain.dstFilters || [];
       if (chain.disabled) {
@@ -408,7 +436,6 @@ export class Executor implements IExecutor {
       const dstFilters = await Promise.all(
         [...dstFiltersInitializers, ...(config.filters || [])].map((filter) =>
           filter(chain.chain, {
-            chain: initializingChain,
             logger: this.logger,
           }),
         ),
@@ -418,15 +445,19 @@ export class Executor implements IExecutor {
       const srcFilters = await Promise.all(
         (chain.srcFilters || []).map((initializer) =>
           initializer(chain.chain, {
-            chain: initializingChain,
             logger: this.logger,
           }),
         ),
       );
 
-      const srcConstraints = {
-        ...Executor.getSrcConstraints(chain.constraints || {}),
-        perOrderValue: Executor.getSrcConstraintsPerOrderValue(
+      const srcConstraints: ExecutorSupportedChain['srcConstraints'] = {
+        ...Executor.getSrcConstraints(
+          chain.chain,
+          chain.constraints || {},
+          config.srcConstraints || {},
+        ),
+        ...Executor.getSrcOrderConstraints(chain.constraints || {}),
+        perOrderValue: Executor.getSrcOrderConstraintsPerOrderValue(
           chain.chain as unknown as SupportedChain,
           chain.constraints || {},
         ),
@@ -434,12 +465,16 @@ export class Executor implements IExecutor {
 
       this.chains[chain.chain] = {
         chain: chain.chain,
-        chainRpc: chain.chainRpc,
+        connection,
+        network: {
+          avgBlockSpeed: avgBlockSpeed[chain.chain as unknown as SupportedChain],
+          finalizedBlockCount:
+            BLOCK_CONFIRMATIONS_HARD_CAPS[chain.chain as unknown as SupportedChain],
+        },
         srcFilters,
         dstFilters,
-        orderProcessor,
-        unlockProvider,
-        fulfillProvider,
+        unlockAuthority: transactionBuilder.fulfillAuthority,
+        fulfillAuthority: transactionBuilder.unlockAuthority,
         throughput: new ThroughputController(
           chain.chain,
           [
@@ -466,13 +501,21 @@ export class Executor implements IExecutor {
           chain.constraints?.TVLBudget || 0,
           this.logger,
         ),
-        beneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
+        unlockBeneficiary: tokenStringToBuffer(chain.chain, chain.beneficiary),
         srcConstraints,
         dstConstraints: {
           ...Executor.getDstConstraints(chain.dstConstraints || {}),
           perOrderValue: Executor.getDstConstraintsPerOrderValue(chain.dstConstraints || {}),
         },
       };
+
+      // eslint-disable-next-line no-await-in-loop -- Intentional because works only during initialization
+      this.processors[chain.chain] = await OrderProcessor.initialize(
+        transactionBuilder,
+        this.chains[chain.chain]!,
+        this,
+        this.logger,
+      );
     }
 
     if (Object.keys(evmChainConfig).length !== 0) {
@@ -500,7 +543,7 @@ export class Executor implements IExecutor {
 
     const unlockAuthorities = Object.values(this.chains).map((chain) => ({
       chainId: chain.chain,
-      address: chain.unlockProvider.address as string,
+      address: chain.unlockAuthority.address as string,
     }));
 
     const minConfirmationThresholds = Object.values(this.chains)
@@ -512,10 +555,10 @@ export class Executor implements IExecutor {
       }))
       .filter((range) => range.points.length > 0); // skip chains without necessary confirmation points
     orderFeed.init(
-      this.execute.bind(this),
+      (event) => this.execute(event),
       unlockAuthorities,
       minConfirmationThresholds,
-      hooksEngine,
+      this.hookEngine,
     );
 
     // Override internal slippage calculation: do not reserve slippage buffer for pre-fulfill swap
@@ -524,38 +567,123 @@ export class Executor implements IExecutor {
     this.#isInitialized = true;
   }
 
+  private getEVMProvider(
+    chain: ChainDefinition,
+    contracts: string[],
+    connection: Web3,
+    authority: SignerAuthority,
+  ): EvmTransactionBuilder {
+    switch (authority.type) {
+      case 'PK': {
+        return new EvmTransactionBuilder(
+          chain.chain,
+          contracts,
+          connection,
+          new EvmTxSigner(
+            chain.chain,
+            connection,
+            authority.privateKey,
+            chain.environment?.evm?.evmRebroadcastAdapterOpts,
+          ),
+          this,
+        );
+      }
+
+      default:
+        throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`);
+    }
+  }
+
+  private getSolanaProvider(
+    chain: ChainDefinition,
+    client: Solana.DlnClient,
+    connection: Connection,
+    authority: SignerAuthority,
+  ): SolanaTransactionBuilder {
+    const decodeKey = (key: string) =>
+      Keypair.fromSecretKey(key.startsWith('0x') ? helpers.hexToBuffer(key) : bs58.decode(key));
+
+    switch (authority.type) {
+      case 'PK': {
+        return new SolanaTransactionBuilder(
+          client,
+          new SolanaTxSigner(connection, decodeKey(authority.privateKey)),
+          this,
+        );
+      }
+
+      default:
+        throw new Error(`Unsupported authority "${authority.type}" for ${ChainId[chain.chain]}`);
+    }
+  }
+
   private static getDstConstraintsPerOrderValue(
     configDstConstraints: ChainDefinition['dstConstraints'],
-  ): DstConstraintsPerOrderValue {
-    return (
-      (configDstConstraints?.perOrderValueUpperThreshold || [])
-        .map((constraint) => ({
-          upperThreshold: constraint.upperThreshold,
-          ...Executor.getDstConstraints(constraint, configDstConstraints),
-        }))
-        // important to sort by upper bound ASC for easier finding of the corresponding range
-        .sort((constraintA, constraintB) => constraintA.upperThreshold - constraintB.upperThreshold)
-    );
+  ): Array<DstConstraintsPerOrderValue> {
+    return (configDstConstraints?.perOrderValueUpperThreshold || [])
+      .map((constraint) => ({
+        minBlockConfirmations: constraint.minBlockConfirmations,
+        ...Executor.getDstConstraints(constraint, configDstConstraints),
+      }))
+      .sort(
+        (constraintB, constraintA) =>
+          constraintA.minBlockConfirmations - constraintB.minBlockConfirmations,
+      );
+  }
+
+  private static getSrcConstraints(
+    chainId: ChainId,
+    chainConstraint: RawSrcConstraints,
+    sharedConstraint: RawSrcConstraints,
+  ): SrcConstraints {
+    const maxBatchSize = 10;
+    const maxBatchSizeToSolana = 7;
+
+    const srcConstraints = {
+      TVLBudget: chainConstraint.TVLBudget || sharedConstraint.TVLBudget || 0,
+      profitability:
+        chainConstraint.minProfitabilityBps ||
+        sharedConstraint.minProfitabilityBps ||
+        DEFAULT_MIN_PROFITABILITY_BPS,
+      batchUnlockSize:
+        chainConstraint.batchUnlockSize || sharedConstraint.batchUnlockSize || maxBatchSize,
+    };
+
+    if (srcConstraints.batchUnlockSize < 1 || srcConstraints.batchUnlockSize > maxBatchSize) {
+      throw new Error(
+        `Unlock batch size is out of bounds: expected [1,${maxBatchSize}]; actual: ${srcConstraints.batchUnlockSize} for ${ChainId[chainId]}`,
+      );
+    }
+
+    if (chainId === ChainId.Solana) {
+      if (srcConstraints.batchUnlockSize > maxBatchSizeToSolana) {
+        srcConstraints.batchUnlockSize = maxBatchSizeToSolana;
+        // TODO write WARN to log
+        // throw new Error(`Unlock batch size for Solana is out of bounds: expected to be up to ${maxBatchSizeToSolana}, actual: ${srcConstraints.unlockBatchSize}`)
+      }
+    }
+
+    return srcConstraints;
   }
 
   private static getDstConstraints(
-    primaryConstraints: RawDstOrderConstraints,
-    defaultConstraints?: RawDstOrderConstraints,
+    chainConstraint: RawDstOrderConstraints,
+    sharedConstraint?: RawDstOrderConstraints,
   ): DstOrderConstraints {
     return {
       fulfillmentDelay:
-        primaryConstraints?.fulfillmentDelay || defaultConstraints?.fulfillmentDelay || 0,
+        chainConstraint?.fulfillmentDelay || sharedConstraint?.fulfillmentDelay || 0,
       preFulfillSwapChangeRecipient:
-        primaryConstraints?.preFulfillSwapChangeRecipient ||
-        defaultConstraints?.preFulfillSwapChangeRecipient ||
+        chainConstraint?.preFulfillSwapChangeRecipient ||
+        sharedConstraint?.preFulfillSwapChangeRecipient ||
         'taker',
     };
   }
 
-  private static getSrcConstraintsPerOrderValue(
+  private static getSrcOrderConstraintsPerOrderValue(
     chain: SupportedChain,
     configSrcConstraints: ChainDefinition['constraints'],
-  ): SrcConstraintsPerOrderValue {
+  ): Array<SrcConstraintsPerOrderValue> {
     return (
       (configSrcConstraints?.requiredConfirmationsThresholds || [])
         .map((constraint) => {
@@ -568,7 +696,7 @@ export class Executor implements IExecutor {
           return {
             upperThreshold: constraint.thresholdAmountInUSD,
             minBlockConfirmations: constraint.minBlockConfirmations || 0,
-            ...Executor.getSrcConstraints(constraint),
+            ...Executor.getSrcOrderConstraints(constraint),
           };
         })
         // important to sort by upper bound ASC for easier finding of the corresponding range
@@ -576,7 +704,7 @@ export class Executor implements IExecutor {
     );
   }
 
-  private static getSrcConstraints(constraints: RawSrcOrderConstraints): SrcOrderConstraints {
+  private static getSrcOrderConstraints(constraints: RawSrcOrderConstraints): SrcOrderConstraints {
     return {
       fulfillmentDelay: constraints?.fulfillmentDelay || 0,
       throughputTimeWindowSec: constraints?.throughputTimeWindowSec || 0,
@@ -584,92 +712,39 @@ export class Executor implements IExecutor {
     };
   }
 
-  async execute(nextOrderInfo: IncomingOrder<any>) {
-    const { orderId } = nextOrderInfo;
-    const logger = this.logger.child({ orderId });
-    logger.info(`new order received, type: ${OrderInfoStatus[nextOrderInfo.status]}`);
-    logger.debug(nextOrderInfo);
-    try {
-      await this.executeOrder(nextOrderInfo, logger);
-    } catch (e) {
-      logger.error(`received error while order execution: ${e}`);
-      logger.error(e);
-    }
-  }
-
-  private async executeOrder(nextOrderInfo: IncomingOrder<any>, logger: Logger): Promise<boolean> {
-    const { order, orderId } = nextOrderInfo;
-    if (!order || !orderId) throw new Error('Order is undefined');
+  private async execute(nextOrderInfo: IncomingOrder<any>) {
+    const { orderId, order } = nextOrderInfo;
+    this.logger.info(
+      `📥 received order ${orderId} of status ${OrderInfoStatus[nextOrderInfo.status]}`,
+    );
 
     const takeChain = this.chains[order.take.chainId];
     if (!takeChain) {
-      logger.info(`${ChainId[order.take.chainId]} not configured, dropping`);
-      return false;
+      this.logger.info(
+        `dropping order ${nextOrderInfo.orderId} because take chain ${
+          ChainId[order.take.chainId]
+        } is not configured`,
+      );
+      return;
     }
 
     const giveChain = this.chains[order.give.chainId];
     if (!giveChain) {
-      logger.info(`${ChainId[order.give.chainId]} not configured, dropping`);
-      return false;
-    }
-
-    // to accept an order, all filters must approve the order.
-    // executor invokes three groups of filters:
-    // 1) defined globally (config.filters)
-    // 2) defined as dstFilters under the takeChain config
-    // 3) defined as srcFilters under the giveChain config
-
-    // global filters
-    const listOrderFilters = [];
-
-    // dstFilters@takeChain
-    if (takeChain.dstFilters && takeChain.dstFilters.length > 0) {
-      listOrderFilters.push(...takeChain.dstFilters);
-    }
-
-    // srcFilters@giveChain
-    if (giveChain.srcFilters && giveChain.srcFilters.length > 0) {
-      listOrderFilters.push(...giveChain.srcFilters);
-    }
-
-    //
-    // run filters for create or archival orders
-    //
-    if ([OrderInfoStatus.Created, OrderInfoStatus.ArchivalCreated].includes(nextOrderInfo.status)) {
-      logger.debug('running filters against the order');
-      const orderFilters = await Promise.all(
-        listOrderFilters.map((filter) =>
-          filter(order, {
-            logger,
-            config: this,
-            giveChain,
-            takeChain,
-          }),
-        ),
+      this.logger.info(
+        `dropping order ${nextOrderInfo.orderId} because give chain ${
+          ChainId[order.give.chainId]
+        } is not configured`,
       );
-
-      if (!orderFilters.every((it) => it)) {
-        logger.info('order has been filtered off, dropping');
-        return false;
-      }
-    } else {
-      logger.debug('accepting order as is');
+      return;
     }
 
     //
     // run processor
     //
-    logger.debug(`passing the order to the processor`);
-    takeChain.orderProcessor.handleEvent({
+    this.processors[takeChain.chain]!.handleEvent({
       orderInfo: nextOrderInfo,
-      context: {
-        logger,
-        config: this,
-        giveChain,
-        takeChain,
-      },
+      giveChain,
+      takeChain,
     });
-
-    return true;
   }
 }

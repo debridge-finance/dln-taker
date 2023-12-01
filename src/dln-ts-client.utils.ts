@@ -1,4 +1,10 @@
-import { Logger as ClientLogger, LogLevel } from '@debridge-finance/dln-client';
+import {
+  CommonDlnClient,
+  Evm,
+  Solana,
+  Logger as ClientLogger,
+  LogLevel,
+} from '@debridge-finance/dln-client';
 import { Logger } from 'pino';
 
 export const createClientLogger = (logger: Logger) =>
@@ -14,20 +20,19 @@ export const createClientLogger = (logger: Logger) =>
       }, '')
       .trim();
     switch (level) {
-      case LogLevel.LOG: {
-        logger.info(message);
-        break;
-      }
-
+      case LogLevel.LOG:
       case LogLevel.VERBOSE: {
-        logger.debug(message);
+        logger.debug(`[dln-ts-client] ${message}`);
         break;
       }
 
       case LogLevel.ERROR:
       default: {
-        logger.error(message);
+        logger.error(`[dln-ts-client] ${message}`);
         break;
       }
     }
   });
+
+type ActiveClients = Solana.DlnClient | Evm.DlnClient;
+export type DlnClient = CommonDlnClient<ActiveClients>;

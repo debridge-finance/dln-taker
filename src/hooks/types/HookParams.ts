@@ -1,10 +1,6 @@
-import { ChainId } from '@debridge-finance/dln-client';
-
-import { IncomingOrder } from '../../interfaces';
-import { OrderProcessorContext } from '../../processors/base';
+import { ChainId, OrderData } from '@debridge-finance/dln-client';
+import { IExecutor } from '../../executor';
 import { Hooks, PostponingReason, RejectionReason } from '../HookEnums';
-
-import { OrderEstimation } from './OrderEstimation';
 
 export type HookParams<T extends Hooks> = {} & (T extends Hooks.OrderFeedConnected
   ? {
@@ -18,17 +14,20 @@ export type HookParams<T extends Hooks> = {} & (T extends Hooks.OrderFeedConnect
     : {}) &
   (T extends Hooks.OrderFulfilled
     ? {
-        order: IncomingOrder<any>;
+        orderId: string;
+        order: OrderData;
         txHash: string;
       }
     : {}) &
   (T extends Hooks.OrderPostponed
     ? {
-        order: IncomingOrder<any>;
+        orderId: string;
+        order: OrderData;
+        isLive: boolean;
         reason: PostponingReason;
         message: string;
         attempts: number;
-        context: OrderProcessorContext;
+        executor: IExecutor;
       }
     : {}) &
   (T extends Hooks.OrderUnlockFailed
@@ -49,17 +48,12 @@ export type HookParams<T extends Hooks> = {} & (T extends Hooks.OrderFeedConnect
     : {}) &
   (T extends Hooks.OrderRejected
     ? {
-        order: IncomingOrder<any>;
+        orderId: string;
+        order: OrderData;
+        isLive: boolean;
         reason: RejectionReason;
         message: string;
         attempts: number;
-        context: OrderProcessorContext;
-      }
-    : {}) &
-  (T extends Hooks.OrderEstimated
-    ? {
-        order: IncomingOrder<any>;
-        estimation: OrderEstimation;
-        context: OrderProcessorContext;
+        executor: IExecutor;
       }
     : {});

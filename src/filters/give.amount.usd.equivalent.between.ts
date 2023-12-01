@@ -2,7 +2,7 @@ import { OrderData } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import BigNumber from 'bignumber.js';
 
-import { createClientLogger } from '../logger';
+import { createClientLogger } from '../dln-ts-client.utils';
 
 import { FilterContext, OrderFilterInitializer } from './order.filter';
 

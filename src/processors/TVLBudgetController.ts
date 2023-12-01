@@ -1,7 +1,7 @@
 import { Address, buffersAreEqual, ChainId } from '@debridge-finance/dln-client';
 import NodeCache from 'node-cache';
 import { Logger } from 'pino';
-import { ExecutorSupportedChain, IExecutor } from '../executors/executor';
+import { ExecutorSupportedChain, IExecutor } from '../executor';
 
 enum TvlCacheKey {
   TVL,
@@ -31,7 +31,7 @@ export class TVLBudgetController {
     this.budget = budget;
     this.logger = logger.child({ service: TVLBudgetController.name, chainId: chain, budget });
     if (budget) {
-      this.logger.debug(`Will preserve a TVL of $${budget} on ${ChainId[chain]}`);
+      this.logger.info(`Will preserve a TVL of $${budget} on ${ChainId[chain]}`);
     }
   }
 
@@ -41,8 +41,8 @@ export class TVLBudgetController {
 
   get hasSeparateUnlockBeneficiary(): boolean {
     return !buffersAreEqual(
-      this.giveChain.fulfillProvider.bytesAddress,
-      this.giveChain.beneficiary,
+      this.giveChain.fulfillAuthority.bytesAddress,
+      this.giveChain.unlockBeneficiary,
     );
   }
 
@@ -78,12 +78,12 @@ export class TVLBudgetController {
   }
 
   private async getTakerAccountBalance(): Promise<number> {
-    return this.getAccountValue(this.giveChain.fulfillProvider.bytesAddress);
+    return this.getAccountValue(this.giveChain.fulfillAuthority.bytesAddress);
   }
 
   private async getUnlockBeneficiaryAccountBalance(): Promise<number> {
     if (!this.hasSeparateUnlockBeneficiary) return 0;
-    return this.getAccountValue(this.giveChain.beneficiary);
+    return this.getAccountValue(this.giveChain.unlockBeneficiary);
   }
 
   private async getAccountValue(account: Address): Promise<number> {
