@@ -61,6 +61,7 @@ import { SolanaForDefiTransactionAdapter } from './chain-solana/fordefi-adapter'
 import { EmptyTransactionBuilder } from './chain-common/tx-builder-disabled';
 import { isValidEvmAddress } from './chain-evm/utils';
 import { die } from './errors';
+import { JupiterDexExcluder } from './chain-solana/jupiter-dex-limiter';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
@@ -350,7 +351,7 @@ export class Executor implements IExecutor {
             connection,
             config.jupiterConfig?.apiToken,
             config.jupiterConfig?.maxAccounts || 16,
-            config.jupiterConfig?.blacklistedDexes || [],
+            new JupiterDexExcluder(config.jupiterConfig?.nativeWhitelistedDexes || []),
           ),
         );
 
