@@ -5,6 +5,7 @@ import {
   buffersAreEqual,
   getEngineByChainId,
   ChainEngine,
+  ChainId,
 } from '@debridge-finance/dln-client';
 import { findExpectedBucket } from '@debridge-finance/legacy-dln-profitability';
 import { helpers } from '@debridge-finance/solana-utils';
@@ -87,15 +88,42 @@ export class CreatedOrder {
 
   async getMaxProfitableReserveAmountWithoutOperatingExpenses(): Promise<bigint> {
     // getting the rough amount we are willing to spend after reserving our intended margin
-    const margin = BigInt(this.giveChain.srcConstraints.profitability);
     const reserveDstAmount = await this.getGiveAmountInReserveToken();
-    const amount = (reserveDstAmount * (10_000n - margin)) / 10_000n;
+    const amount = (reserveDstAmount * (10_000n - BigInt(this.requiredMargin))) / 10_000n;
     return amount;
   }
 
   get blockConfirmations(): number {
     if (this.finalization === 'Finalized') return this.giveChain.network.finalizedBlockCount;
     return this.finalization;
+  }
+
+  /**
+   * Returns margin requirement for this particular order. It may take give- and take-chain into consideration
+   */
+  get requiredMargin(): number {
+    let margin = this.legacyRequiredMargin;
+
+    if (process.env.DISABLE_OP_HORIZON_CAMPAIGN !== 'true') {
+      if (this.takeChain.chain === ChainId.Optimism) {
+        margin -= 4;
+      } else if (this.giveChain.chain === ChainId.Optimism) {
+        margin -= 2;
+      }
+
+      if (margin < 0) margin = 0;
+    }
+
+    return margin;
+  }
+
+  /**
+   * Similar to `requiredMargin`, but used by the legacy-dln-profitability package. The difference between
+   * requiredMargin and legacyRequiredMargin is that the latter does not account for OP HORIZON Campaign rebates
+   * bc legacy-dln-profitability does this internally
+   */
+  get legacyRequiredMargin(): number {
+    return this.giveChain.srcConstraints.profitability;
   }
 
   public srcConstraints(): SrcOrderConstraints {
