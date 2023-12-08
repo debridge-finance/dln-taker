@@ -112,14 +112,14 @@ export class OrderEstimator extends OrderEvaluationContextual {
       logger: createClientLogger(this.logger),
       batchSize: this.order.giveChain.srcConstraints.batchUnlockSize,
       swapEstimationPreference: this.getRouteHint(),
-      isFeatureEnableOpHorizon: process.env.FEATURE_OP_HORIZON_CAMPAIGN === 'true',
+      isFeatureEnableOpHorizon: process.env.DISABLE_OP_HORIZON_CAMPAIGN !== 'true',
     };
   }
 
   protected async getRawOrderEstimation(): Promise<RawOrderEstimation> {
     const rawEstimation = await calculateExpectedTakeAmount(
       this.order.orderData,
-      this.order.giveChain.srcConstraints.profitability,
+      this.order.legacyRequiredMargin,
       await this.getExpectedTakeAmountContext(),
     );
 

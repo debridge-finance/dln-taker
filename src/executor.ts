@@ -451,7 +451,7 @@ export class Executor implements IExecutor {
       );
 
       const srcConstraints: ExecutorSupportedChain['srcConstraints'] = {
-        ...Executor.getSrcConstraints(
+        ...this.getSrcConstraints(
           chain.chain,
           chain.constraints || {},
           config.srcConstraints || {},
@@ -631,37 +631,43 @@ export class Executor implements IExecutor {
       );
   }
 
-  private static getSrcConstraints(
+  private getSrcConstraints(
     chainId: ChainId,
     chainConstraint: RawSrcConstraints,
     sharedConstraint: RawSrcConstraints,
   ): SrcConstraints {
-    const maxBatchSize = 10;
-    const maxBatchSizeToSolana = 7;
+    const getBatchSize = (): number => {
+      const maxBatchSize = 10;
+      const maxBatchSizeToSolana = 7;
+      const size =
+        chainConstraint.batchUnlockSize || sharedConstraint.batchUnlockSize || maxBatchSize;
 
-    const srcConstraints = {
+      if (size < 1 || size > maxBatchSize) {
+        throw new Error(
+          `Unlock batch size is out of bounds: expected [1,${maxBatchSize}]; actual: ${size} for ${ChainId[chainId]}`,
+        );
+      }
+
+      if (chainId === ChainId.Solana) {
+        if (size > maxBatchSizeToSolana) {
+          this.logger.warn(
+            `Size of batch unlock to Solana forcibly reduced to ${maxBatchSizeToSolana}`,
+          );
+          return maxBatchSizeToSolana;
+        }
+      }
+
+      return size;
+    };
+
+    const srcConstraints: SrcConstraints = {
       TVLBudget: chainConstraint.TVLBudget || sharedConstraint.TVLBudget || 0,
       profitability:
         chainConstraint.minProfitabilityBps ||
         sharedConstraint.minProfitabilityBps ||
         DEFAULT_MIN_PROFITABILITY_BPS,
-      batchUnlockSize:
-        chainConstraint.batchUnlockSize || sharedConstraint.batchUnlockSize || maxBatchSize,
+      batchUnlockSize: getBatchSize(),
     };
-
-    if (srcConstraints.batchUnlockSize < 1 || srcConstraints.batchUnlockSize > maxBatchSize) {
-      throw new Error(
-        `Unlock batch size is out of bounds: expected [1,${maxBatchSize}]; actual: ${srcConstraints.batchUnlockSize} for ${ChainId[chainId]}`,
-      );
-    }
-
-    if (chainId === ChainId.Solana) {
-      if (srcConstraints.batchUnlockSize > maxBatchSizeToSolana) {
-        srcConstraints.batchUnlockSize = maxBatchSizeToSolana;
-        // TODO write WARN to log
-        // throw new Error(`Unlock batch size for Solana is out of bounds: expected to be up to ${maxBatchSizeToSolana}, actual: ${srcConstraints.unlockBatchSize}`)
-      }
-    }
 
     return srcConstraints;
   }

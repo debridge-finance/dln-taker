@@ -19,6 +19,9 @@
 - [Testing the order execution flow in the wild](#testing-the-order-execution-flow-in-the-wild)
   - [Restricting orders from fulfillment](#restricting-orders-from-fulfillment)
   - [Placing new orders](#placing-new-orders)
+- [Smart contract addresses](#smart-contract-addresses)
+- [Miscellaneous](#miscellaneous)
+  - [Disable OP Horizon campaign](#disable-op-horizon-campaign)
 
 ## TL;DR
 
@@ -339,6 +342,12 @@ You can use the [order placement app](https://dln.debridge.finance/) to place ne
 
 If you decided to use the `whitelistedReceiver` filter (mentioned in the previous section) then don't forget to set the `receiver` property of an order with your trusted address.
 
-# Smart contract addresses
+## Smart contract addresses
 
 The DLN smart contracts deployed across supported chains which are used to run the DLN are listed in [this file](./src/environments.ts). `dln-taker` sets the unlimited approvals to the `contracts` upon first launch.
+
+## Miscellaneous
+
+### Disable OP Horizon campaign
+
+Orders coming from/to Optimism participate in the OP Horizon campaign, which rebates expenses and taker's profits in the OP token. To get out of the campaign, use the `DISABLE_OP_HORIZON_CAMPAIGN` env variable set to `true`.
