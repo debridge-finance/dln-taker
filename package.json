@@ -28,7 +28,8 @@
     "pretty:package": "prettier-package-json --write",
     "pretty:ts": "prettier --write \"{src,tests}/**/*.ts\" sample.config.ts",
     "start:compiled": "./dist/cli/bootstrap.js",
-    "test": "mocha -r ts-node/register -b -t 100000 ./tests/**/*.test.ts"
+    "test": "DLN_TAKER_LOCAL_MODE=true mocha -r ts-node/register -b -t 100000 './{src,tests}/**/*.test.ts'",
+    "test:verbose": "DLN_TAKER_LOCAL_MODE=true TEST_LOG_LEVEL=debug mocha -r ts-node/register -b -t 100000 './{src,tests}/**/*.test.ts'"
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
@@ -41,6 +42,8 @@
     "axios-cache-adapter": "2.7.3",
     "bignumber.js": "9.1.2",
     "bs58": "5.0.0",
+    "chai": "^4.3.10",
+    "chai-as-promised": "^7.1.1",
     "dotenv": "16.0.3",
     "node-cache": "^5.1.2",
     "pino": "8.7.0",
@@ -62,7 +65,12 @@
     }
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
+    "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
+    "@nomiclabs/hardhat-web3": "^2.0.0",
     "@types/chai": "4.3.3",
+    "@types/chai-as-promised": "^7.1.8",
     "@types/mocha": "9.1.1",
     "@types/node": "18.11.9",
     "@typescript-eslint/eslint-plugin": "^6.4.1",
@@ -72,6 +80,7 @@
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-prettier": "^5.0.0",
+    "hardhat": "^2.19.2",
     "husky": "^8.0.3",
     "lint-staged": "^14.0.1",
     "mocha": "10.1.0",

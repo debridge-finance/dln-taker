@@ -5,6 +5,10 @@ import { OrderFilterInitializer } from './filters/order.filter';
 import { GetNextOrder } from './interfaces';
 import { Hooks } from './hooks/HookEnums';
 import { HookHandler } from './hooks/HookHandler';
+import { EvmFeeOpts } from './chain-evm/fees/manager';
+import { EvmChainParameters } from './chain-evm/preferences/preferences';
+import { TransactionBroadcasterOpts } from './chain-evm/broadcaster/broadcaster';
+import { Optional } from './types';
 
 type StringifiedAddress = string;
 
@@ -58,38 +62,6 @@ type PrivateKeyAuthority = {
 };
 export type SignerAuthority = PrivateKeyAuthority;
 
-export class EvmRebroadcastAdapterOpts {
-  /**
-   * defines a multiplier to increase a pending txn's gasPrice for pushing it off the mempool.
-   * Default: 1.11
-   */
-  bumpGasPriceMultiplier?: number;
-
-  /**
-   * defines an interval (in ms) of how often to query RPC to detect if the fulfill txn has been included to the block
-   * default: chain's avgBlockSpeed
-   */
-  pollingInterval?: number;
-
-  /**
-   * max time frame to wait for fulfillment transaction for inclusion. Otherwise, skip fulfillment
-   * default: 24 blocks (24 * chain's avgBlockSpeed)
-   */
-  pollingTimeframe?: number;
-
-  /**
-   * defines an interval (in ms) of how often to rebroadcast the tx to force its inclusion to the block
-   * Default: 6 blocks (6 * chain's avgBlockSpeed)
-   */
-  rebroadcastInterval?: number;
-
-  /**
-   * number of attempts to rebroadcast tx with bumped gasPrice
-   * default: 3
-   */
-  rebroadcastMaxAttempts?: number;
-}
-
 export type ChainEnvironment = {
   /**
    * Address of the DLN contract responsible for order creation, unlocking and cancellation
@@ -108,7 +80,11 @@ export type ChainEnvironment = {
 
   evm?: {
     forwarderContract?: StringifiedAddress;
-    evmRebroadcastAdapterOpts?: EvmRebroadcastAdapterOpts;
+    preferences?: {
+      feeManagerOpts?: Optional<EvmFeeOpts>;
+      parameters?: Optional<EvmChainParameters>;
+      broadcasterOpts?: Optional<TransactionBroadcasterOpts>;
+    };
   };
 
   solana?: {

@@ -54,6 +54,7 @@ import { TransactionBuilder } from './chain-common/tx-builder';
 import { SolanaTransactionBuilder } from './chain-solana/tx-builder';
 import { EvmTransactionBuilder } from './chain-evm/tx-builder';
 import { SwapConnectorImplementationService } from './processors/swap-connector-implementation.service';
+import { EvmChainPreferencesStore } from './chain-evm/preferences/preferences';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
@@ -398,6 +399,13 @@ export class Executor implements IExecutor {
       } else {
         connection = new Web3(chain.chainRpc);
 
+        EvmChainPreferencesStore.set(chain.chain, {
+          connection,
+          feeManagerOpts: chain.environment?.evm?.preferences?.feeManagerOpts,
+          parameters: chain.environment?.evm?.preferences?.parameters,
+          broadcasterOpts: chain.environment?.evm?.preferences?.broadcasterOpts,
+        });
+
         evmChainConfig[chain.chain] = {
           connection,
           dlnSourceAddress:
@@ -593,12 +601,7 @@ export class Executor implements IExecutor {
           chain.chain,
           contracts,
           connection,
-          new EvmTxSigner(
-            chain.chain,
-            connection,
-            authority.privateKey,
-            chain.environment?.evm?.evmRebroadcastAdapterOpts,
-          ),
+          new EvmTxSigner(chain.chain, connection, authority.privateKey),
           this,
         );
       }
