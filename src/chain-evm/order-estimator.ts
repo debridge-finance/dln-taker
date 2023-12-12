@@ -2,6 +2,7 @@ import { calculateExpectedTakeAmount } from '@debridge-finance/legacy-dln-profit
 import { OrderEstimator } from '../chain-common/order-estimator';
 import { EVMOrderValidator } from './order-validator';
 import { EvmFeeManager } from './feeManager';
+import { safeIntToBigInt } from '../utils';
 
 export class EVMOrderEstimator extends OrderEstimator {
   // Must cover up to 12.5% block base fee increase. Must be in sync with EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_MULTIPLIER
@@ -26,7 +27,7 @@ export class EVMOrderEstimator extends OrderEstimator {
     const estimatedNextGasPrice = await feeManager.estimateNextGasPrice();
     const bufferedGasPrice =
       (estimatedNextGasPrice *
-        BigInt(EVMOrderEstimator.EVM_FULFILL_GAS_PRICE_MULTIPLIER * 10_000)) /
+        safeIntToBigInt(EVMOrderEstimator.EVM_FULFILL_GAS_PRICE_MULTIPLIER * 10_000)) /
       10_000n;
     this.logger.debug(
       `estimated gas price for the next block: ${estimatedNextGasPrice}, buffered: ${bufferedGasPrice}`,
