@@ -1,5 +1,6 @@
 import { ChainId } from '@debridge-finance/dln-client';
 import Web3 from 'web3';
+import { safeIntToBigInt } from '../utils';
 import { EIP1551Fee, EvmFeeManager, findMaxBigInt } from './feeManager';
 import { BroadcastedTx } from './signer';
 
@@ -23,14 +24,14 @@ export class BumpedFeeManager extends EvmFeeManager {
     fees.maxPriorityFeePerGas = findMaxBigInt(
       fees.maxPriorityFeePerGas,
       (BigInt(replaceTx.tx.maxPriorityFeePerGas?.toString() || 0n) *
-        BigInt(this.#bumpGasPriceMultiplier * 10_000)) /
+        safeIntToBigInt(this.#bumpGasPriceMultiplier * 10_000)) /
         10_000n,
     );
 
     fees.maxFeePerGas = findMaxBigInt(
       fees.baseFee + fees.maxPriorityFeePerGas,
       (BigInt(replaceTx.tx.maxFeePerGas?.toString() || 0n) *
-        BigInt(this.#bumpGasPriceMultiplier * 10_000)) /
+        safeIntToBigInt(this.#bumpGasPriceMultiplier * 10_000)) /
         10_000n,
     );
 
@@ -43,7 +44,7 @@ export class BumpedFeeManager extends EvmFeeManager {
     if (replaceTx) {
       const replacementTxGasPrice =
         (BigInt(replaceTx.tx.gasPrice?.toString() || 0n) *
-          BigInt(this.#bumpGasPriceMultiplier * 10_000)) /
+          safeIntToBigInt(this.#bumpGasPriceMultiplier * 10_000)) /
         10_000n;
       if (replacementTxGasPrice > gasPrice) gasPrice = replacementTxGasPrice;
     }
