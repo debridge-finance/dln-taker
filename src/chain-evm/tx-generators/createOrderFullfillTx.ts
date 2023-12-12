@@ -26,6 +26,10 @@ async function getLowLevelEvmInstruction(
       {
         unlockAuthority: order.takeChain.unlockAuthority.bytesAddress,
         externalCallRewardBeneficiary: order.takeChain.unlockBeneficiary,
+        preswapChangeRecipient:
+          order.dstConstraints().preFulfillSwapChangeRecipient === 'taker'
+            ? order.takeChain.unlockBeneficiary
+            : undefined,
       },
     );
   }
