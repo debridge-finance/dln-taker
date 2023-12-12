@@ -22,6 +22,8 @@
 - [Smart contract addresses](#smart-contract-addresses)
 - [Miscellaneous](#miscellaneous)
   - [Disable OP Horizon campaign](#disable-op-horizon-campaign)
+  - [Fine-tuning](#fine-tuning)
+  - [Development](#development)
 
 ## TL;DR
 
@@ -351,3 +353,17 @@ The DLN smart contracts deployed across supported chains which are used to run t
 ### Disable OP Horizon campaign
 
 Orders coming from/to Optimism participate in the OP Horizon campaign, which rebates expenses and taker's profits in the OP token. To get out of the campaign, use the `DISABLE_OP_HORIZON_CAMPAIGN` env variable set to `true`.
+
+### Fine-tuning
+
+Several kernel-related parameters can be fine-tuned using environment variables.
+
+- EVM
+  - BNB Chain
+    - `EVM_BNB_MIN_GAS_PRICE`
+    - `EVM_BNB_MAX_GAS_PRICE`
+
+### Development
+- `IS_TEST`
+- `TEST_AGAINST_LOCAL_NODE`
+- `TEST_LOG_LEVEL`
