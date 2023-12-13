@@ -1,5 +1,6 @@
 import { ChainId, PriceTokenService } from '@debridge-finance/dln-client';
 
+import { SubsidizationRule } from '@debridge-finance/legacy-dln-profitability';
 import { OrderFilterInitializer } from './filters/order.filter';
 import { GetNextOrder } from './interfaces';
 import { Hooks } from './hooks/HookEnums';
@@ -321,6 +322,17 @@ export interface ExecutorLaunchConfig {
    * Default: CoingeckoPriceFeed
    */
   tokenPriceService?: PriceTokenService;
+
+  /**
+   * Rule to subsidize orders
+   * Default: []
+   */
+  subsidizationRules?: SubsidizationRule[];
+
+  /**
+   * Default: false
+   */
+  allowSubsidy?: boolean;
 
   /**
    * Source of orders

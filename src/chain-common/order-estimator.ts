@@ -113,6 +113,8 @@ export class OrderEstimator extends OrderEvaluationContextual {
       batchSize: this.order.giveChain.srcConstraints.batchUnlockSize,
       swapEstimationPreference: this.getRouteHint(),
       isFeatureEnableOpHorizon: process.env.DISABLE_OP_HORIZON_CAMPAIGN !== 'true',
+      allowSubsidy: this.order.executor.allowSubsidy,
+      subsidizationRules: this.order.executor.subsidizationRules,
     };
   }
 

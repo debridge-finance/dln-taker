@@ -50,6 +50,9 @@ const config: ExecutorLaunchConfig = {
     },
   ],
 
+  subsidizationRules: [],
+  allowSubsidy: false,
+
   tokenPriceService: configurator.tokenPriceService({
     coingeckoApiKey: process?.env?.COINGECKO_API_KEY,
   }),

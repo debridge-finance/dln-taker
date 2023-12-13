@@ -1,4 +1,5 @@
 import { ChainId } from '@debridge-finance/dln-client';
+import { SubsidizationRule } from '@debridge-finance/legacy-dln-profitability';
 import configurator from './configurator/index';
 import * as filters from './filters';
 import { ExecutorLaunchConfig } from './config';
@@ -22,6 +23,7 @@ export {
   configurator,
   filters,
   ExecutorLaunchConfig,
+  SubsidizationRule,
 
   // environment
   environments,
