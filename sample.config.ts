@@ -50,7 +50,32 @@ const config: ExecutorLaunchConfig = {
     },
   ],
 
+  /*
+  Example:
+  subsidizationRules: [{
+    giveChainIds: [ChainId.BSC],
+    takeChainIds: "any",
+    notTakeChainIds: [ChainId.Solana],
+    ranges: [
+      {
+        range: {
+          minUsdOrderValue: 1,
+          maxUsdOrderValue: 100,
+        },
+        usdSubsidy: 1,
+      },
+      {
+        range: {
+          minUsdOrderValue: 101,
+          maxUsdOrderValue: 1000,
+        },
+        usdSubsidy: 2,
+      }
+    ]
+  }],
+   */
   subsidizationRules: [],
+
   allowSubsidy: false,
 
   tokenPriceService: configurator.tokenPriceService({
