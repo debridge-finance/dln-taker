@@ -19,7 +19,11 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import bs58 from 'bs58';
 import { Logger } from 'pino';
 
-import { TokensBucket, setSlippageOverloader } from '@debridge-finance/legacy-dln-profitability';
+import {
+  TokensBucket,
+  setSlippageOverloader,
+  SubsidizationRule,
+} from '@debridge-finance/legacy-dln-profitability';
 import BigNumber from 'bignumber.js';
 import Web3 from 'web3';
 import {
@@ -34,7 +38,7 @@ import {
   avgBlockSpeed,
 } from './config';
 import * as filters from './filters/index';
-import { OrderFilter } from './filters/index';
+import { OrderFilter } from './filters';
 import { Authority, GetNextOrder, IncomingOrder, OrderInfoStatus } from './interfaces';
 import { WsNextOrder } from './orderFeeds/ws.order.feed';
 import { EvmTxSigner } from './chain-evm/signer';
@@ -119,6 +123,8 @@ export interface IExecutor {
   readonly client: DlnClient;
   readonly dlnApi: DataStore;
   readonly hookEngine: HooksEngine;
+  readonly subsidizationRules: SubsidizationRule[];
+  readonly allowSubsidy: boolean;
 
   getSupportedChainIds(): Array<ChainId>;
   getSupportedChain(chain: ChainId): ExecutorSupportedChain;
@@ -150,6 +156,12 @@ export class Executor implements IExecutor {
 
   // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
   hookEngine: HooksEngine;
+
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
+  allowSubsidy: boolean;
+
+  // @ts-ignore Initialized deferredly within the init() method. Should be rewritten during the next major refactoring
+  subsidizationRules: SubsidizationRule[];
 
   chains: { [key in ChainId]?: ExecutorSupportedChain } = {};
 
@@ -239,6 +251,8 @@ export class Executor implements IExecutor {
     if (this.#isInitialized) return;
 
     this.tokenPriceService = config.tokenPriceService || new CoingeckoPriceFeed();
+    this.allowSubsidy = config.allowSubsidy || false;
+    this.subsidizationRules = config.subsidizationRules || [];
 
     this.swapConnector = new SwapConnectorImplementationService({
       oneInchApi: this.#url1Inch,
