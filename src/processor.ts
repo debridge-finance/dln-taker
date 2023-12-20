@@ -129,15 +129,21 @@ export class OrderProcessor {
 
     // creation events must be tracked in a separate storage
     if ([OrderInfoStatus.Created, OrderInfoStatus.ArchivalCreated].includes(status)) {
-      if (this.#createdOrdersMetadata.has(orderId)) {
-        this.#createdOrdersMetadata.get(orderId)!.context = context;
-      } else {
+      // order is not yet known
+      if (!this.#createdOrdersMetadata.has(orderId)) {
         this.#createdOrdersMetadata.set(orderId, {
           orderId,
           arrivedAt: new Date(),
           attempts: 0,
           context,
         });
+        // order is known, so we receive only Live updates. Archival orders should not override data
+      } else if (context.orderInfo.status === OrderInfoStatus.Created) {
+        const knownContext = this.#createdOrdersMetadata.get(orderId)!.context;
+        // only finalization_info to be updated
+        (<IncomingOrder<OrderInfoStatus.Created>>knownContext.orderInfo).finalization_info = (<
+          IncomingOrder<OrderInfoStatus.Created>
+        >context.orderInfo).finalization_info;
       }
     }
 
