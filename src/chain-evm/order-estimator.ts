@@ -1,13 +1,10 @@
 import { calculateExpectedTakeAmount } from '@debridge-finance/legacy-dln-profitability';
 import { OrderEstimator } from '../chain-common/order-estimator';
 import { EVMOrderValidator } from './order-validator';
-import { EvmFeeManager } from './feeManager';
-import { safeIntToBigInt } from '../utils';
+import { EvmChainPreferencesStore } from './preferences/store';
+import { GasCategory } from './fees/types';
 
 export class EVMOrderEstimator extends OrderEstimator {
-  // Must cover up to 12.5% block base fee increase. Must be in sync with EVMOrderValidator.EVM_FULFILL_GAS_LIMIT_MULTIPLIER
-  public static readonly EVM_FULFILL_GAS_PRICE_MULTIPLIER = 1.075;
-
   public static readonly PAYLOAD_ENTRY__EVM_ESTIMATED_GAS_PRICE =
     'EVMOrderEstimator.PAYLOAD_ENTRY__EVM_ESTIMATED_GAS_PRICE';
 
@@ -19,25 +16,16 @@ export class EVMOrderEstimator extends OrderEstimator {
    * exactly this gas price
    */
   private async getEstimatedGasPrice(): Promise<bigint> {
-    const takeChain = this.order.takeChain.chain;
-    const feeManager = new EvmFeeManager(
-      takeChain,
-      this.order.executor.getSupportedChain(takeChain).connection,
-    );
-    const estimatedNextGasPrice = await feeManager.estimateNextGasPrice();
-    const bufferedGasPrice =
-      (estimatedNextGasPrice *
-        safeIntToBigInt(EVMOrderEstimator.EVM_FULFILL_GAS_PRICE_MULTIPLIER * 10_000)) /
-      10_000n;
-    this.logger.debug(
-      `estimated gas price for the next block: ${estimatedNextGasPrice}, buffered: ${bufferedGasPrice}`,
-    );
+    const estimatedNextGasPrice = await EvmChainPreferencesStore.get(
+      this.order.takeChain.chain,
+    ).feeManager.getGasPrice(GasCategory.PROJECTED, { logger: this.logger });
+    this.logger.debug(`estimated gas price for the next block: ${estimatedNextGasPrice}`);
     this.setPayloadEntry(
       EVMOrderEstimator.PAYLOAD_ENTRY__EVM_ESTIMATED_GAS_PRICE,
-      bufferedGasPrice,
+      estimatedNextGasPrice,
     );
 
-    return bufferedGasPrice;
+    return estimatedNextGasPrice;
   }
 
   /**

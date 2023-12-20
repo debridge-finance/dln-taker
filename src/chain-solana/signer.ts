@@ -3,7 +3,6 @@ import { helpers } from '@debridge-finance/solana-utils';
 import { Connection, Keypair, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { Logger } from 'pino';
 import { Authority } from '../interfaces';
-import { avgBlockSpeed, BLOCK_CONFIRMATIONS_HARD_CAPS } from '../config';
 
 export type SolanaTxContext = {
   logger: Logger;
@@ -26,16 +25,6 @@ export class SolanaTxSigner implements Authority {
 
   public get bytesAddress(): Uint8Array {
     return this.wallet.publicKey.toBuffer();
-  }
-
-  // eslint-disable-next-line class-methods-use-this -- interface requirement
-  get avgBlockSpeed(): number {
-    return avgBlockSpeed[ChainId.Solana];
-  }
-
-  // eslint-disable-next-line class-methods-use-this -- interface requirement
-  get finalizedBlockCount(): number {
-    return BLOCK_CONFIRMATIONS_HARD_CAPS[ChainId.Solana];
   }
 
   async sendTransaction(

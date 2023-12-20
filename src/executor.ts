@@ -33,9 +33,9 @@ import {
   DstOrderConstraints as RawDstOrderConstraints,
   SrcOrderConstraints as RawSrcOrderConstraints,
   SrcConstraints as RawSrcConstraints,
-  BLOCK_CONFIRMATIONS_HARD_CAPS,
   SignerAuthority,
-  avgBlockSpeed,
+  getAvgBlockSpeed,
+  getFinalizedBlockConfirmations,
 } from './config';
 import * as filters from './filters/index';
 import { OrderFilter } from './filters';
@@ -54,6 +54,7 @@ import { TransactionBuilder } from './chain-common/tx-builder';
 import { SolanaTransactionBuilder } from './chain-solana/tx-builder';
 import { EvmTransactionBuilder } from './chain-evm/tx-builder';
 import { SwapConnectorImplementationService } from './processors/swap-connector-implementation.service';
+import { EvmChainPreferencesStore } from './chain-evm/preferences/store';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
@@ -398,6 +399,13 @@ export class Executor implements IExecutor {
       } else {
         connection = new Web3(chain.chainRpc);
 
+        EvmChainPreferencesStore.set(chain.chain, {
+          connection,
+          feeManagerOpts: chain.environment?.evm?.preferences?.feeManagerOpts,
+          parameters: chain.environment?.evm?.preferences?.parameters,
+          broadcasterOpts: chain.environment?.evm?.preferences?.broadcasterOpts,
+        });
+
         evmChainConfig[chain.chain] = {
           connection,
           dlnSourceAddress:
@@ -472,7 +480,7 @@ export class Executor implements IExecutor {
         ),
         ...Executor.getSrcOrderConstraints(chain.constraints || {}),
         perOrderValue: Executor.getSrcOrderConstraintsPerOrderValue(
-          chain.chain as unknown as SupportedChain,
+          chain.chain,
           chain.constraints || {},
         ),
       };
@@ -481,9 +489,8 @@ export class Executor implements IExecutor {
         chain: chain.chain,
         connection,
         network: {
-          avgBlockSpeed: avgBlockSpeed[chain.chain as unknown as SupportedChain],
-          finalizedBlockCount:
-            BLOCK_CONFIRMATIONS_HARD_CAPS[chain.chain as unknown as SupportedChain],
+          avgBlockSpeed: getAvgBlockSpeed(chain.chain),
+          finalizedBlockCount: getFinalizedBlockConfirmations(chain.chain),
         },
         srcFilters,
         dstFilters,
@@ -501,8 +508,7 @@ export class Executor implements IExecutor {
 
             // and the final range covering the finalization (if any)
             {
-              minBlockConfirmations:
-                BLOCK_CONFIRMATIONS_HARD_CAPS[chain.chain as unknown as SupportedChain],
+              minBlockConfirmations: getFinalizedBlockConfirmations(chain.chain),
               maxFulfillThroughputUSD: srcConstraints.maxFulfillThroughputUSD,
               throughputTimeWindowSec: srcConstraints.throughputTimeWindowSec,
             },
@@ -593,12 +599,7 @@ export class Executor implements IExecutor {
           chain.chain,
           contracts,
           connection,
-          new EvmTxSigner(
-            chain.chain,
-            connection,
-            authority.privateKey,
-            chain.environment?.evm?.evmRebroadcastAdapterOpts,
-          ),
+          new EvmTxSigner(chain.chain, connection, authority.privateKey),
           this,
         );
       }
@@ -701,15 +702,16 @@ export class Executor implements IExecutor {
   }
 
   private static getSrcOrderConstraintsPerOrderValue(
-    chain: SupportedChain,
+    chain: ChainId,
     configSrcConstraints: ChainDefinition['constraints'],
   ): Array<SrcConstraintsPerOrderValue> {
     return (
       (configSrcConstraints?.requiredConfirmationsThresholds || [])
         .map((constraint) => {
-          if (BLOCK_CONFIRMATIONS_HARD_CAPS[chain] <= (constraint.minBlockConfirmations || 0)) {
+          const finalizedBlockConfirmations = getFinalizedBlockConfirmations(chain);
+          if (finalizedBlockConfirmations <= (constraint.minBlockConfirmations || 0)) {
             throw new Error(
-              `Unable to set required confirmation threshold for $${constraint.thresholdAmountInUSD} on ${SupportedChain[chain]}: minBlockConfirmations (${constraint.minBlockConfirmations}) must be less than max block confirmations (${BLOCK_CONFIRMATIONS_HARD_CAPS[chain]})`,
+              `Unable to set required confirmation threshold for $${constraint.thresholdAmountInUSD} on ${SupportedChain[chain]}: minBlockConfirmations (${constraint.minBlockConfirmations}) must be less than max block confirmations (${finalizedBlockConfirmations})`,
             );
           }
 

@@ -1,10 +1,13 @@
 import { ChainId, PriceTokenService } from '@debridge-finance/dln-client';
-
 import { SubsidizationRule } from '@debridge-finance/legacy-dln-profitability';
 import { OrderFilterInitializer } from './filters/order.filter';
 import { GetNextOrder } from './interfaces';
 import { Hooks } from './hooks/HookEnums';
 import { HookHandler } from './hooks/HookHandler';
+import { EvmFeeManagerOpts } from './chain-evm/fees/manager';
+import { EvmChainParameters } from './chain-evm/preferences/store';
+import { EvmTxBroadcasterOpts } from './chain-evm/networking/broadcaster';
+import { assert } from './errors';
 
 type StringifiedAddress = string;
 
@@ -21,7 +24,7 @@ export enum SupportedChain {
   Optimism = ChainId.Optimism,
 }
 
-export const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
+const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } = {
   [SupportedChain.Arbitrum]: 12,
   [SupportedChain.Avalanche]: 12,
   [SupportedChain.BSC]: 12,
@@ -34,7 +37,13 @@ export const BLOCK_CONFIRMATIONS_HARD_CAPS: { [key in SupportedChain]: number } 
   [SupportedChain.Solana]: 32,
 };
 
-export const avgBlockSpeed: { [key in SupportedChain]: number } = {
+export function getFinalizedBlockConfirmations(chainId: ChainId): number {
+  const value = BLOCK_CONFIRMATIONS_HARD_CAPS[chainId as any as SupportedChain];
+  assert(value !== undefined, `unknown chain: ${ChainId[chainId]}`);
+  return value;
+}
+
+const avgBlockSpeed: { [key in SupportedChain]: number } = {
   [ChainId.Arbitrum]: 0.4,
   [ChainId.Avalanche]: 2,
   [ChainId.BSC]: 3,
@@ -47,6 +56,12 @@ export const avgBlockSpeed: { [key in SupportedChain]: number } = {
   [ChainId.Optimism]: 2,
 };
 
+export function getAvgBlockSpeed(chainId: ChainId): number {
+  const value = avgBlockSpeed[chainId as any as SupportedChain];
+  assert(value !== undefined, `unknown chain: ${ChainId[chainId]}`);
+  return value;
+}
+
 export enum DexlessChains {
   Linea = ChainId.Linea,
   Neon = ChainId.Neon,
@@ -57,38 +72,6 @@ type PrivateKeyAuthority = {
   privateKey: string;
 };
 export type SignerAuthority = PrivateKeyAuthority;
-
-export class EvmRebroadcastAdapterOpts {
-  /**
-   * defines a multiplier to increase a pending txn's gasPrice for pushing it off the mempool.
-   * Default: 1.11
-   */
-  bumpGasPriceMultiplier?: number;
-
-  /**
-   * defines an interval (in ms) of how often to query RPC to detect if the fulfill txn has been included to the block
-   * default: chain's avgBlockSpeed
-   */
-  pollingInterval?: number;
-
-  /**
-   * max time frame to wait for fulfillment transaction for inclusion. Otherwise, skip fulfillment
-   * default: 24 blocks (24 * chain's avgBlockSpeed)
-   */
-  pollingTimeframe?: number;
-
-  /**
-   * defines an interval (in ms) of how often to rebroadcast the tx to force its inclusion to the block
-   * Default: 6 blocks (6 * chain's avgBlockSpeed)
-   */
-  rebroadcastInterval?: number;
-
-  /**
-   * number of attempts to rebroadcast tx with bumped gasPrice
-   * default: 3
-   */
-  rebroadcastMaxAttempts?: number;
-}
 
 export type ChainEnvironment = {
   /**
@@ -108,7 +91,11 @@ export type ChainEnvironment = {
 
   evm?: {
     forwarderContract?: StringifiedAddress;
-    evmRebroadcastAdapterOpts?: EvmRebroadcastAdapterOpts;
+    preferences?: {
+      feeManagerOpts?: Partial<EvmFeeManagerOpts>;
+      parameters?: Partial<EvmChainParameters>;
+      broadcasterOpts?: Partial<EvmTxBroadcasterOpts>;
+    };
   };
 
   solana?: {
