@@ -273,7 +273,7 @@ export class OrderValidator extends OrderEvaluationContextual {
 
     if (giveOrderStatus?.status === undefined) {
       const message = `order does not exist on the give chain (${ChainId[giveChainId]})`;
-      return this.sc.reject(RejectionReason.MISSING, message);
+      return this.sc.postpone(PostponingReason.MISSING, message);
     }
 
     if (giveOrderStatus?.status !== OrderState.Created) {

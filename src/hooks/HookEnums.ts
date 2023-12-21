@@ -49,6 +49,12 @@ export enum PostponingReason {
    * triggered when throughput has reached its limit for the given give chain
    */
   CAPPED_THROUGHPUT,
+
+  /**
+   * indicates that the order is missing on the give chain. One of the possible reasons is a lag in the RPC node, which
+   * is often the case when it comes to Solana
+   */
+  MISSING,
 }
 
 export enum RejectionReason {
@@ -66,12 +72,6 @@ export enum RejectionReason {
    * indicates that the order on the give chain has non-zero status (e.g., unlocked)
    */
   UNEXPECTED_GIVE_STATUS,
-
-  /**
-   * indicates that the order is missing on the give chain.
-   * This is extremely unlikely, and indicates protocol discrepancy if happens
-   */
-  MISSING,
 
   /**
    * indicates that the order is revoked due to chain reorg
