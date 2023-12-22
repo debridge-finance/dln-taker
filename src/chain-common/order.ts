@@ -7,10 +7,14 @@ import {
   ChainEngine,
   ChainId,
 } from '@debridge-finance/dln-client';
-import { findExpectedBucket } from '@debridge-finance/legacy-dln-profitability';
+import {
+  calculateSubsidization,
+  findExpectedBucket,
+} from '@debridge-finance/legacy-dln-profitability';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Logger } from 'pino';
 import { EVMOrderValidator } from '../chain-evm/order-validator';
+import { createClientLogger } from '../dln-ts-client.utils';
 import {
   IExecutor,
   ExecutorSupportedChain,
@@ -88,9 +92,30 @@ export class CreatedOrder {
 
   async getMaxProfitableReserveAmountWithoutOperatingExpenses(): Promise<bigint> {
     // getting the rough amount we are willing to spend after reserving our intended margin
-    const reserveDstAmount = await this.getGiveAmountInReserveToken();
-    const amount = (reserveDstAmount * (10_000n - BigInt(this.requiredMargin))) / 10_000n;
-    return amount;
+    let reserveDstAmount = await this.getGiveAmountInReserveToken();
+
+    // subtracting margin
+    reserveDstAmount = (reserveDstAmount * (10_000n - BigInt(this.requiredMargin))) / 10_000n;
+
+    // adding subsidy
+    if (this.executor.allowSubsidy && this.executor.subsidizationRules) {
+      const subsidyAmount = await calculateSubsidization(
+        {
+          order: this.orderData,
+          reserveDstTokenAddress: this.route.reserveDstToken,
+        },
+        {
+          client: this.executor.client,
+          priceTokenService: this.executor.tokenPriceService,
+          subsidizationRules: this.executor.subsidizationRules,
+          logger: createClientLogger(this.#logger),
+        },
+      );
+
+      reserveDstAmount += subsidyAmount;
+    }
+
+    return reserveDstAmount;
   }
 
   get blockConfirmations(): number {
