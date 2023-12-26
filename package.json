@@ -1,6 +1,6 @@
 {
   "name": "@debridge-finance/dln-taker",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "description": "DLN executor is the rule-based daemon service developed to automatically execute orders placed on the deSwap Liquidity Network (DLN) across supported blockchains",
   "license": "GPL-3.0-only",
   "author": "deBridge",
@@ -33,11 +33,11 @@
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@debridge-finance/dln-client": "8.3.3",
+    "@debridge-finance/dln-client": "8.6.0",
     "@debridge-finance/legacy-dln-profitability": "3.2.0",
-    "@debridge-finance/solana-utils": "4.2.1",
+    "@debridge-finance/solana-utils": "4.4.2",
     "@protobuf-ts/plugin": "2.8.1",
-    "@solana/web3.js": "1.66.2",
+    "@solana/web3.js": "1.87.6",
     "axios": "0.21.4",
     "axios-cache-adapter": "2.7.3",
     "bignumber.js": "9.1.2",

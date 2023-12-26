@@ -55,6 +55,7 @@ import { SolanaTransactionBuilder } from './chain-solana/tx-builder';
 import { EvmTransactionBuilder } from './chain-evm/tx-builder';
 import { SwapConnectorImplementationService } from './processors/swap-connector-implementation.service';
 import { EvmChainPreferencesStore } from './chain-evm/preferences/store';
+import { JupiterLimiter } from './chain-solana/juipter-limiter';
 
 const DEFAULT_MIN_PROFITABILITY_BPS = 4;
 
@@ -348,9 +349,12 @@ export class Executor implements IExecutor {
           ChainId.Solana,
           new Jupiter.JupiterConnectorV6(
             connection,
+            config.jupiterConfig?.apiUrl,
             config.jupiterConfig?.apiToken,
             config.jupiterConfig?.maxAccounts || 16,
-            config.jupiterConfig?.blacklistedDexes || [],
+            config.jupiterConfig?.blacklistedDexes
+              ? new JupiterLimiter(config.jupiterConfig.blacklistedDexes)
+              : undefined,
           ),
         );
 

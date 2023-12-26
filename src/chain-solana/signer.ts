@@ -45,7 +45,8 @@ export class SolanaTxSigner implements Authority {
     });
 
     return helpers.sendAll(this.connection, this.wallet, data, {
-      rpcCalls: 3,
+      blockhashCommitment: 'finalized',
+      simulationCommtiment: 'confirmed',
       skipPreflight: false,
       logger: (...args: any) => logger.debug(args), // sendAll will log base64 tx data sent to blockchain
       ...context.options,

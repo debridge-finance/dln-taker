@@ -338,6 +338,7 @@ export interface ExecutorLaunchConfig {
   }>;
 
   jupiterConfig?: {
+    apiUrl?: string;
     apiToken?: string;
     maxAccounts?: number;
     blacklistedDexes?: Array<string>;
