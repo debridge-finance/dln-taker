@@ -89,9 +89,13 @@ export class ForDefiClient {
     if (!response.ok) {
       const error = <ErrorResponse>parsedData;
       logger.debug(
-        `response for requestId: ${error.request_id} is not Ok: code: ${response.status}, details: ${error?.title} (${error?.detail}), body: ${parsedData}`,
+        `response for requestId: ${error.request_id} is not Ok: code: ${
+          response.status
+        }, msg: ${error?.title} (${JSON.stringify(
+          error?.detail || parsedData,
+        )}), id: ${error?.request_id}`,
       );
-      throw new Error(`forDefi returned error: ${error?.title} (${error?.detail})`);
+      throw new Error(`forDefi returned error: ${error?.title}`);
     }
 
     logger.trace(parsedData);

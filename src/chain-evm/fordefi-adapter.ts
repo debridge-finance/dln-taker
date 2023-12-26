@@ -2,7 +2,6 @@ import { ChainId, OrderDataWithId } from '@debridge-finance/dln-client';
 import { helpers } from '@debridge-finance/solana-utils';
 import { Logger, LoggerOptions } from 'pino';
 import Web3 from 'web3';
-import { EvmFeeManager } from './feeManager';
 import { EVM_GAS_LIMIT_MULTIPLIER, InputTransaction } from './signer';
 import { ForDefiTransactionBuilderAdapter } from '../authority-forDefi/tx-builder';
 import { createBatchOrderUnlockTx } from './tx-generators/createBatchOrderUnlockTx';
@@ -34,8 +33,6 @@ function encodeNote<T extends ForDefiTransactionAction>(
 export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAdapter {
   readonly #chainId: ChainId;
 
-  readonly #feeManager: EvmFeeManager;
-
   readonly #vaultId: string;
 
   readonly #vaultAddress: Uint8Array;
@@ -59,7 +56,6 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
     this.#executor = executor;
     this.#connection = connection;
     this.#contractsForApprove = contractsForApprove;
-    this.#feeManager = new EvmFeeManager(chain, connection);
   }
 
   public get address(): string {
@@ -135,7 +131,11 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
         type: 'evm_raw_transaction',
         use_secure_node: false,
         chain: convertChainIdToChain(this.#chainId as any as SupportedChain),
-        gas: await this.safeGetCustomGasPricing(tx, gasLimit),
+        gas: {
+          type: 'priority',
+          priority_level: 'high',
+          gas_limit: Math.round(gasLimit * 1.3).toString(),
+        },
         to: tx.to,
         value: tx.value?.toString() || '0',
         data: {
@@ -149,65 +149,65 @@ export class EvmForDefiTransactionAdapter implements ForDefiTransactionBuilderAd
     return request;
   }
 
-  private async safeGetCustomGasPricing(
-    tx: InputTransaction,
-    gasLimit: number,
-  ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
-    if (tx.cappedFee && tx.cappedFee > 0)
-      return this.#feeManager.isLegacy
-        ? this.safeGetCustomLegacyGas(tx.cappedFee, gasLimit)
-        : this.safeGetCustomGas(tx.cappedFee, gasLimit);
-    return {
-      type: 'priority',
-      priority_level: 'high',
-      gas_limit: gasLimit.toString(),
-    };
-  }
+  // private async safeGetCustomGasPricing(
+  //   tx: InputTransaction,
+  //   gasLimit: number,
+  // ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
+  //   if (tx.cappedFee && tx.cappedFee > 0)
+  //     return this.#feeManager.isLegacy
+  //       ? this.safeGetCustomLegacyGas(tx.cappedFee, gasLimit)
+  //       : this.safeGetCustomGas(tx.cappedFee, gasLimit);
+  //   return {
+  //     type: 'priority',
+  //     priority_level: 'high',
+  //     gas_limit: gasLimit.toString(),
+  //   };
+  // }
+  //
+  // private async safeGetCustomLegacyGas(
+  //   cappedFee: bigint,
+  //   gasLimit: number,
+  // ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
+  //   const gasPrice = await this.#feeManager.getOptimisticLegacyFee();
+  //   if (cappedFee > 0n) {
+  //     const actualFee = BigInt(gasLimit) * gasPrice;
+  //     if (cappedFee < actualFee)
+  //       throw new Error(
+  //         `can't populate pricing: actualFee (${actualFee}) > cappedFee (${cappedFee})`,
+  //       );
+  //   }
 
-  private async safeGetCustomLegacyGas(
-    cappedFee: bigint,
-    gasLimit: number,
-  ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
-    const gasPrice = await this.#feeManager.getOptimisticLegacyFee();
-    if (cappedFee > 0n) {
-      const actualFee = BigInt(gasLimit) * gasPrice;
-      if (cappedFee < actualFee)
-        throw new Error(
-          `can't populate pricing: actualFee (${actualFee}) > cappedFee (${cappedFee})`,
-        );
-    }
+  //   return {
+  //     gas_limit: gasLimit.toString(),
+  //     type: 'custom',
+  //     details: {
+  //       type: 'legacy',
+  //       price: gasPrice.toString(),
+  //     },
+  //   };
+  // }
 
-    return {
-      gas_limit: gasLimit.toString(),
-      type: 'custom',
-      details: {
-        type: 'legacy',
-        price: gasPrice.toString(),
-      },
-    };
-  }
+  // private async safeGetCustomGas(
+  //   cappedFee: bigint,
+  //   gasLimit: number,
+  // ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
+  //   const fee = await this.#feeManager.getOptimisticFee();
+  //   if (cappedFee > 0n) {
+  //     const actualFee = BigInt(gasLimit) * fee.maxFeePerGas;
+  //     if (cappedFee < actualFee)
+  //       throw new Error(
+  //         `can't populate pricing: actualFee (${actualFee}) > cappedFee (${cappedFee})`,
+  //       );
+  //   }
 
-  private async safeGetCustomGas(
-    cappedFee: bigint,
-    gasLimit: number,
-  ): Promise<CreateEvmRawTransactionRequest['details']['gas']> {
-    const fee = await this.#feeManager.getOptimisticFee();
-    if (cappedFee > 0n) {
-      const actualFee = BigInt(gasLimit) * fee.maxFeePerGas;
-      if (cappedFee < actualFee)
-        throw new Error(
-          `can't populate pricing: actualFee (${actualFee}) > cappedFee (${cappedFee})`,
-        );
-    }
-
-    return {
-      gas_limit: gasLimit.toString(),
-      type: 'custom',
-      details: {
-        type: 'dynamic',
-        max_fee_per_gas: fee.maxFeePerGas.toString(),
-        max_priority_fee_per_gas: fee.maxPriorityFeePerGas.toString(),
-      },
-    };
-  }
+  //   return {
+  //     gas_limit: gasLimit.toString(),
+  //     type: 'custom',
+  //     details: {
+  //       type: 'dynamic',
+  //       max_fee_per_gas: fee.maxFeePerGas.toString(),
+  //       max_priority_fee_per_gas: fee.maxPriorityFeePerGas.toString(),
+  //     },
+  //   };
+  // }
 }
