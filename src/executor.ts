@@ -494,8 +494,8 @@ export class Executor implements IExecutor {
         },
         srcFilters,
         dstFilters,
-        unlockAuthority: transactionBuilder.fulfillAuthority,
-        fulfillAuthority: transactionBuilder.unlockAuthority,
+        fulfillAuthority: transactionBuilder.fulfillAuthority,
+        unlockAuthority: transactionBuilder.unlockAuthority,
         throughput: new ThroughputController(
           chain.chain,
           [
