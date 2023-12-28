@@ -80,6 +80,7 @@ const config: ExecutorLaunchConfig = {
 
   tokenPriceService: configurator.tokenPriceService({
     coingeckoApiKey: process?.env?.COINGECKO_API_KEY,
+    // mapping: {}
   }),
 
   srcConstraints: {
