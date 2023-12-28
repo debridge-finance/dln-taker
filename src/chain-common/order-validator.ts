@@ -52,7 +52,6 @@ export class OrderValidator extends OrderEvaluationContextual {
     await this.checkPrefulfillSwapAbility();
 
     await this.checkTakeStatus();
-    await this.checkGiveStatus();
 
     await this.checkFilters();
     await this.checkAccountBalance();
@@ -62,6 +61,12 @@ export class OrderValidator extends OrderEvaluationContextual {
     await this.checkThroughput();
     await this.checkRoughProfitability();
     await this.runChecks();
+
+    // check again in case order has been already fulfilled
+    await this.checkTakeStatus();
+
+    // security check: does the order exists?
+    await this.checkGiveStatus();
 
     return this.getOrderEstimator();
   }
@@ -268,7 +273,8 @@ export class OrderValidator extends OrderEvaluationContextual {
         orderId: this.order.orderId,
         giveChain: giveChainId,
       },
-      { confirmationsCount: this.order.blockConfirmations },
+      // solana-specific: we want to accept orders even in the "processed" commitment level
+      { confirmationsCount: 0 },
     );
 
     if (giveOrderStatus?.status === undefined) {
