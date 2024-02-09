@@ -20,6 +20,13 @@ const config: ExecutorLaunchConfig = {
     maxAccounts: 16,
   },
 
+  oneInchConfig: {
+    // MANDATORY
+    apiToken: `${process.env.ONEINCH_API_V5_TOKEN}`, // obtain one at https://portal.1inch.dev
+    disablePMMProtocols: true,
+    disabledProtocols: [],
+  },
+
   buckets: [
     //
     // Setting the USDC bucket (all tokens are emitted by Circle Inc on every DLN supported chain)

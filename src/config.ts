@@ -342,4 +342,11 @@ export interface ExecutorLaunchConfig {
     maxAccounts?: number;
     blacklistedDexes?: Array<string>;
   };
+
+  oneInchConfig: {
+    apiToken: string;
+    apiServer?: string;
+    disablePMMProtocols?: boolean;
+    disabledProtocols?: string[];
+  };
 }
