@@ -76,6 +76,13 @@ const config: ExecutorLaunchConfig = {
    */
   subsidizationRules: [],
 
+  oneInchConfig: {
+    apiServer: 'https://api.1inch.dev/swap',
+    apiToken: undefined, // obtain one at https://portal.1inch.dev
+    disablePMMProtocols: true,
+    disabledProtocols: [],
+  },
+
   allowSubsidy: false,
 
   tokenPriceService: configurator.tokenPriceService({

@@ -174,8 +174,6 @@ export class Executor implements IExecutor {
 
   #isInitialized = false;
 
-  readonly #url1Inch = 'https://nodes.debridge.finance';
-
   private readonly logger: Logger;
 
   constructor(logger: Logger) {
@@ -256,7 +254,7 @@ export class Executor implements IExecutor {
     this.subsidizationRules = config.subsidizationRules || [];
 
     this.swapConnector = new SwapConnectorImplementationService({
-      oneInchApi: this.#url1Inch,
+      oneInchConfig: config.oneInchConfig,
     });
 
     this.buckets = Executor.getTokenBuckets(config.buckets);
