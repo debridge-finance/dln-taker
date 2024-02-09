@@ -343,8 +343,8 @@ export interface ExecutorLaunchConfig {
     blacklistedDexes?: Array<string>;
   };
 
-  oneInchConfig?: {
-    apiToken?: string;
+  oneInchConfig: {
+    apiToken: string;
     apiServer?: string;
     disablePMMProtocols?: boolean;
     disabledProtocols?: string[];

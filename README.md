@@ -9,6 +9,7 @@
 - [How `dln-taker` works?](#how-dln-taker-works)
 - [Installation](#installation)
   - [Preparing the environment](#preparing-the-environment)
+  - [Obtaining an API token for 1inch.io API](#obtaining-an-api-token-for-1inchio-api)
   - [Understanding reserve funds](#understanding-reserve-funds)
   - [Deploying reserve funds](#deploying-reserve-funds)
 - [Managing cross-chain risk/reward ratio](#managing-cross-chain-riskreward-ratio)
@@ -108,6 +109,17 @@ The next step is to deploy your assets to the addresses used by `dln-taker` for 
 
 If you wish to avoid order fulfillments in a particular chain, use the [`disableFulfill`](./ADVANCED.md#disablefulfill) filter in the config file, however you are **still required** to fill the variables with correct values to enable orders coming from such chain. For example, if you wouldn't want to deploy liquidity on Solana (and thus avoid fulfillments in this chain), add the `disableFulfill` filter to the Solana's section of the configuration file, but you'll still be able to fulfill orders coming **from** Solana. If you wish to exclude the chain from processing, skipping orders coming from and to such chain, just comment out the corresponding section in the config file: in this case, any order coming from or to Solana would be dropped by your instance of `dln-taker`.
 
+### Obtaining an API token for 1inch.io API
+
+Starting v3.3.0, dln-taker uses 1inch's API v5, which requires a valid API token. Before launching the script, you need to obtain one at https://portal.1inch.dev, and set it in the `.env` file to the `ONEINCH_API_V5_TOKEN` environment variable. Ensure that this variable is correctly passed in the configuration file:
+
+```ts
+  oneInchConfig: {
+    apiToken: `${process.env.ONEINCH_API_V5_TOKEN}`,
+    disablePMMProtocols: true,
+    disabledProtocols: [],
+  },
+```
 
 ### Understanding reserve funds
 
