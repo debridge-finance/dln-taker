@@ -344,7 +344,7 @@ export interface ExecutorLaunchConfig {
   };
 
   oneInchConfig?: {
-    apiToken?: string;
+    apiToken: string;
     apiServer?: string;
     disablePMMProtocols?: boolean;
     disabledProtocols?: string[];

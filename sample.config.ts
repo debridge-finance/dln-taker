@@ -32,7 +32,7 @@ const config: ExecutorLaunchConfig = {
       [ChainId.Ethereum]: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
       [ChainId.Linea]: '0x176211869cA2b568f2A7D4EE941E073a821EE1ff',
       [ChainId.Optimism]: '0x7f5c764cbc14f9669b88837ca1490cca17c31607',
-      [ChainId.Polygon]: '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
+      [ChainId.Polygon]: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
       [ChainId.Solana]: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     },
     //
@@ -78,7 +78,7 @@ const config: ExecutorLaunchConfig = {
 
   oneInchConfig: {
     apiServer: 'https://api.1inch.dev/swap',
-    apiToken: undefined, // obtain one at https://portal.1inch.dev
+    apiToken: `${process.env.ONEINCH_API_TOKEN}`, // obtain one at https://portal.1inch.dev
     disablePMMProtocols: true,
     disabledProtocols: [],
   },

@@ -10,7 +10,7 @@ import {
 } from '@debridge-finance/dln-client';
 
 type OneInchConfig = {
-  apiToken?: string;
+  apiToken: string;
   apiServer?: string;
   disablePMMProtocols?: boolean;
   disabledProtocols?: string[];
