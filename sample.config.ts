@@ -38,7 +38,7 @@ const config: ExecutorLaunchConfig = {
       [ChainId.Base]: ['0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca'],
       [ChainId.Ethereum]: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
       [ChainId.Linea]: '0x176211869cA2b568f2A7D4EE941E073a821EE1ff',
-      [ChainId.Optimism]: '0x7f5c764cbc14f9669b88837ca1490cca17c31607',
+      [ChainId.Optimism]: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
       [ChainId.Polygon]: '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
       [ChainId.Solana]: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
     },
