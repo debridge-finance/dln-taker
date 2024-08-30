@@ -1,3 +1,14 @@
+# Archival Notice
+
+This repository was a home for the reference implementation of the engine built to automatically execute profitable orders placed on the [deBridge Liquidity Network](https://docs.debridge.finance/dln-the-debridge-liquidity-network-protocol/introduction) (DLN) protocol. Since 2024, the DLN protocol has become a highly competitive market, with many solvers competing to be the first to take each new profitable order using highly efficient custom-built engines, while the current implementation remains conservative.
+
+So we decided to stop active development of this product and archive the repository. It would remain public and open to anyone who wants to have example of some basic implementation of solver, and build your own implementation that will be able to compete for speed with other solvers. We can't provide support for it.
+
+THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
+
+License: see [LICENSE](./LICENSE)
+
+
 # `dln-taker`
 
 [<img src="https://user-images.githubusercontent.com/31035222/204026000-2f1950b0-104e-4491-a4ed-00d98cd54d46.png" height="50" />](https://github.com/debridge-finance/debridge-security/blob/master/DeBridge_DLN_Taker_Code_Security_Assessment_Report_Halborn_Final.pdf)
